@@ -1,0 +1,13 @@
+{
+  "$schema": "../../../../tool/language_config_schema.json",
+  "comments": {
+    "line": "--"
+  },
+  "brackets": [
+    {"open": "(", "close": ")", "autoClose": true, "newline": false},
+    {"open": "\"", "close": "\"", "autoClose": true, "newline": false}
+  ],
+  "indentation": {
+    "keywordOpeners": ["is", "loop", "begin", "then", "else", "record"]
+  }
+}

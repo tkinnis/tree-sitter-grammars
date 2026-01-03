@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Language Manifest Schema",
+  "description": "Schema for tree-sitter and TextMate language manifests",
+  "type": "object",
+  "patternProperties": {
+    "^[a-zA-Z0-9_.-]+$": {
+      "type": "object",
+      "required": ["displayName", "scope"],
+      "properties": {
+        "queryOnly": {
+          "type": "boolean",
+          "description": "Whether this is a query-only language (no parser, only queries)",
+          "default": false
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Human-readable name for the language",
+          "minLength": 1
+        },
+        "symbol": {
+          "type": "string",
+          "description": "Internal identifier used for lookups",
+          "pattern": "^[a-zA-Z0-9_.+-]+$",
+          "minLength": 1
+        },
+        "scope": {
+          "type": "string",
+          "description": "TextMate scope name",
+          "pattern": "^[a-zA-Z][a-zA-Z0-9._-]*$",
+          "minLength": 1
+        },
+        "extensions": {
+          "type": "array",
+          "description": "File extensions associated with this language",
+          "items": {
+            "type": "string",
+            "pattern": "^\\.[.a-zA-Z0-9_-]+$|^[A-Z][a-zA-Z0-9_-]*$"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "dylib_dir": {
+          "type": "string",
+          "description": "Tree-sitter specific: Path to directory containing the compiled language library (relative to output/)",
+          "minLength": 1
+        },
+        "queries_dir": {
+          "type": "string",
+          "description": "Tree-sitter specific: Path to directory containing query files (relative to output/)",
+          "minLength": 1
+        },
+        "queries": {
+          "type": "object",
+          "description": "Tree-sitter specific: Available query types (optional)",
+          "properties": {
+            "highlights": {
+              "type": "boolean",
+              "description": "Whether highlights.scm query is available"
+            },
+            "injections": {
+              "type": "boolean",
+              "description": "Whether injections.scm query is available"
+            },
+            "locals": {
+              "type": "boolean",
+              "description": "Whether locals.scm query is available"
+            },
+            "tags": {
+              "type": "boolean",
+              "description": "Whether tags.scm query is available"
+            },
+            "folds": {
+              "type": "boolean",
+              "description": "Whether folds.scm query is available"
+            },
+            "indents": {
+              "type": "boolean",
+              "description": "Whether indents.scm query is available"
+            },
+            "textobjects": {
+              "type": "boolean",
+              "description": "Whether textobjects.scm query is available"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

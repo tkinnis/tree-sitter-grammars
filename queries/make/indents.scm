@@ -1,0 +1,3 @@
+[
+  (rule)
+] @indent.begin

@@ -1,0 +1,8 @@
+{
+  "$schema": "../../../../tool/language_config_schema.json",
+  "brackets": [
+    {"open": "{", "close": "}", "autoClose": true, "newline": true},
+    {"open": "[", "close": "]", "autoClose": true, "newline": true},
+    {"open": "\"", "close": "\"", "autoClose": true, "newline": false}
+  ]
+}

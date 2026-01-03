@@ -1,0 +1,20 @@
+{
+  "$schema": "../../../../tool/language_config_schema.json",
+  "comments": {
+    "line": "#",
+    "block": ["=begin", "=end"]
+  },
+  "brackets": [
+    {"open": "{", "close": "}", "autoClose": true, "newline": true},
+    {"open": "(", "close": ")", "autoClose": true, "newline": false},
+    {"open": "[", "close": "]", "autoClose": true, "newline": false},
+    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
+    {"open": "'", "close": "'", "autoClose": true, "newline": false},
+    {"open": "`", "close": "`", "autoClose": true, "newline": false}
+  ],
+  "indentation": {
+    "blockOpeners": ["{", "(", "[", "|"],
+    "keywordOpeners": ["do", "then", "begin", "case", "when", "else", "elsif"],
+    "lineStartKeywords": ["def", "class", "module", "if", "unless", "while", "until", "for"]
+  }
+}

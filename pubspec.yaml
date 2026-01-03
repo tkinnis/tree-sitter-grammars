@@ -1,0 +1,13 @@
+name: tree_sitter_grammars
+description: Pre-built tree-sitter grammar libraries and query files for syntax highlighting.
+version: 1.0.0
+publish_to: none
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  path: ^1.9.0
+
+dev_dependencies:
+  lints: ^5.0.0

@@ -1,0 +1,2 @@
+((Comment) @injection.content
+)

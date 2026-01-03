@@ -1,0 +1,15 @@
+{
+  "$schema": "../../../../tool/language_config_schema.json",
+  "comments": {
+    "line": ";",
+    "doc": ";;;",
+    "block": ["#|", "|#"]
+  },
+  "brackets": [
+    {"open": "(", "close": ")", "autoClose": true, "newline": false}
+  ],
+  "indentation": {
+    "blockOpeners": [],
+    "lineStartBlockOpeners": ["("]
+  }
+}

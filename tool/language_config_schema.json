@@ -1,0 +1,152 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Language Configuration",
+  "description": "Per-language configuration for source_kit. Includes comments, brackets, and indentation heuristics.",
+  "type": "object",
+  "properties": {
+    "comments": {
+      "type": "object",
+      "description": "Comment syntax for the language (used for comment toggling and auto-continue)",
+      "properties": {
+        "line": {
+          "oneOf": [
+            {"type": "string"},
+            {"type": "array", "items": {"type": "string"}, "minItems": 1}
+          ],
+          "description": "Line comment prefix(es). Can be a string or array (e.g., '//', '#', ['//','#'])"
+        },
+        "doc": {
+          "type": "string",
+          "description": "Doc comment prefix (e.g., '///' for Dart/Rust). When pressing Enter on a doc comment line, this prefix is auto-continued."
+        },
+        "block": {
+          "type": "array",
+          "items": { "type": "string" },
+          "minItems": 2,
+          "maxItems": 2,
+          "description": "Block comment delimiters [start, end] (e.g., ['/*', '*/'])"
+        },
+        "blockContinuation": {
+          "type": "string",
+          "default": " * ",
+          "description": "Text to insert when continuing a block comment on a new line (e.g., ' * '). Pressing Enter inside /* */ adds this prefix."
+        }
+      },
+      "additionalProperties": false
+    },
+    "lists": {
+      "type": "object",
+      "description": "List marker syntax for languages like Markdown (used for list continuation on Enter)",
+      "properties": {
+        "unorderedMarkers": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Unordered list markers (e.g., ['-', '*', '+']). Pressing Enter on a list item continues with the same marker."
+        },
+        "orderedPattern": {
+          "type": "string",
+          "description": "Regex pattern for ordered list markers (e.g., '^(\\\\d+)\\\\.\\\\s' for '1. '). Capture group 1 is the number to increment."
+        },
+        "checkboxUnchecked": {
+          "type": "string",
+          "description": "Unchecked checkbox marker (e.g., '- [ ] '). Pressing Enter on a task list item adds an unchecked box."
+        },
+        "checkboxChecked": {
+          "type": "string",
+          "description": "Checked checkbox marker (e.g., '- [x] '). Used to detect task list items."
+        }
+      },
+      "additionalProperties": false
+    },
+    "brackets": {
+      "type": "array",
+      "description": "Bracket pairs for matching, highlighting, and auto-close",
+      "items": {
+        "type": "object",
+        "properties": {
+          "open": {
+            "type": "string",
+            "description": "Opening bracket (e.g., '{', '(', '[', '<')"
+          },
+          "close": {
+            "type": "string",
+            "description": "Closing bracket (e.g., '}', ')', ']', '>')"
+          },
+          "autoClose": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether to auto-insert the closing bracket when opening is typed"
+          },
+          "newline": {
+            "type": "boolean",
+            "default": false,
+            "description": "Whether pressing Enter between these brackets should add an indented line"
+          }
+        },
+        "required": ["open", "close"],
+        "additionalProperties": false
+      }
+    },
+    "autoCloseBefore": {
+      "type": "string",
+      "default": ";:.,=}])>'\"`",
+      "description": "Characters before which auto-close is allowed (cursor must be before one of these)"
+    },
+    "indentation": {
+      "type": "object",
+      "description": "Fallback indentation heuristics (used when parser lags behind typing)",
+      "properties": {
+        "blockOpeners": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["{", "(", "["],
+          "description": "Tokens at END of line that increase indent on next line"
+        },
+        "lineStartBlockOpeners": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Tokens at START of line that increase indent (Lisp-family languages)"
+        },
+        "keywordOpeners": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Keywords at END of line that increase indent (e.g., 'do', 'then')"
+        },
+        "lineStartKeywords": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Keywords at START of line that increase indent (e.g., 'def', 'class')"
+        },
+        "colonOpensBlock": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether ':' at end of line increases indent (Python, YAML)"
+        },
+        "dedentPairs": {
+          "type": "array",
+          "description": "Paired delimiters for heuristic dedent (when AST is stale). Default: [{open: '{', close: '}'}, {open: '(', close: ')'}, {open: '[', close: ']'}]",
+          "items": {
+            "type": "object",
+            "properties": {
+              "open": {
+                "type": "string",
+                "description": "Opening delimiter (e.g., '{', '(', 'begin')"
+              },
+              "close": {
+                "type": "string",
+                "description": "Closing delimiter (e.g., '}', ')', 'end')"
+              }
+            },
+            "required": ["open", "close"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

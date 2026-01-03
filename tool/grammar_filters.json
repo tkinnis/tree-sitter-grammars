@@ -1,0 +1,60 @@
+{
+  "description": "Configuration for filtering helper grammars that should not appear in language manifests. These are grammars used for injection, documentation, or specialized variants that are not standalone languages.",
+  "patterns": [
+    {
+      "pattern": ".injection",
+      "description": "Injection grammars (e.g., jsdoc.ts.injection)",
+      "type": "substring"
+    },
+    {
+      "pattern": "-derivative",
+      "description": "Derivative grammars (e.g., html-derivative)",
+      "type": "substring"
+    },
+    {
+      "pattern": ".embedded",
+      "description": "Embedded grammars with dot separator (e.g., cpp.embedded.macro)",
+      "type": "substring"
+    },
+    {
+      "pattern": "-embedded",
+      "description": "Embedded grammars with hyphen separator (e.g., yaml-embedded)",
+      "type": "substring"
+    },
+    {
+      "pattern": "-bailout",
+      "description": "Bailout grammars for error recovery (e.g., cpp-grammar-bailout)",
+      "type": "substring"
+    },
+    {
+      "pattern": "-combined",
+      "description": "Combined variant grammars (e.g., markdown-latex-combined)",
+      "type": "substring"
+    },
+    {
+      "pattern": "md-math",
+      "description": "Markdown math variants (md-math, md-math-block, etc.)",
+      "type": "substring"
+    },
+    {
+      "pattern": "platform",
+      "description": "Platform-specific variants (e.g., platform C variant)",
+      "type": "substring"
+    },
+    {
+      "pattern": "sassdoc",
+      "description": "SassDoc documentation grammar (not standalone)",
+      "type": "substring"
+    },
+    {
+      "pattern": "yaml-1.",
+      "description": "Specific YAML version grammars (keep just 'yaml')",
+      "type": "substring"
+    }
+  ],
+  "notes": [
+    "Patterns are matched using substring matching (languageId.contains(pattern))",
+    "Grammars matching any pattern will be excluded from the manifest",
+    "This helps prevent extension conflicts and ensures only standalone languages are included"
+  ]
+}
