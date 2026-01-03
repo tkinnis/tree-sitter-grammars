@@ -417,10 +417,17 @@ Future<bool> _buildGrammar(
 
   // Build library
   print('  Compiling library...');
+
+  // On macOS, add headerpad flag so install_name_tool can rewrite paths later
+  final environment = Platform.isMacOS
+      ? {'LDFLAGS': '-headerpad_max_install_names'}
+      : <String, String>{};
+
   final buildResult = await Process.run(
     treeSitterPath,
     ['build'],
     workingDirectory: grammarDir,
+    environment: environment,
   );
   if (buildResult.exitCode != 0) {
     print('  ✗ Build failed: ${buildResult.stderr}');
