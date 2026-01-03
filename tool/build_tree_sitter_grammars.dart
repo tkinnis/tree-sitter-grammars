@@ -219,6 +219,11 @@ Future<void> main(List<String> args) async {
       continue;
     }
 
+    // Skip query-only languages (like html_tags, comment) that have no grammar
+    if (configMap.containsKey('queryOnly') && configMap['queryOnly'] == true) {
+      continue;
+    }
+
     final url = configMap['url'] as String;
     final repoName = _getRepoNameFromUrl(url);
     final repoDir = Directory('grammars/$repoName');
