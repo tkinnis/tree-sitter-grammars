@@ -4,4 +4,6 @@ grammars/
 node_modules/
 .dart_tool/
 pubspec.lock
+*.tar.gz
+*.zip
 
