@@ -102,6 +102,10 @@ Future<void> main(List<String> args) async {
     if (configMap.containsKey('noop') && configMap['noop'] == true) {
       continue;
     }
+    // Skip query-only languages (like html_tags, comment) that have no grammar
+    if (configMap.containsKey('queryOnly') && configMap['queryOnly'] == true) {
+      continue;
+    }
     final url = configMap['url'] as String;
     reposByUrl[url] ??= [];
     reposByUrl[url]!.add(configMap);

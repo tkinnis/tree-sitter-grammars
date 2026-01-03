@@ -144,6 +144,90 @@ dart tool/validate_queries.dart
 | `textobjects.scm` | Semantic text objects |
 | `config.json` | Language configuration (comments, brackets) |
 
+## Creating Releases
+
+Releases provide pre-built binaries for each platform. You can create releases automatically via GitHub Actions or manually from local builds.
+
+### Option 1: Automated Releases (GitHub Actions)
+
+Push a version tag to trigger the release workflow:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The workflow builds for all platforms (macOS arm64/x64, Linux x64, Windows x64) and creates a GitHub release with the artifacts.
+
+### Option 2: Manual Releases (Local Build)
+
+For single-platform releases or when GitHub Actions aren't available:
+
+#### Step 1: Build Locally
+
+```bash
+# Install prerequisites
+npm install -g tree-sitter-cli
+dart pub get
+
+# Build all grammars (takes 15-30 minutes)
+dart tool/build_tree_sitter_grammars.dart tool/grammars.json
+
+# Copy queries to output
+cp -R queries output/
+```
+
+#### Step 2: Create Release Archive
+
+Determine your platform string:
+- macOS ARM: `macos-arm64`
+- macOS Intel: `macos-x64`
+- Linux: `linux-x64`
+- Windows: `windows-x64`
+
+```bash
+# macOS/Linux
+cd output
+tar -czvf ../grammars-<platform>.tar.gz .
+
+# Windows (PowerShell)
+cd output
+Compress-Archive -Path * -DestinationPath ../grammars-windows-x64.zip
+```
+
+#### Step 3: Upload to GitHub Release
+
+Using GitHub CLI:
+
+```bash
+# Install gh CLI (macOS)
+brew install gh
+
+# Authenticate (one-time setup)
+gh auth login
+
+# Create release and upload
+gh release create v1.0.0 --title "v1.0.0" --notes "Initial release"
+gh release upload v1.0.0 grammars-macos-arm64.tar.gz
+```
+
+Or manually via the GitHub web interface:
+1. Go to your repository's Releases page
+2. Click "Create a new release" or edit an existing one
+3. Drag the archive file to the "Attach binaries" area
+4. Publish the release
+
+### Release Naming Convention
+
+Archives must follow this naming pattern for the build hook to find them:
+
+```
+grammars-<platform>.tar.gz   # Unix
+grammars-<platform>.zip      # Windows
+```
+
+Where `<platform>` is one of: `macos-arm64`, `macos-x64`, `linux-x64`, `windows-x64`
+
 ## License
 
 Query files are sourced from [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) and individual grammar repositories. See each grammar repository for its specific license.
