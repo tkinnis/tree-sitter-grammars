@@ -212,6 +212,14 @@ Most languages work with the default `{`, `(`, `[` block openers. Only create `c
 
 This ensures responsive indentation even during rapid typing.
 
+## Known Limitations
+
+### Mermaid
+
+The mermaid grammar ([mikkihugo/tree-sitter-mermaid](https://github.com/mikkihugo/tree-sitter-mermaid)) supports **one diagram per file**. This matches typical usage where each mermaid diagram is in its own markdown code block.
+
+If you have multiple diagrams in a single file, only the first one will parse correctly. Split diagrams into separate files or use markdown with embedded code blocks for multiple diagrams.
+
 ## Source Attribution
 
 Query files are initially imported from [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter), which provides community-tested queries for 300+ languages. We maintain our own `tags.scm` files using the tree-sitter standard tags format.

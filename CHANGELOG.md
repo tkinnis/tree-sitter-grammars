@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-01-05
+
+### Changed
+
+- Switched mermaid grammar to [mikkihugo/tree-sitter-mermaid](https://github.com/mikkihugo/tree-sitter-mermaid) for better parsing
+  - Fixes keyword substring matching bug (e.g., "as" incorrectly highlighted inside "Fast")
+  - Adds support for all 23 Mermaid diagram types
+  - More comprehensive syntax highlighting coverage
+
+### Fixed
+
+- Mermaid grammar now correctly parses keywords without false positives
+- Updated highlights.scm with complete node type coverage (590 rules)
+
+### Note
+
+- Mermaid grammar supports one diagram per file (by design - matches typical markdown code block usage)
+
 ## [1.0.1] - 2026-01-04
 
 ### Added
@@ -37,6 +55,7 @@ HTML, IDL, Java, JavaDoc, JavaScript, JSDoc, JSON, JSX, Kotlin, Lua, Make,
 Markdown, Objective-C, OCaml, Pascal, Perl, PHP, Proto, Python, Regex, Ruby,
 Rust, Scala, Scheme, SQL, Swift, Thrift, TOML, TSX, TypeScript, XML, YAML, Zig
 
-[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/tkinnis/tree-sitter-grammars/releases/tag/v1.0.0

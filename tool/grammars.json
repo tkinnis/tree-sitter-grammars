@@ -248,7 +248,7 @@
     ]
   },
   {
-    "url": "https://github.com/monaqa/tree-sitter-mermaid",
+    "url": "https://github.com/mikkihugo/tree-sitter-mermaid",
     "name": "mermaid",
     "scope": "source.mermaid",
     "file-types": [
