@@ -248,6 +248,16 @@
     ]
   },
   {
+    "url": "https://github.com/monaqa/tree-sitter-mermaid",
+    "name": "mermaid",
+    "scope": "source.mermaid",
+    "file-types": [
+      "mermaid",
+      "mmd"
+    ],
+    "highlights": "queries/highlights.scm"
+  },
+  {
     "name": "html_tags",
     "displayName": "HTML Tags",
     "extensions": [],

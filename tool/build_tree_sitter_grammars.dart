@@ -322,7 +322,16 @@ Future<void> main(List<String> args) async {
 
   print('');
   print('─' * 80);
-  print('Step 5: Generating Manifest');
+  print('Step 5: Copying Query Files to Grammar Bundles');
+  print('─' * 80);
+  print('');
+
+  // Copy query files to each grammar's output directory
+  await _copyQueryFilesToOutput(manifest, outputDir);
+
+  print('');
+  print('─' * 80);
+  print('Step 6: Generating Manifest');
   print('─' * 80);
   print('');
 
@@ -334,7 +343,7 @@ Future<void> main(List<String> args) async {
 
   print('');
   print('─' * 80);
-  print('Step 6: Validating Manifest');
+  print('Step 7: Validating Manifest');
   print('─' * 80);
   print('');
 
@@ -420,56 +429,68 @@ Future<bool> _buildGrammar(
     return false;
   }
 
-  // Build library
+  // Compile library directly with clang (not tree-sitter build)
+  // This gives us full control over linker flags, which is needed for
+  // -headerpad_max_install_names on macOS
   print('  Compiling library...');
-
-  // On macOS, add headerpad flag so install_name_tool can rewrite paths later
-  final environment = Platform.isMacOS
-      ? {'LDFLAGS': '-headerpad_max_install_names'}
-      : <String, String>{};
-
-  final buildResult = await Process.run(
-    treeSitterPath,
-    ['build'],
-    workingDirectory: grammarDir,
-    environment: environment,
-  );
-  if (buildResult.exitCode != 0) {
-    print('  ✗ Build failed: ${buildResult.stderr}');
-    return false;
-  }
 
   // Create dylib output directory
   await dylibOutputDir.create(recursive: true);
 
-  // Find and copy the compiled library
+  // Determine library extension
   final libExtension = Platform.isLinux
       ? '.so'
       : Platform.isMacOS
           ? '.dylib'
           : '.dll';
 
-  // tree-sitter build creates {name}.dylib, parser.dylib, or {name-with-hyphens}.dylib
-  var compiledLib = File('$grammarDir/$grammarName$libExtension');
-  if (!compiledLib.existsSync()) {
-    compiledLib = File('$grammarDir/parser$libExtension');
-  }
-  // Try with hyphens instead of underscores (e.g., markdown-inline.dylib vs markdown_inline.dylib)
-  if (!compiledLib.existsSync()) {
-    final nameWithHyphens = grammarName.replaceAll('_', '-');
-    compiledLib = File('$grammarDir/$nameWithHyphens$libExtension');
-  }
+  final srcDir = Directory(path.join(grammarDir, 'src'));
+  final parserFile = File(path.join(srcDir.path, 'parser.c'));
+  final scannerCFile = File(path.join(srcDir.path, 'scanner.c'));
+  final scannerCcFile = File(path.join(srcDir.path, 'scanner.cc'));
 
-  if (!compiledLib.existsSync()) {
-    print('  ✗ Compiled library not found at: $grammarDir/*$libExtension');
-    print(
-      '     Tried: $grammarName$libExtension, parser$libExtension, ${grammarName.replaceAll('_', '-')}$libExtension',
-    );
+  if (!parserFile.existsSync()) {
+    print('  ✗ parser.c not found at: ${parserFile.path}');
     return false;
   }
 
   final destLib = File('${dylibOutputDir.path}/lib$grammarName$libExtension');
-  await compiledLib.copy(destLib.path);
+  final compiler = Platform.environment['CC'] ?? 'clang';
+
+  // Build compiler arguments
+  final args = <String>[
+    '-shared', // Create shared library
+    '-fPIC', // Position Independent Code
+    '-I', srcDir.path, // Include src directory
+    '-O3', // Optimization
+    '-o', destLib.path, // Output file
+    if (Platform.isMacOS) ...[
+      '-headerpad_max_install_names', // Allow install_name_tool to rewrite paths
+      '-undefined', 'dynamic_lookup', // Allow unresolved symbols (standard for plugins)
+      '-install_name', '@rpath/lib$grammarName.dylib', // Set install name
+    ],
+    parserFile.path,
+  ];
+
+  // Add scanner if present (check both .c and .cc)
+  if (scannerCFile.existsSync()) {
+    args.add(scannerCFile.path);
+  } else if (scannerCcFile.existsSync()) {
+    // For C++ scanners, use clang++
+    args.add(scannerCcFile.path);
+    args.addAll(['-lstdc++']); // Link C++ standard library
+  }
+
+  final buildResult = await Process.run(compiler, args);
+  if (buildResult.exitCode != 0) {
+    print('  ✗ Compile failed: ${buildResult.stderr}');
+    return false;
+  }
+
+  if (!destLib.existsSync()) {
+    print('  ✗ Compiled library not found at: ${destLib.path}');
+    return false;
+  }
 
   return true;
 }
@@ -576,10 +597,17 @@ Future<void> _buildTreeSitterLibrary(Directory outputDir) async {
   } else {
     // Build using make
     print('  Running make...');
+
+    // On macOS, add headerpad flag so install_name_tool can rewrite paths later
+    final environment = Platform.isMacOS
+        ? {'LDFLAGS': '-headerpad_max_install_names'}
+        : <String, String>{};
+
     final buildResult = await Process.run(
       'make',
       [],
       workingDirectory: treeSitterDir.path,
+      environment: environment,
     );
 
     if (buildResult.exitCode != 0) {
@@ -595,6 +623,20 @@ Future<void> _buildTreeSitterLibrary(Directory outputDir) async {
 
   // Copy to output directory
   await sourceLib.copy(destLib.path);
+
+  // On macOS, fix the install name to use @rpath for portability
+  if (Platform.isMacOS) {
+    final newId = '@rpath/libtree-sitter.dylib';
+    final result = await Process.run('install_name_tool', [
+      '-id',
+      newId,
+      destLib.path,
+    ]);
+    if (result.exitCode != 0) {
+      print('  ⚠ Warning: Could not set install name: ${result.stderr}');
+    }
+  }
+
   print('  ✓ tree-sitter core library copied to ${destLib.path}');
 }
 
@@ -928,6 +970,13 @@ Future<void> _manifestOnlyMode(String grammarFile) async {
   }
 
   print('');
+  print('Copying query files to grammar bundles...');
+
+  // Copy query files to each grammar's output directory
+  final outputDir = Directory('output');
+  await _copyQueryFilesToOutput(manifest, outputDir);
+
+  print('');
   print('Writing manifest.json...');
 
   // Write manifest.json
@@ -961,4 +1010,100 @@ Future<void> _manifestOnlyMode(String grammarFile) async {
   print(
     '════════════════════════════════════════════════════════════════════════════════',
   );
+}
+
+/// Copies query files from queries/ to each grammar's output directory.
+///
+/// This creates self-contained grammar bundles that include:
+/// - The compiled library (lib{lang}.dylib/.so/.dll)
+/// - All query files (highlights.scm, injections.scm, etc.)
+/// - A config.json with language metadata
+///
+/// The bundle structure matches the user grammar format for consistency.
+Future<void> _copyQueryFilesToOutput(
+  Map<String, Map<String, dynamic>> manifest,
+  Directory outputDir,
+) async {
+  final queriesSourceDir = Directory('queries');
+  if (!queriesSourceDir.existsSync()) {
+    print('⚠ queries/ directory not found, skipping query file copy');
+    return;
+  }
+
+  var copiedCount = 0;
+  var skippedCount = 0;
+
+  for (final entry in manifest.entries) {
+    final grammarName = entry.key;
+    final grammarData = entry.value;
+
+    // Skip no-op languages like plaintext
+    if (!grammarData.containsKey('dylib_dir')) {
+      skippedCount++;
+      continue;
+    }
+
+    final sourceQueryDir = Directory(path.join('queries', grammarName));
+    final destDir = Directory(path.join(outputDir.path, 'dylibs', grammarName));
+
+    if (!sourceQueryDir.existsSync()) {
+      // Try query-only directory
+      final queriesDir = grammarData['queries_dir'] as String?;
+      if (queriesDir == null) {
+        print('  ⊙ $grammarName: no query files found');
+        skippedCount++;
+        continue;
+      }
+    }
+
+    if (!destDir.existsSync()) {
+      await destDir.create(recursive: true);
+    }
+
+    // Copy all .scm files
+    final scmFiles = <String>[];
+    if (sourceQueryDir.existsSync()) {
+      await for (final entity in sourceQueryDir.list()) {
+        if (entity is File && entity.path.endsWith('.scm')) {
+          final filename = path.basename(entity.path);
+          final destFile = File(path.join(destDir.path, filename));
+          await entity.copy(destFile.path);
+          scmFiles.add(filename);
+        }
+      }
+    }
+
+    // Generate config.json for this grammar bundle
+    final bundleConfig = <String, dynamic>{
+      'displayName': grammarData['displayName'],
+      'symbol': grammarData['symbol'],
+      'scope': grammarData['scope'],
+      'extensions': grammarData['extensions'],
+    };
+
+    // Add filenames if present
+    if (grammarData.containsKey('filenames')) {
+      bundleConfig['filenames'] = grammarData['filenames'];
+    }
+
+    // Add query availability info
+    final queries = grammarData['queries'] as Map<String, dynamic>?;
+    if (queries != null) {
+      bundleConfig['queries'] = queries;
+    }
+
+    final configFile = File(path.join(destDir.path, 'config.json'));
+    await configFile.writeAsString(
+      const JsonEncoder.withIndent('  ').convert(bundleConfig),
+    );
+
+    print('  ✓ $grammarName: ${scmFiles.length} query files + config.json');
+    copiedCount++;
+  }
+
+  print('');
+  print('Copied query files to $copiedCount grammar bundles');
+  if (skippedCount > 0) {
+    print('Skipped $skippedCount grammars (no query files or no-op)');
+  }
 }

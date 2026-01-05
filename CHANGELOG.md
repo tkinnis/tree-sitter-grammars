@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-01-04
+
+### Added
+
+- Mermaid diagram language support with syntax highlighting for:
+  - Sequence diagrams
+  - Flowcharts
+  - Class diagrams
+  - State diagrams
+  - Entity-relationship diagrams
+  - Gantt charts
+  - Pie charts
+
 ## [1.0.0] - 2025-01-03
 
 ### Added
@@ -24,5 +37,6 @@ HTML, IDL, Java, JavaDoc, JavaScript, JSDoc, JSON, JSX, Kotlin, Lua, Make,
 Markdown, Objective-C, OCaml, Pascal, Perl, PHP, Proto, Python, Regex, Ruby,
 Rust, Scala, Scheme, SQL, Swift, Thrift, TOML, TSX, TypeScript, XML, YAML, Zig
 
-[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/tkinnis/tree-sitter-grammars/releases/tag/v1
+[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/tkinnis/tree-sitter-grammars/releases/tag/v1.0.0
