@@ -12,11 +12,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - LaTeX grammar support with syntax highlighting, folds, and injections
+- Build script `--archive` and `--release=<ver>` options for automated releases
 
 ### Fixed
 
-- Perl `postfix_deref` query patterns that caused compilation errors
-- Haskell choice block with field names (split into separate patterns)
+- LaTeX: Fixed math environment highlighting - `\begin{equation}` and `\end{equation}` now properly highlighted
+- LaTeX: Removed whole-node `@nospell` patterns that caused child captures to be filtered out
+- LaTeX: Changed Neovim-specific predicates (`#lua-match?`, `#set!`) to standard tree-sitter predicates
+- LaTeX: Fixed capture names (`@module` → `@keyword`, `@label` → `@type`) for proper theme mapping
+- Haskell: Fixed choice block patterns in `decl/function` that caused query compilation errors
+- Haskell: Fixed sibling patterns to properly handle signature, function, and bind nodes
+- Perl: Fixed `postfix_deref` query patterns that caused compilation errors
 - Query-only grammars (html_tags, comment) now included in release archives
 
 ### Changed

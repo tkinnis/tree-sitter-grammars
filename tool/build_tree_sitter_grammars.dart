@@ -18,11 +18,21 @@ import 'package:path/path.dart' as path;
 ///   --force          Rebuild even if grammar already exists
 ///   --cleanup        Delete grammars/ directory after build
 ///   --manifest-only  Only regenerate manifest (no builds)
+///   --archive        Create platform-specific archive after build
+///   --release=<ver>  Upload archive to GitHub release (requires --archive)
 
 Future<void> main(List<String> args) async {
   final force = args.contains('--force');
   final cleanup = args.contains('--cleanup');
   final manifestOnly = args.contains('--manifest-only');
+  final createArchive = args.contains('--archive');
+  final releaseArg = args.firstWhere(
+    (arg) => arg.startsWith('--release='),
+    orElse: () => '',
+  );
+  final releaseVersion = releaseArg.isNotEmpty
+      ? releaseArg.substring('--release='.length)
+      : null;
   final grammarFile = args.firstWhere(
     (arg) => !arg.startsWith('--'),
     orElse: () => '',
@@ -30,19 +40,48 @@ Future<void> main(List<String> args) async {
 
   if (grammarFile.isEmpty) {
     print(
-      'Usage: dart tool/build_grammars.dart [--force] [--cleanup] [--manifest-only] <path_to_grammars.json>',
+      'Usage: dart tool/build_grammars.dart [options] <path_to_grammars.json>',
     );
     print('');
     print('Options:');
     print('  --force          Rebuild even if grammar already exists');
     print('  --cleanup        Delete grammars/ directory after build');
     print('  --manifest-only  Only regenerate manifest (no builds)');
+    print('  --archive        Create platform-specific archive after build');
+    print('  --release=<ver>  Upload archive to GitHub release (requires --archive)');
+    exit(1);
+  }
+
+  if (releaseVersion != null && !createArchive) {
+    print('Error: --release requires --archive');
     exit(1);
   }
 
   // Fast path: only regenerate manifest
   if (manifestOnly) {
     await _manifestOnlyMode(grammarFile);
+
+    // Still support archive creation in manifest-only mode
+    if (createArchive) {
+      final outputDir = Directory('output');
+      print('');
+      print(
+        '────────────────────────────────────────────────────────────────────────────────',
+      );
+      print('Creating Release Archive');
+      print(
+        '────────────────────────────────────────────────────────────────────────────────',
+      );
+
+      final archivePath = await _createReleaseArchive(outputDir);
+      print('✓ Created $archivePath');
+
+      if (releaseVersion != null) {
+        print('');
+        print('Uploading to GitHub release $releaseVersion...');
+        await _uploadToGitHubRelease(archivePath, releaseVersion);
+      }
+    }
     return;
   }
 
@@ -375,6 +414,28 @@ Future<void> main(List<String> args) async {
     print('Cleaning up grammars/ directory (--cleanup)...');
     await grammarsDir.delete(recursive: true);
     print('✓ Cleanup complete');
+  }
+
+  // Create archive if requested
+  if (createArchive) {
+    print('');
+    print(
+      '────────────────────────────────────────────────────────────────────────────────',
+    );
+    print('Creating Release Archive');
+    print(
+      '────────────────────────────────────────────────────────────────────────────────',
+    );
+
+    final archivePath = await _createReleaseArchive(outputDir);
+    print('✓ Created $archivePath');
+
+    // Upload to GitHub release if requested
+    if (releaseVersion != null) {
+      print('');
+      print('Uploading to GitHub release $releaseVersion...');
+      await _uploadToGitHubRelease(archivePath, releaseVersion);
+    }
   }
 
   print(
@@ -1168,4 +1229,122 @@ Future<void> _copyQueryFilesToOutput(
   if (skippedCount > 0) {
     print('Skipped $skippedCount grammars (no query files or no-op)');
   }
+}
+
+/// Creates a platform-specific release archive.
+///
+/// The archive contains:
+/// - libtree-sitter.{dylib,so,dll}
+/// - dylibs/ (grammar libraries with queries and config)
+/// - queries/ (query-only grammars for inheritance)
+/// - manifest.json
+///
+/// Returns the path to the created archive.
+Future<String> _createReleaseArchive(Directory outputDir) async {
+  // Determine platform
+  final platform = _getCurrentPlatform();
+  final archiveName = 'grammars-$platform.tar.gz';
+  final archivePath = path.join(outputDir.path, archiveName);
+
+  // Delete old archive if exists
+  final archiveFile = File(archivePath);
+  if (archiveFile.existsSync()) {
+    await archiveFile.delete();
+  }
+
+  // Build list of files to include
+  final filesToInclude = <String>[];
+
+  // Core library
+  final libExt = Platform.isMacOS
+      ? 'dylib'
+      : Platform.isWindows
+          ? 'dll'
+          : 'so';
+  filesToInclude.add('libtree-sitter.$libExt');
+
+  // Dylibs directory
+  filesToInclude.add('dylibs/');
+
+  // Queries directory (if exists - for query-only grammars)
+  final queriesDir = Directory(path.join(outputDir.path, 'queries'));
+  if (queriesDir.existsSync()) {
+    filesToInclude.add('queries/');
+  }
+
+  // Manifest
+  filesToInclude.add('manifest.json');
+
+  print('Creating archive with: ${filesToInclude.join(", ")}');
+
+  // Create tar.gz archive
+  final result = await Process.run(
+    'tar',
+    ['-czvf', archiveName, ...filesToInclude],
+    workingDirectory: outputDir.path,
+  );
+
+  if (result.exitCode != 0) {
+    throw Exception('Failed to create archive: ${result.stderr}');
+  }
+
+  // Get file size
+  final size = await archiveFile.length();
+  final sizeMB = (size / 1024 / 1024).toStringAsFixed(2);
+  print('Archive size: $sizeMB MB');
+
+  return archivePath;
+}
+
+/// Returns the current platform string for archive naming.
+String _getCurrentPlatform() {
+  if (Platform.isMacOS) {
+    // Detect ARM vs Intel
+    final result = Process.runSync('uname', ['-m']);
+    final arch = (result.stdout as String).trim();
+    return arch == 'arm64' ? 'macos-arm64' : 'macos-x64';
+  } else if (Platform.isLinux) {
+    return 'linux-x64';
+  } else if (Platform.isWindows) {
+    return 'windows-x64';
+  }
+  throw Exception('Unsupported platform');
+}
+
+/// Uploads the archive to a GitHub release.
+Future<void> _uploadToGitHubRelease(String archivePath, String version) async {
+  // Check if gh CLI is available
+  final whichResult = await Process.run('which', ['gh']);
+  if (whichResult.exitCode != 0) {
+    throw Exception(
+      'GitHub CLI (gh) not found. Install with: brew install gh',
+    );
+  }
+
+  // Check if release exists
+  final checkResult = await Process.run('gh', ['release', 'view', version]);
+  if (checkResult.exitCode != 0) {
+    print('Release $version not found. Creating it...');
+    final createResult = await Process.run(
+      'gh',
+      ['release', 'create', version, '--title', version, '--notes', 'Release $version'],
+    );
+    if (createResult.exitCode != 0) {
+      throw Exception('Failed to create release: ${createResult.stderr}');
+    }
+    print('✓ Created release $version');
+  }
+
+  // Upload archive
+  print('Uploading ${path.basename(archivePath)}...');
+  final uploadResult = await Process.run(
+    'gh',
+    ['release', 'upload', version, archivePath, '--clobber'],
+  );
+
+  if (uploadResult.exitCode != 0) {
+    throw Exception('Failed to upload: ${uploadResult.stderr}');
+  }
+
+  print('✓ Uploaded to release $version');
 }

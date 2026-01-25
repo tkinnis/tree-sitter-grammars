@@ -130,12 +130,12 @@
 
 ; ----------------------------------------------------------------------------
 ; Functions and variables
-; Function declarations - split into separate patterns since field names
-; cannot be used inside choice blocks
-(decl
-  name: (variable) @function)
-(decl
-  names: (binding_list (variable) @function))
+(decl/function
+  [
+    name: (variable) @function
+    names: (binding_list
+      (variable) @function)
+  ])
 
 (decl/bind
   name: (variable) @variable)
@@ -151,8 +151,14 @@
   type: (type))
   .
   (decl
-    name: (variable) @variable)
-    match: (_)
+    [
+      (signature
+        name: (variable) @variable)
+      (function
+        name: (variable) @variable)
+      (bind
+        name: (variable) @variable)
+    ])
   (#eq? @_name @variable))
 
 ; but consider a type that involves 'IO' a decl/function
@@ -169,8 +175,14 @@
   (#eq? @_type "IO"))
   .
   (decl
-    name: (variable) @function)
-    match: (_)
+    [
+      (signature
+        name: (variable) @function)
+      (function
+        name: (variable) @function)
+      (bind
+        name: (variable) @function)
+    ])
   (#eq? @_name @function))
 
 ((decl/signature) @function

@@ -134,15 +134,12 @@
    array: (_) @variable.array
    hash: (_) @variable.hash
   ])
-; Postfix dereference for arrays - match sigil and splat separately
-(postfix_deref "@" @variable.array)
-(postfix_deref "$#" @variable.array)
-; Postfix dereference for hashes
-(postfix_deref "%" @variable.hash)
-(slices
-  hashref:_ [ "@" "%" ] @variable.hash )
-(slices
-  arrayref:_  [ "@" "%" ] @variable.array )
+; Postfix dereference expressions
+; Postfix dereference expressions
+(array_deref_expression) @variable.array
+(arraylen_deref_expression) @variable.array
+(hash_deref_expression) @variable.hash
+(scalar_deref_expression) @variable.scalar
 
 
 

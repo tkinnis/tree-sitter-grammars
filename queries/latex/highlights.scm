@@ -54,14 +54,14 @@
 
 ; General environments
 (begin
-  command: _ @module
+  command: _ @keyword
   name: (curly_group_text
-    (text) @label @nospell))
+    (text) @type @nospell))
 
 (end
-  command: _ @module
+  command: _ @keyword
   name: (curly_group_text
-    (text) @label @nospell))
+    (text) @type @nospell))
 
 ; Definitions and references
 (new_command_definition
@@ -163,11 +163,11 @@
   command: _ @function.macro @nospell
   keys: (curly_group_text_list) @markup.link @nospell)
 
-((hyperlink
+; Hyperlinks
+(hyperlink
   command: _ @function @nospell
   uri: (curly_group_uri
-    (_) @markup.link.url @nospell)) @_hyperlink
-  (#set! @_hyperlink url @markup.link.url))
+    (_) @markup.link.url @nospell))
 
 (glossary_entry_definition
   command: _ @function.macro @nospell
@@ -201,61 +201,61 @@
 
 ; Sectioning
 (title_declaration
-  command: _ @module
+  command: _ @keyword
   options: (brack_group
     (_) @markup.heading.1)?
   text: (curly_group
     (_) @markup.heading.1))
 
 (author_declaration
-  command: _ @module
+  command: _ @keyword
   authors: (curly_group_author_list
     (author)+ @markup.heading.1))
 
 (chapter
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.2)?
   text: (curly_group
     (_) @markup.heading.2))
 
 (part
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.2)?
   text: (curly_group
     (_) @markup.heading.2))
 
 (section
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.3)?
   text: (curly_group
     (_) @markup.heading.3))
 
 (subsection
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.4)?
   text: (curly_group
     (_) @markup.heading.4))
 
 (subsubsection
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.5)?
   text: (curly_group
     (_) @markup.heading.5))
 
 (paragraph
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.6)?
   text: (curly_group
     (_) @markup.heading.6))
 
 (subparagraph
-  command: _ @module
+  command: _ @keyword
   toc: (brack_group
     (_) @markup.heading.6)?
   text: (curly_group
@@ -291,7 +291,7 @@
 
 (generic_command
   (command_name) @keyword.conditional
-  (#lua-match? @keyword.conditional "^\\if[a-zA-Z@]+$"))
+  (#match? @keyword.conditional "^\\\\if[a-zA-Z@]+$"))
 
 (generic_command
   (command_name) @keyword.conditional
@@ -347,45 +347,28 @@
   command: _ @keyword.import
   paths: (curly_group_path_list) @string)
 
-; Turn spelling off for whole nodes
-[
-  (counter_declaration)
-  (counter_within_declaration)
-  (counter_without_declaration)
-  (counter_value)
-  (counter_definition)
-  (counter_addition)
-  (counter_increment)
-  (counter_typesetting)
-  (label_reference)
-  (label_reference_range)
-  (label_number)
-  (glossary_entry_reference)
-  (acronym_reference)
-  (color_definition)
-  (color_reference)
-  (class_include)
-  (package_include)
-  (latex_include)
-  (verbatim_include)
-  (import_include)
-  (bibstyle_include)
-  (bibtex_include)
-  (biblatex_include)
-  (graphics_include)
-  (svg_include)
-  (inkscape_include)
-  (tikz_library_import)
-] @nospell
-
 ; Math
 [
   (displayed_equation)
   (inline_formula)
 ] @markup.math @nospell
 
+; Only capture text content as math, not structural elements (begin/end)
 (math_environment
-  (_) @markup.math)
+  (text) @markup.math)
+
+; Math environment begin/end (equation, align, etc.)
+(math_environment
+  (begin
+    command: _ @keyword
+    name: (curly_group_text
+      (text) @type)))
+
+(math_environment
+  (end
+    command: _ @keyword
+    name: (curly_group_text
+      (text) @type)))
 
 ; Comments
 [
@@ -395,7 +378,7 @@
 ] @comment @spell
 
 ((line_comment) @keyword.directive @nospell
-  (#lua-match? @keyword.directive "^%% !TeX"))
+  (#match? @keyword.directive "^% !TeX"))
 
 ((line_comment) @keyword.directive @nospell
-  (#lua-match? @keyword.directive "^%%&"))
+  (#match? @keyword.directive "^%&"))
