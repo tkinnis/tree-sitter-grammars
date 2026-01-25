@@ -130,11 +130,12 @@
 
 ; ----------------------------------------------------------------------------
 ; Functions and variables
+; Function declarations - split into separate patterns since field names
+; cannot be used inside choice blocks
 (decl
-  [
-   name: (variable) @function
-   names: (binding_list (variable) @function)
-  ])
+  name: (variable) @function)
+(decl
+  names: (binding_list (variable) @function))
 
 (decl/bind
   name: (variable) @variable)

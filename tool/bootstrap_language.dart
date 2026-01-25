@@ -119,8 +119,10 @@ Examples:
   }
 
   // Find source queries
+  // Note: nvim-treesitter moved queries from queries/ to runtime/queries/
   final nvimName = languageNameMap[languageName] ?? languageName;
-  final nvimQueryDir = Directory('/tmp/nvim-treesitter/queries/$nvimName');
+  final nvimQueryDir =
+      Directory('/tmp/nvim-treesitter/runtime/queries/$nvimName');
 
   if (!nvimQueryDir.existsSync()) {
     print('Error: Language "$languageName" not found in nvim-treesitter');

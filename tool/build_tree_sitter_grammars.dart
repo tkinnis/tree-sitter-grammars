@@ -1015,9 +1015,13 @@ Future<void> _manifestOnlyMode(String grammarFile) async {
 /// Copies query files from queries/ to each grammar's output directory.
 ///
 /// This creates self-contained grammar bundles that include:
-/// - The compiled library (lib{lang}.dylib/.so/.dll)
+/// - The compiled library (lib{lang}.dylib/.so/.dll) for regular grammars
 /// - All query files (highlights.scm, injections.scm, etc.)
 /// - A config.json with language metadata
+///
+/// Query-only grammars (like html_tags, comment) are also handled - they get
+/// their query files copied to output/queries/{name}/ so they can be used
+/// for query inheritance (e.g., `; inherits: html_tags`).
 ///
 /// The bundle structure matches the user grammar format for consistency.
 Future<void> _copyQueryFilesToOutput(
@@ -1032,12 +1036,67 @@ Future<void> _copyQueryFilesToOutput(
 
   var copiedCount = 0;
   var skippedCount = 0;
+  var queryOnlyCount = 0;
 
   for (final entry in manifest.entries) {
     final grammarName = entry.key;
     final grammarData = entry.value;
 
-    // Skip no-op languages like plaintext
+    // Handle query-only grammars (like html_tags, comment)
+    // These need their queries copied to output/queries/{name}/ for inheritance
+    if (grammarData['queryOnly'] == true) {
+      final sourceQueryDir = Directory(path.join('queries', grammarName));
+      final destDir =
+          Directory(path.join(outputDir.path, 'queries', grammarName));
+
+      if (!sourceQueryDir.existsSync()) {
+        print('  ⊙ $grammarName (query-only): no query files found');
+        skippedCount++;
+        continue;
+      }
+
+      if (!destDir.existsSync()) {
+        await destDir.create(recursive: true);
+      }
+
+      // Copy all .scm files
+      final scmFiles = <String>[];
+      await for (final entity in sourceQueryDir.list()) {
+        if (entity is File && entity.path.endsWith('.scm')) {
+          final filename = path.basename(entity.path);
+          final destFile = File(path.join(destDir.path, filename));
+          await entity.copy(destFile.path);
+          scmFiles.add(filename);
+        }
+      }
+
+      // Generate config.json for query-only grammar
+      final bundleConfig = <String, dynamic>{
+        'displayName': grammarData['displayName'],
+        'scope': grammarData['scope'],
+        'extensions': grammarData['extensions'],
+        'queryOnly': true,
+      };
+
+      // Add query availability info
+      final queries = grammarData['queries'] as Map<String, dynamic>?;
+      if (queries != null) {
+        bundleConfig['queries'] = queries;
+      }
+
+      final configFile = File(path.join(destDir.path, 'config.json'));
+      await configFile.writeAsString(
+        const JsonEncoder.withIndent('  ').convert(bundleConfig),
+      );
+
+      print(
+        '  ✓ $grammarName (query-only): ${scmFiles.length} query files + config.json',
+      );
+      queryOnlyCount++;
+      continue;
+    }
+
+    // Skip no-op languages like plaintext (no dylib_dir and not query-only)
     if (!grammarData.containsKey('dylib_dir')) {
       skippedCount++;
       continue;
@@ -1103,6 +1162,9 @@ Future<void> _copyQueryFilesToOutput(
 
   print('');
   print('Copied query files to $copiedCount grammar bundles');
+  if (queryOnlyCount > 0) {
+    print('Copied $queryOnlyCount query-only grammars (for inheritance)');
+  }
   if (skippedCount > 0) {
     print('Skipped $skippedCount grammars (no query files or no-op)');
   }

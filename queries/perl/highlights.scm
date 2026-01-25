@@ -134,8 +134,11 @@
    array: (_) @variable.array
    hash: (_) @variable.hash
   ])
-(postfix_deref ["@" "$#" ] @variable.array "*" @variable.array)
-(postfix_deref "%" @variable.hash "*" @variable.hash)
+; Postfix dereference for arrays - match sigil and splat separately
+(postfix_deref "@" @variable.array)
+(postfix_deref "$#" @variable.array)
+; Postfix dereference for hashes
+(postfix_deref "%" @variable.hash)
 (slices
   hashref:_ [ "@" "%" ] @variable.hash )
 (slices
