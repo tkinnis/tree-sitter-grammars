@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] - 2026-01-24
+
+### Added
+
+- LaTeX grammar support with syntax highlighting, folds, and injections
+
+### Fixed
+
+- Perl `postfix_deref` query patterns that caused compilation errors
+- Haskell choice block with field names (split into separate patterns)
+- Query-only grammars (html_tags, comment) now included in release archives
+
+### Changed
+
+- Build script now packages query-only grammars in `queries/` directory
+- Bootstrap script updated for nvim-treesitter's new query path
+
 ## [1.0.2] - 2026-01-05
 
 ### Changed
@@ -55,7 +72,8 @@ HTML, IDL, Java, JavaDoc, JavaScript, JSDoc, JSON, JSX, Kotlin, Lua, Make,
 Markdown, Objective-C, OCaml, Pascal, Perl, PHP, Proto, Python, Regex, Ruby,
 Rust, Scala, Scheme, SQL, Swift, Thrift, TOML, TSX, TypeScript, XML, YAML, Zig
 
-[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/tkinnis/tree-sitter-grammars/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/tkinnis/tree-sitter-grammars/releases/tag/v1.0.0
