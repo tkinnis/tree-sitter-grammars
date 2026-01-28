@@ -63,6 +63,20 @@
       "do",
       "else",
       "in"
+    ],
+    "lineStartKeywords": [
+      "if",
+      "for",
+      "while",
+      "until",
+      "case"
+    ],
+    "dedentPairs": [
+      {"open": "if", "close": "fi"},
+      {"open": "for", "close": "done"},
+      {"open": "while", "close": "done"},
+      {"open": "until", "close": "done"},
+      {"open": "case", "close": "esac"}
     ]
   }
 }

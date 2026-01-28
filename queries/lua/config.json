@@ -59,7 +59,19 @@
     ],
     "lineStartKeywords": [
       "function",
-      "local function"
+      "local function",
+      "if",
+      "for",
+      "while",
+      "repeat"
+    ],
+    "dedentPairs": [
+      {"open": "function", "close": "end"},
+      {"open": "if", "close": "end"},
+      {"open": "for", "close": "end"},
+      {"open": "while", "close": "end"},
+      {"open": "do", "close": "end"},
+      {"open": "repeat", "close": "until"}
     ]
   }
 }

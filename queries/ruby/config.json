@@ -75,6 +75,19 @@
       "while",
       "until",
       "for"
+    ],
+    "dedentPairs": [
+      {"open": "def", "close": "end"},
+      {"open": "class", "close": "end"},
+      {"open": "module", "close": "end"},
+      {"open": "if", "close": "end"},
+      {"open": "unless", "close": "end"},
+      {"open": "while", "close": "end"},
+      {"open": "until", "close": "end"},
+      {"open": "for", "close": "end"},
+      {"open": "do", "close": "end"},
+      {"open": "begin", "close": "end"},
+      {"open": "case", "close": "end"}
     ]
   }
 }
