@@ -1,9 +1,29 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "MarkdownInline",
+  "symbol": "markdown_inline",
+  "scope": "text.markdown_inline",
+  "extensions": [
+    ".markdown_inline"
+  ],
   "comments": {},
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "`", "close": "`", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "`",
+      "close": "`",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

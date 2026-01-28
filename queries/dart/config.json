@@ -1,19 +1,67 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Dart",
+  "symbol": "dart",
+  "scope": "source.dart",
+  "extensions": [
+    ".dart"
+  ],
   "comments": {
     "line": "//",
     "doc": "///",
-    "block": ["/*", "*/"],
+    "block": [
+      "/*",
+      "*/"
+    ],
     "blockContinuation": " * "
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "`", "close": "`", "autoClose": true, "newline": false},
-    {"open": "/**", "close": " */", "autoClose": true, "newline": true},
-    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "`",
+      "close": "`",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "/**",
+      "close": " */",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "/*",
+      "close": "*/",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

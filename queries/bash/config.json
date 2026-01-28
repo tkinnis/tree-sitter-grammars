@@ -1,18 +1,68 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Bash",
+  "symbol": "bash",
+  "scope": "source.bash",
+  "extensions": [
+    ".sh",
+    ".bash",
+    "..bashrc",
+    "..bash_profile",
+    ".ebuild",
+    ".eclass"
+  ],
   "comments": {
     "line": "#"
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "[[", "close": "]]", "autoClose": false, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "`", "close": "`", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[[",
+      "close": "]]",
+      "autoClose": false,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "`",
+      "close": "`",
+      "autoClose": true,
+      "newline": false
+    }
   ],
   "indentation": {
-    "keywordOpeners": ["then", "do", "else", "in"]
+    "keywordOpeners": [
+      "then",
+      "do",
+      "else",
+      "in"
+    ]
   }
 }

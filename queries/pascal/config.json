@@ -1,22 +1,70 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Pascal",
+  "symbol": "pascal",
+  "scope": "source.pascal",
+  "extensions": [
+    ".pp",
+    ".lpr",
+    ".dpr",
+    ".pas"
+  ],
   "comments": {
     "line": "//",
-    "block": ["{", "}"]
+    "block": [
+      "{",
+      "}"
+    ]
   },
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    }
   ],
   "indentation": {
-    "keywordOpeners": ["begin", "then", "else", "do", "of", "repeat"],
+    "keywordOpeners": [
+      "begin",
+      "then",
+      "else",
+      "do",
+      "of",
+      "repeat"
+    ],
     "dedentPairs": [
-      {"open": "{", "close": "}"},
-      {"open": "(", "close": ")"},
-      {"open": "[", "close": "]"},
-      {"open": "begin", "close": "end"},
-      {"open": "repeat", "close": "until"}
+      {
+        "open": "{",
+        "close": "}"
+      },
+      {
+        "open": "(",
+        "close": ")"
+      },
+      {
+        "open": "[",
+        "close": "]"
+      },
+      {
+        "open": "begin",
+        "close": "end"
+      },
+      {
+        "open": "repeat",
+        "close": "until"
+      }
     ]
   }
 }

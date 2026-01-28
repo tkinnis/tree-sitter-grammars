@@ -1,12 +1,48 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Make",
+  "symbol": "make",
+  "scope": "source.mk",
+  "extensions": [
+    ".makefile",
+    ".Makefile",
+    ".MAKEFILE",
+    ".GNUmakefile",
+    ".mk",
+    ".mak",
+    ".dsp"
+  ],
+  "filenames": [
+    "Makefile",
+    "makefile",
+    "GNUmakefile"
+  ],
   "comments": {
     "line": "#"
   },
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "{", "close": "}", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

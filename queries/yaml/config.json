@@ -1,13 +1,39 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "YAML",
+  "symbol": "yaml",
+  "scope": "source.yaml",
+  "extensions": [
+    ".yml",
+    ".yaml"
+  ],
   "comments": {
     "line": "#"
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    }
   ],
   "indentation": {
     "blockOpeners": [],

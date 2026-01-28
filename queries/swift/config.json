@@ -1,17 +1,55 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Swift",
+  "symbol": "swift",
+  "scope": "source.swift",
+  "extensions": [
+    ".swift"
+  ],
   "comments": {
     "line": "//",
     "doc": "///",
-    "block": ["/*", "*/"],
+    "block": [
+      "/*",
+      "*/"
+    ],
     "blockContinuation": " * "
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "/**", "close": " */", "autoClose": true, "newline": true},
-    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "/**",
+      "close": " */",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "/*",
+      "close": "*/",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

@@ -1,15 +1,51 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "XML",
+  "symbol": "xml",
+  "scope": "source.xml",
+  "extensions": [
+    ".xml",
+    ".svg",
+    ".xsd",
+    ".xslt",
+    ".xsl",
+    ".rng"
+  ],
   "comments": {
-    "block": ["<!--", "-->"]
+    "block": [
+      "<!--",
+      "-->"
+    ]
   },
   "brackets": [
-    {"open": "<", "close": ">", "autoClose": false, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "<!--", "close": " -->", "autoClose": true, "newline": true}
+    {
+      "open": "<",
+      "close": ">",
+      "autoClose": false,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "<!--",
+      "close": " -->",
+      "autoClose": true,
+      "newline": true
+    }
   ],
   "indentation": {
-    "blockOpeners": ["{", ">"]
+    "blockOpeners": [
+      "{",
+      ">"
+    ]
   }
 }

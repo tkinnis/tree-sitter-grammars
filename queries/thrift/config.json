@@ -1,17 +1,63 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Thrift",
+  "symbol": "thrift",
+  "scope": "source.thrift",
+  "extensions": [
+    ".thrift"
+  ],
   "comments": {
-    "line": ["//", "#"],
-    "block": ["/*", "*/"],
+    "line": [
+      "//",
+      "#"
+    ],
+    "block": [
+      "/*",
+      "*/"
+    ],
     "blockContinuation": " * "
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "<", "close": ">", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "<",
+      "close": ">",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "/*",
+      "close": "*/",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

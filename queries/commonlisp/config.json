@@ -1,15 +1,31 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Commonlisp",
+  "symbol": "commonlisp",
+  "scope": "source.cl",
+  "extensions": [
+    ".cl",
+    ".lisp"
+  ],
   "comments": {
     "line": ";",
     "doc": ";;;",
-    "block": ["#|", "|#"]
+    "block": [
+      "#|",
+      "|#"
+    ]
   },
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    }
   ],
   "indentation": {
     "blockOpeners": [],
-    "lineStartBlockOpeners": ["("]
+    "lineStartBlockOpeners": [
+      "("
+    ]
   }
 }

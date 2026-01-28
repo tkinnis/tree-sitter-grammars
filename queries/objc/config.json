@@ -1,18 +1,63 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Objc",
+  "symbol": "objc",
+  "scope": "source.objc",
+  "extensions": [
+    ".h",
+    ".m",
+    ".objc"
+  ],
   "comments": {
     "line": "//",
     "doc": "///",
-    "block": ["/*", "*/"],
+    "block": [
+      "/*",
+      "*/"
+    ],
     "blockContinuation": " * "
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "/**", "close": " */", "autoClose": true, "newline": true},
-    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "/**",
+      "close": " */",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "/*",
+      "close": "*/",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

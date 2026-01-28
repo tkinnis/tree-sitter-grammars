@@ -1,7 +1,17 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Csv",
+  "symbol": "csv",
+  "scope": "source.csv",
+  "extensions": [
+    ".csv"
+  ],
   "comments": {},
   "brackets": [
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false}
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

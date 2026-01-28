@@ -1,5 +1,11 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Diff",
+  "symbol": "diff",
+  "scope": "source.diff",
+  "extensions": [
+    ".diff",
+    ".patch"
+  ],
   "comments": {},
   "brackets": []
 }

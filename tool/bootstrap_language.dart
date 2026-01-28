@@ -189,6 +189,43 @@ Examples:
     }
   }
 
+  // Create config.json skeleton
+  final configFile = File('${queriesDir.path}/config.json');
+  if (!configFile.existsSync() || force) {
+    final displayName =
+        languageName[0].toUpperCase() + languageName.substring(1);
+
+    final configContent = '''{
+  "displayName": "$displayName",
+  "symbol": "$languageName",
+  "scope": "source.$languageName",
+  "extensions": [
+    ".$languageName"
+  ],
+  "comments": {
+    "line": "//",
+    "block": ["/*", "*/"]
+  },
+  "brackets": [
+    {"open": "{", "close": "}", "autoClose": true, "newline": true},
+    {"open": "(", "close": ")", "autoClose": true, "newline": false},
+    {"open": "[", "close": "]", "autoClose": true, "newline": false},
+    {"open": "\\"", "close": "\\"", "autoClose": true, "newline": false},
+    {"open": "'", "close": "'", "autoClose": true, "newline": false}
+  ]
+}
+''';
+
+    if (dryRun) {
+      print('  config.json: Would create skeleton');
+    } else {
+      await configFile.writeAsString(configContent);
+      print('  config.json: Created skeleton (edit to customize)');
+    }
+  } else {
+    print('  config.json: Already exists (preserved)');
+  }
+
   // Summary
   print('\n=== Summary ===');
   if (dryRun) {
@@ -200,11 +237,12 @@ Examples:
     print('  ${queriesDir.path}/');
     print('');
     print('Next steps:');
-    print('  1. Review and customize the imported queries as needed');
-    print('  2. Add symbol patterns to tags.scm for code navigation');
+    print('  1. Edit config.json to set correct extensions, comments, brackets');
+    print('  2. Review and customize the imported queries as needed');
+    print('  3. Add symbol patterns to tags.scm for code navigation');
     print(
-      '  3. Run: dart run tool/build_tree_sitter_grammars.dart tool/grammars.json',
+      '  4. Run: dart run tool/build_tree_sitter_grammars.dart tool/grammars.json',
     );
-    print('  4. Test syntax highlighting with example files');
+    print('  5. Test syntax highlighting with example files');
   }
 }

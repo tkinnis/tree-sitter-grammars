@@ -1,15 +1,31 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Scheme",
+  "symbol": "scheme",
+  "scope": "source.scheme",
+  "extensions": [
+    ".scm",
+    ".ss"
+  ],
   "comments": {
     "line": ";",
     "doc": ";;;",
-    "block": ["#|", "|#"]
+    "block": [
+      "#|",
+      "|#"
+    ]
   },
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    }
   ],
   "indentation": {
     "blockOpeners": [],
-    "lineStartBlockOpeners": ["("]
+    "lineStartBlockOpeners": [
+      "("
+    ]
   }
 }

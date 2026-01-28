@@ -1131,24 +1131,34 @@ Future<void> _copyQueryFilesToOutput(
         }
       }
 
-      // Generate config.json for query-only grammar
-      final bundleConfig = <String, dynamic>{
-        'displayName': grammarData['displayName'],
-        'scope': grammarData['scope'],
-        'extensions': grammarData['extensions'],
-        'queryOnly': true,
-      };
+      // Copy config.json from source and add queries availability info
+      final sourceConfigFile =
+          File(path.join(sourceQueryDir.path, 'config.json'));
+      final destConfigFile = File(path.join(destDir.path, 'config.json'));
 
-      // Add query availability info
-      final queries = grammarData['queries'] as Map<String, dynamic>?;
-      if (queries != null) {
-        bundleConfig['queries'] = queries;
+      if (sourceConfigFile.existsSync()) {
+        try {
+          final sourceConfig = jsonDecode(await sourceConfigFile.readAsString())
+              as Map<String, dynamic>;
+
+          // Add query availability info
+          final queries = grammarData['queries'] as Map<String, dynamic>?;
+          if (queries != null) {
+            sourceConfig['queries'] = queries;
+          }
+
+          await destConfigFile.writeAsString(
+            const JsonEncoder.withIndent('  ').convert(sourceConfig),
+          );
+        } catch (e) {
+          print(
+            '    Warning: Failed to process config.json for $grammarName: $e',
+          );
+          await sourceConfigFile.copy(destConfigFile.path);
+        }
+      } else {
+        print('    Warning: No config.json found for $grammarName');
       }
-
-      final configFile = File(path.join(destDir.path, 'config.json'));
-      await configFile.writeAsString(
-        const JsonEncoder.withIndent('  ').convert(bundleConfig),
-      );
 
       print(
         '  ✓ $grammarName (query-only): ${scmFiles.length} query files + config.json',
@@ -1180,7 +1190,7 @@ Future<void> _copyQueryFilesToOutput(
       await destDir.create(recursive: true);
     }
 
-    // Copy all .scm files
+    // Copy all .scm files and config.json
     final scmFiles = <String>[];
     if (sourceQueryDir.existsSync()) {
       await for (final entity in sourceQueryDir.list()) {
@@ -1193,29 +1203,33 @@ Future<void> _copyQueryFilesToOutput(
       }
     }
 
-    // Generate config.json for this grammar bundle
-    final bundleConfig = <String, dynamic>{
-      'displayName': grammarData['displayName'],
-      'symbol': grammarData['symbol'],
-      'scope': grammarData['scope'],
-      'extensions': grammarData['extensions'],
-    };
+    // Copy config.json from source and add queries availability info
+    final sourceConfigFile = File(path.join(sourceQueryDir.path, 'config.json'));
+    final destConfigFile = File(path.join(destDir.path, 'config.json'));
 
-    // Add filenames if present
-    if (grammarData.containsKey('filenames')) {
-      bundleConfig['filenames'] = grammarData['filenames'];
+    if (sourceConfigFile.existsSync()) {
+      // Load source config, add queries info, and write to dest
+      try {
+        final sourceConfig =
+            jsonDecode(await sourceConfigFile.readAsString()) as Map<String, dynamic>;
+
+        // Add query availability info
+        final queries = grammarData['queries'] as Map<String, dynamic>?;
+        if (queries != null) {
+          sourceConfig['queries'] = queries;
+        }
+
+        await destConfigFile.writeAsString(
+          const JsonEncoder.withIndent('  ').convert(sourceConfig),
+        );
+      } catch (e) {
+        print('    Warning: Failed to process config.json for $grammarName: $e');
+        // Fall back to just copying
+        await sourceConfigFile.copy(destConfigFile.path);
+      }
+    } else {
+      print('    Warning: No config.json found for $grammarName');
     }
-
-    // Add query availability info
-    final queries = grammarData['queries'] as Map<String, dynamic>?;
-    if (queries != null) {
-      bundleConfig['queries'] = queries;
-    }
-
-    final configFile = File(path.join(destDir.path, 'config.json'));
-    await configFile.writeAsString(
-      const JsonEncoder.withIndent('  ').convert(bundleConfig),
-    );
 
     print('  ✓ $grammarName: ${scmFiles.length} query files + config.json');
     copiedCount++;

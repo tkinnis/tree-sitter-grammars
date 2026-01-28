@@ -1,18 +1,50 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Markdown",
+  "symbol": "markdown",
+  "scope": "text.markdown",
+  "extensions": [
+    ".md"
+  ],
   "comments": {
-    "block": ["<!--", "-->"]
+    "block": [
+      "<!--",
+      "-->"
+    ]
   },
   "lists": {
-    "unorderedMarkers": ["-", "*", "+"],
+    "unorderedMarkers": [
+      "-",
+      "*",
+      "+"
+    ],
     "orderedPattern": "^(\\d+)\\.\\s",
     "checkboxUnchecked": "- [ ] ",
     "checkboxChecked": "- [x] "
   },
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "`", "close": "`", "autoClose": true, "newline": false},
-    {"open": "```", "close": "```", "autoClose": true, "newline": true}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "`",
+      "close": "`",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "```",
+      "close": "```",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

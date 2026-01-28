@@ -1,19 +1,65 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Lua",
+  "symbol": "lua",
+  "scope": "source.lua",
+  "extensions": [
+    ".lua"
+  ],
   "comments": {
     "line": "--",
-    "block": ["--[[", "]]"]
+    "block": [
+      "--[[",
+      "]]"
+    ]
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "--[[", "close": " ]]", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "--[[",
+      "close": " ]]",
+      "autoClose": true,
+      "newline": true
+    }
   ],
   "indentation": {
-    "keywordOpeners": ["do", "then", "else", "elseif"],
-    "lineStartKeywords": ["function", "local function"]
+    "keywordOpeners": [
+      "do",
+      "then",
+      "else",
+      "elseif"
+    ],
+    "lineStartKeywords": [
+      "function",
+      "local function"
+    ]
   }
 }

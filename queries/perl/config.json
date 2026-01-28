@@ -1,14 +1,51 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Perl",
+  "symbol": "perl",
+  "scope": "source.pm",
+  "extensions": [
+    ".pm",
+    ".pl",
+    ".t"
+  ],
   "comments": {
     "line": "#"
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "`", "close": "`", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "`",
+      "close": "`",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

@@ -7,12 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-01-24
+## [1.0.3] - 2026-01-27
 
 ### Added
 
 - LaTeX grammar support with syntax highlighting, folds, and injections
 - Build script `--archive` and `--release=<ver>` options for automated releases
+- Complete language config data in per-language config.json files:
+  - `comments` (line and block comment syntax)
+  - `brackets` (auto-close and indentation behavior)
+  - `indentation` (language-specific indent rules)
+
+### Changed
+
+- Build script now copies full config.json from source instead of generating partial configs
+- Manifest data (displayName, symbol, scope, extensions) merged into config.json files
+- Bootstrap script creates complete config.json skeleton for new languages
 
 ### Fixed
 

@@ -1,18 +1,64 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "HTML",
+  "symbol": "html",
+  "scope": "source.html",
+  "extensions": [
+    ".html"
+  ],
   "comments": {
-    "block": ["<!--", "-->"]
+    "block": [
+      "<!--",
+      "-->"
+    ]
   },
   "brackets": [
-    {"open": "<", "close": ">", "autoClose": false, "newline": false},
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false},
-    {"open": "<!--", "close": " -->", "autoClose": true, "newline": true}
+    {
+      "open": "<",
+      "close": ">",
+      "autoClose": false,
+      "newline": false
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "'",
+      "close": "'",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "<!--",
+      "close": " -->",
+      "autoClose": true,
+      "newline": true
+    }
   ],
   "indentation": {
-    "blockOpeners": ["{", ">"]
+    "blockOpeners": [
+      "{",
+      ">"
+    ]
   }
 }

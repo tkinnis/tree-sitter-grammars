@@ -1,16 +1,54 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "idl",
+  "symbol": "idl",
+  "scope": "source.j2",
+  "extensions": [
+    ".idl"
+  ],
   "comments": {
     "line": "//",
-    "block": ["/*", "*/"],
+    "block": [
+      "/*",
+      "*/"
+    ],
     "blockContinuation": " * "
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "<", "close": ">", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
-    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "<",
+      "close": ">",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "/*",
+      "close": "*/",
+      "autoClose": true,
+      "newline": true
+    }
   ]
 }

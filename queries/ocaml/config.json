@@ -1,13 +1,46 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "OCaml",
+  "symbol": "ocaml",
+  "scope": "source.ocaml",
+  "extensions": [
+    ".ml"
+  ],
   "comments": {
-    "block": ["(*", "*)"]
+    "block": [
+      "(*",
+      "*)"
+    ]
   },
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(*", "close": " *)", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(*",
+      "close": " *)",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

@@ -1,7 +1,17 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Javadoc",
+  "symbol": "javadoc",
+  "scope": "source.javadoc",
+  "extensions": [
+    ".javadoc"
+  ],
   "comments": {},
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

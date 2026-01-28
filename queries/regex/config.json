@@ -1,9 +1,29 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "Regex",
+  "symbol": "regex",
+  "scope": "source.regex",
+  "extensions": [
+    ".regex"
+  ],
   "comments": {},
   "brackets": [
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "{", "close": "}", "autoClose": true, "newline": false}
+    {
+      "open": "(",
+      "close": ")",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": false
+    },
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }

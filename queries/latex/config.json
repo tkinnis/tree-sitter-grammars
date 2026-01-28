@@ -1,0 +1,11 @@
+{
+  "displayName": "Latex",
+  "symbol": "latex",
+  "scope": "text.tex.latex",
+  "extensions": [
+    ".tex",
+    ".sty",
+    ".cls",
+    ".bib"
+  ]
+}

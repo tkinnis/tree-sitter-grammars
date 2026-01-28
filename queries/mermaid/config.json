@@ -1,6 +1,7 @@
 {
-  "$schema": "../../tool/language_config_schema.json",
   "displayName": "Mermaid",
+  "symbol": "mermaid",
+  "scope": "source.mermaid",
   "extensions": [
     ".mermaid",
     ".mmd"

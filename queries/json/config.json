@@ -1,8 +1,28 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "JSON",
+  "symbol": "json",
+  "scope": "source.json",
+  "extensions": [
+    ".json"
+  ],
   "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "[", "close": "]", "autoClose": true, "newline": true},
-    {"open": "\"", "close": "\"", "autoClose": true, "newline": false}
+    {
+      "open": "{",
+      "close": "}",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "[",
+      "close": "]",
+      "autoClose": true,
+      "newline": true
+    },
+    {
+      "open": "\"",
+      "close": "\"",
+      "autoClose": true,
+      "newline": false
+    }
   ]
 }
