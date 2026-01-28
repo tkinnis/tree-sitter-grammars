@@ -43,7 +43,6 @@ tree-sitter-grammars/
 │   ├── grammars.json           # Grammar repository configuration
 │   ├── build_tree_sitter_grammars.dart  # Main build script
 │   ├── bootstrap_language.dart # Import queries from nvim-treesitter
-│   ├── validate_manifest.dart  # Manifest validation
 │   └── validate_queries.dart   # Query syntax validation
 ├── tree-sitter/                # tree-sitter core (submodule)
 ├── .github/workflows/
@@ -53,8 +52,7 @@ tree-sitter-grammars/
     ├── libtree-sitter.{dylib,so,dll}
     ├── dylibs/
     │   └── <lang>/lib<lang>.{dylib,so,dll}
-    ├── queries/                # Copied from queries/
-    └── manifest.json           # Runtime manifest
+    └── queries/                # Copied from queries/
 ```
 
 ## Building Locally
@@ -80,7 +78,6 @@ dart tool/build_tree_sitter_grammars.dart tool/grammars.json
 # Build options:
 #   --force          Rebuild all grammars
 #   --cleanup        Delete grammars/ after build
-#   --manifest-only  Only regenerate manifest.json
 ```
 
 ## Using Pre-built Binaries
@@ -93,14 +90,16 @@ Download platform-specific archives from [GitHub Releases](../../releases).
 grammars-macos-arm64.tar.gz
 ├── libtree-sitter.dylib       # Core tree-sitter library
 ├── dylibs/
-│   ├── c/libc.dylib
-│   ├── dart/libdart.dylib
-│   └── .../
-├── queries/
 │   ├── c/
+│   │   ├── libc.dylib
+│   │   ├── config.json        # Language configuration
+│   │   └── *.scm              # Query files
 │   ├── dart/
+│   │   ├── libdart.dylib
+│   │   ├── config.json
+│   │   └── *.scm
 │   └── .../
-└── manifest.json              # Language metadata
+└── grammars.sha256            # Content hash for version checking
 ```
 
 ## Adding a New Language
@@ -142,7 +141,53 @@ dart tool/validate_queries.dart
 | `locals.scm` | Scope and variable tracking |
 | `tags.scm` | Symbol extraction for navigation |
 | `textobjects.scm` | Semantic text objects |
-| `config.json` | Language configuration (comments, brackets) |
+| `config.json` | Language configuration (see below) |
+
+### config.json Schema
+
+Each language has a `config.json` with metadata and editor settings:
+
+```json
+{
+  "displayName": "Ruby",
+  "symbol": "ruby",
+  "scope": "source.ruby",
+  "extensions": [".rb"],
+  "comments": {
+    "line": "#",
+    "block": ["=begin", "=end"]
+  },
+  "brackets": [
+    {"open": "{", "close": "}", "autoClose": true, "newline": true},
+    {"open": "(", "close": ")", "autoClose": true, "newline": false}
+  ],
+  "indentation": {
+    "blockOpeners": ["{", "(", "["],
+    "keywordOpeners": ["do", "then", "begin"],
+    "lineStartKeywords": ["def", "class", "module", "if"],
+    "dedentPairs": [
+      {"open": "def", "close": "end"},
+      {"open": "class", "close": "end"}
+    ]
+  },
+  "queries": {
+    "highlights": true,
+    "folds": true,
+    "indents": true
+  }
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `displayName` | Human-readable name |
+| `symbol` | Entry point symbol name in native library |
+| `scope` | TextMate scope for theme matching |
+| `extensions` | File extensions (including dot) |
+| `comments` | Comment delimiters for toggle/insertion |
+| `brackets` | Auto-close and smart bracket settings |
+| `indentation` | Heuristic indent settings for real-time typing |
+| `queries` | Which query files are available |
 
 ## Creating Releases
 
