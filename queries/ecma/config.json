@@ -1,5 +1,8 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "ECMAScript",
+  "scope": "source.ecma",
+  "extensions": [],
+  "queryOnly": true,
   "comments": {
     "line": "//",
     "block": ["/*", "*/"],

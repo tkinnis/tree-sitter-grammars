@@ -291,5 +291,32 @@
     "queries": {
       "highlights": true
     }
+  },
+  {
+    "name": "ecma",
+    "displayName": "ECMAScript",
+    "extensions": [],
+    "scope": "source.ecma",
+    "queryOnly": true,
+    "queries": {
+      "highlights": true,
+      "indents": true,
+      "folds": true,
+      "injections": true,
+      "locals": true
+    }
+  },
+  {
+    "name": "jsx",
+    "displayName": "JSX",
+    "extensions": [],
+    "scope": "source.jsx",
+    "queryOnly": true,
+    "queries": {
+      "highlights": true,
+      "indents": true,
+      "folds": true,
+      "injections": true
+    }
   }
 ]

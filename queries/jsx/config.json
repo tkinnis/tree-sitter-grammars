@@ -1,5 +1,8 @@
 {
-  "$schema": "../../../../tool/language_config_schema.json",
+  "displayName": "JSX",
+  "scope": "source.jsx",
+  "extensions": [],
+  "queryOnly": true,
   "comments": {
     "line": "//",
     "block": ["/*", "*/"],
