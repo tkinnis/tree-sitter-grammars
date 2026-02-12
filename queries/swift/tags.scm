@@ -7,9 +7,11 @@
 (function_declaration
   name: (simple_identifier) @name) @definition.function
 
-(init_declaration) @definition.method
+(init_declaration
+  "init" @name) @definition.method
 
-(deinit_declaration) @definition.method
+(deinit_declaration
+  "deinit" @name) @definition.method
 
 (property_declaration
   (pattern

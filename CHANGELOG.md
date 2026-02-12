@@ -7,38 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.3] - 2026-01-27
+## [1.0.3] - 2026-02-11
 
 ### Added
 
 - LaTeX grammar support with syntax highlighting, folds, and injections
+- ECMAScript and JSX as query-only grammars
 - Build script `--archive` and `--release=<ver>` options for automated releases
 - Complete language config data in per-language config.json files:
   - `comments` (line and block comment syntax)
   - `brackets` (auto-close and indentation behavior)
   - `indentation` (language-specific indent rules)
+  - `dedentPairs` for Ruby, Lua, Bash, and Ada
 
 ### Changed
 
+- Manifest data merged into per-language config.json files
 - Build script now copies full config.json from source instead of generating partial configs
-- Manifest data (displayName, symbol, scope, extensions) merged into config.json files
-- Bootstrap script creates complete config.json skeleton for new languages
+- Build script now packages query-only grammars in `queries/` directory
+- Bootstrap script creates complete config.json skeleton for new languages and updated for nvim-treesitter's new query path
 
 ### Fixed
 
-- LaTeX: Fixed math environment highlighting - `\begin{equation}` and `\end{equation}` now properly highlighted
-- LaTeX: Removed whole-node `@nospell` patterns that caused child captures to be filtered out
-- LaTeX: Changed Neovim-specific predicates (`#lua-match?`, `#set!`) to standard tree-sitter predicates
-- LaTeX: Fixed capture names (`@module` → `@keyword`, `@label` → `@type`) for proper theme mapping
-- Haskell: Fixed choice block patterns in `decl/function` that caused query compilation errors
-- Haskell: Fixed sibling patterns to properly handle signature, function, and bind nodes
+- Dart: Removed redundant catch-all `method_signature` patterns that produced `<anonymous>` outline symbols for getters, setters, factory constructors, and named constructors
+- CSS: Added `@name` capture to `tag_name` definition to prevent anonymous symbols
+- Kotlin: Moved `@definition.method` scope from `class_declaration` to `function_declaration` for accurate method ranges; added `@name` capture to `primary_constructor`
+- Swift: Added `"init"` and `"deinit"` name captures to constructor/destructor declarations
+- Go: Added `@definition.variable` and `@definition.constant` captures to var/const declarations
+- LaTeX: Fixed math environment highlighting, removed `@nospell` patterns, fixed Neovim-specific predicates, fixed capture names
+- Haskell: Fixed choice block patterns and sibling patterns in `decl/function`
 - Perl: Fixed `postfix_deref` query patterns that caused compilation errors
 - Query-only grammars (html_tags, comment) now included in release archives
-
-### Changed
-
-- Build script now packages query-only grammars in `queries/` directory
-- Bootstrap script updated for nvim-treesitter's new query path
 
 ## [1.0.2] - 2026-01-05
 

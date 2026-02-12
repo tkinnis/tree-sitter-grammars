@@ -10,7 +10,7 @@
 (class_declaration
   (class_body
     (function_declaration
-      (simple_identifier) @name))) @definition.method
+      (simple_identifier) @name) @definition.method))
 
 (property_declaration
   (variable_declaration
@@ -22,7 +22,8 @@
 (secondary_constructor
   "constructor" @name) @definition.method
 
-(primary_constructor) @definition.method
+(primary_constructor
+  "constructor" @name) @definition.method
 
 (anonymous_initializer
   "init" @name) @definition.method

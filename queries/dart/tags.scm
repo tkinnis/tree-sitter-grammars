@@ -2,23 +2,20 @@
 (class_definition
   name: (identifier) @name) @definition.class
 
-(method_signature
-  (function_signature)) @definition.method
-
 (type_alias
   (type_identifier) @name) @definition.type
 
 (method_signature
-(getter_signature
-  name: (identifier) @name)) @definition.method
+  (getter_signature
+    name: (identifier) @name)) @definition.method
 
 (method_signature
-(setter_signature
-  name: (identifier) @name)) @definition.method 
+  (setter_signature
+    name: (identifier) @name)) @definition.method
 
 (method_signature
   (function_signature
-  name: (identifier) @name)) @definition.method
+    name: (identifier) @name)) @definition.method
 
 (method_signature
   (factory_constructor_signature
@@ -26,12 +23,10 @@
 
 (method_signature
   (constructor_signature
-  name: (identifier) @name)) @definition.method
+    name: (identifier) @name)) @definition.method
 
 (method_signature
   (operator_signature)) @definition.method
-
-(method_signature) @definition.method
 
 (mixin_declaration
   (mixin)

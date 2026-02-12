@@ -37,6 +37,10 @@
 
 (import_declaration (import_spec) @name)
 
-(var_declaration (var_spec name: (identifier) @name))
+(var_declaration
+  (var_spec
+    name: (identifier) @name)) @definition.variable
 
-(const_declaration (const_spec name: (identifier) @name))
+(const_declaration
+  (const_spec
+    name: (identifier) @name)) @definition.constant
