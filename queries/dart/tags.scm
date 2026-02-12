@@ -26,7 +26,31 @@
     name: (identifier) @name)) @definition.method
 
 (method_signature
-  (operator_signature)) @definition.method
+  (operator_signature
+    [(binary_operator)
+     "~"
+     "[]"
+     "[]="] @name)) @definition.method
+
+; Constructors via declaration path (semicolon-terminated, initializer lists)
+(declaration
+  (constructor_signature
+    name: (identifier) @name)) @definition.method
+
+(declaration
+  (constant_constructor_signature
+    . (identifier) @name)) @definition.method
+
+; Class field declarations
+(declaration
+  (initialized_identifier_list
+    (initialized_identifier
+      . (identifier) @name))) @definition.property
+
+(declaration
+  (static_final_declaration_list
+    (static_final_declaration
+      . (identifier) @name))) @definition.property
 
 (mixin_declaration
   (mixin)
