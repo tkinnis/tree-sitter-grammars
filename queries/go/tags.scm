@@ -39,8 +39,8 @@
 
 (var_declaration
   (var_spec
-    name: (identifier) @name)) @definition.variable
+    name: (identifier) @name) @definition.variable)
 
 (const_declaration
   (const_spec
-    name: (identifier) @name)) @definition.constant
+    name: (identifier) @name) @definition.constant)
