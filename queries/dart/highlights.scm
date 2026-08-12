@@ -246,5 +246,5 @@
 (false) @boolean
 (null_literal) @constant.null
 
-(documentation_comment) @comment
+(documentation_comment) @comment.documentation
 (comment) @comment
