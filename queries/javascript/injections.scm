@@ -17,10 +17,14 @@
 ((regex_pattern) @injection.content
  (#set! injection.language "regex"))
 
- ; Parse JSDoc annotations in comments
+; Documentation comments carry JSDoc, and every comment carries the
+; tags the comment grammar reads.
+(((comment) @_jsdoc_comment
+  (#match? @_jsdoc_comment "^/\\*\\*[^*][\\s\\S]*\\*/$")) @injection.content
+  (#set! injection.language "jsdoc"))
 
 ((comment) @injection.content
- (#set! injection.language "jsdoc"))
+  (#set! injection.language "comment"))
 
 ; Parse Ember/Glimmer/Handlebars/HTMLBars/etc. template literals
 ; e.g.: await render(hbs`<SomeComponent />`)

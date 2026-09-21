@@ -1,5 +1,5 @@
 ((Comment) @injection.content
-)
+  (#set! injection.language "comment"))
 
 ; SVG style
 ((element

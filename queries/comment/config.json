@@ -1,8 +1,8 @@
 {
   "displayName": "Comment",
   "scope": "comment",
+  "symbol": "comment",
   "extensions": [],
-  "queryOnly": true,
   "comments": {},
   "brackets": []
 }

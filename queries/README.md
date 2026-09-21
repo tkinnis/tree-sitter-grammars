@@ -48,6 +48,14 @@ Captures in `highlights.scm` are mapped to TextMate scopes via `theme_scope_map.
 - `@string` - string literals
 - `@comment` - comments
 
+### Injections
+
+A pattern in `injections.scm` marks a node's text as another language with `@injection.content`, and says which language either through a `(#set! injection.language "<name>")` directive on the pattern or through an `@injection.language` capture whose text names it. A pattern carrying neither matches and injects nothing, so it costs a query match per node for no result. `tool/convert_neovim_queries.dart` removes every `#set!` directive from the queries it imports, which is why a language bootstrapped from nvim-treesitter has to have its directives put back by hand — `((comment) @injection.content)` alone is the shape that looks finished and does nothing.
+
+Every grammar whose comments are their own node injects `comment` into them, so a `TODO:`, `FIXME(user):` or `NOTE:` tag is read by the comment grammar wherever it is written; JavaScript, TypeScript and TSX inject `jsdoc` into a comment shaped like documentation as well, through a `#match?` on the comment's text, and the two are read side by side. The name a directive gives has to be a grammar in `tool/grammars.json` — `comment`, `regex`, `jsdoc`, `markdown_inline` and the rest — since the editor loads the injected language by that name, and a name no grammar answers to is a layer that never parses.
+
+A predicate on an injection pattern — `#match?`, `#eq?`, `#any-of?` and their `not-` forms — is evaluated by the editor before the pattern injects, so a directive can be confined to the comments that look like documentation. Bash's `regex` nodes are left uninjected on purpose: the grammar files the pattern of a parameter expansion — `${file%.txt}` — under that node, and read as a regular expression it draws a shell glob in the wrong colours.
+
 ### Indentation
 
 The `indents.scm` file defines auto-indentation behavior:

@@ -141,7 +141,7 @@ Future<void> main(List<String> args) async {
     if (configMap.containsKey('noop') && configMap['noop'] == true) {
       continue;
     }
-    // Skip query-only languages (like html_tags, comment) that have no grammar
+    // Skip query-only languages (like html_tags, ecma, jsx) that have no grammar
     if (configMap.containsKey('queryOnly') && configMap['queryOnly'] == true) {
       continue;
     }
@@ -258,7 +258,7 @@ Future<void> main(List<String> args) async {
       continue;
     }
 
-    // Skip query-only languages (like html_tags, comment) that have no grammar
+    // Skip query-only languages (like html_tags, ecma, jsx) that have no grammar
     if (configMap.containsKey('queryOnly') && configMap['queryOnly'] == true) {
       continue;
     }
@@ -933,7 +933,7 @@ Future<void> _manifestOnlyMode(String grammarFile) async {
       continue;
     }
 
-    // Handle query-only languages (e.g., comment)
+    // Handle query-only languages (e.g., ecma)
     if (configMap['queryOnly'] == true) {
       final name = configMap['name'] as String;
       final manifestEntry = <String, dynamic>{
@@ -1080,7 +1080,7 @@ Future<void> _manifestOnlyMode(String grammarFile) async {
 /// - All query files (highlights.scm, injections.scm, etc.)
 /// - A config.json with language metadata
 ///
-/// Query-only grammars (like html_tags, comment) are also handled - they get
+/// Query-only grammars (like html_tags, ecma, jsx) are also handled - they get
 /// their query files copied to output/queries/{name}/ so they can be used
 /// for query inheritance (e.g., `; inherits: html_tags`).
 ///
@@ -1103,7 +1103,7 @@ Future<void> _copyQueryFilesToOutput(
     final grammarName = entry.key;
     final grammarData = entry.value;
 
-    // Handle query-only grammars (like html_tags, comment)
+    // Handle query-only grammars (like html_tags, ecma, jsx)
     // These need their queries copied to output/queries/{name}/ for inheritance
     if (grammarData['queryOnly'] == true) {
       final sourceQueryDir = Directory(path.join('queries', grammarName));

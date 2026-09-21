@@ -2,7 +2,7 @@
 )
 
 ((comment) @injection.content
-)
+  (#set! injection.language "comment"))
 
 ((comment) @injection.content
   (#match? @injection.content "/\\*!([a-zA-Z]+:)?re2c")

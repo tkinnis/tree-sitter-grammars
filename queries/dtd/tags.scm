@@ -1,11 +1,14 @@
-(element_decl
-  (name) @name) @definition.element
+(elementdecl
+  (Name) @name) @definition.element
 
-(attlist_decl
-  (name) @name) @definition.attribute
+(AttlistDecl
+  (Name) @name) @definition.attribute
 
-(entity_decl
-  (name) @name) @definition.entity
+(GEDecl
+  (Name) @name) @definition.entity
 
-(notation_decl
-  (name) @name) @definition.notation
+(PEDecl
+  (Name) @name) @definition.entity
+
+(NotationDecl
+  (Name) @name) @definition.notation

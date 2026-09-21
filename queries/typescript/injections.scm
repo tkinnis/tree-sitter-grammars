@@ -12,15 +12,6 @@
   (#set! injection.include-children))
 
 
-; Parse regex syntax within regex literals
-
-((regex_pattern) @injection.content
- (#set! injection.language "regex"))
-
- ; Parse JSDoc annotations in comments
-
-((comment) @injection.content
- (#set! injection.language "jsdoc"))
 
 ; Parse Ember/Glimmer/Handlebars/HTMLBars/etc. template literals
 ; e.g.: await render(hbs`<SomeComponent />`)

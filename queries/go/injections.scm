@@ -1,5 +1,5 @@
 ((comment) @injection.content
-)
+  (#set! injection.language "comment"))
 
 (call_expression
   (selector_expression) @_function

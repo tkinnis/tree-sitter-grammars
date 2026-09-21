@@ -1,5 +1,5 @@
 ((comment) @injection.content
-)
+  (#set! injection.language "comment"))
 
 ; TODO: add when asm is added
 ; (asm_output_item (string) @injection.content

@@ -6,3 +6,6 @@
   arguments: (arguments (string content: _ @injection.content
     (#set! injection.language "c"))))
   (#eq? @_cdef_identifier "cdef"))
+
+((comment) @injection.content
+  (#set! injection.language "comment"))

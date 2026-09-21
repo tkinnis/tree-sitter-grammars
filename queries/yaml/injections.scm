@@ -1,5 +1,5 @@
 ((comment) @injection.content
-)
+  (#set! injection.language "comment"))
 
 ; Github actions ("run") / Gitlab CI ("scripts")
 ; Taskfile scripts ("cmds", "cmd", "sh")

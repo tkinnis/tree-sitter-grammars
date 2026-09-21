@@ -1,4 +1,4 @@
 [
-  (element_declaration)
-  (attlist_declaration)
+  (elementdecl)
+  (AttlistDecl)
 ] @indent.begin

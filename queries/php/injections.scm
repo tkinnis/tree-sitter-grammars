@@ -1,5 +1,5 @@
 ((comment) @injection.content
-  (#set! injection.language "phpdoc"))
+  (#set! injection.language "comment"))
 
 (heredoc
   (heredoc_body) @injection.content

@@ -1,2 +1,2 @@
-; Injections for mermaid
-; Mermaid does not have embedded languages
+((comment) @injection.content
+  (#set! injection.language "comment"))

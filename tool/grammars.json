@@ -283,14 +283,11 @@
     }
   },
   {
+    "url": "https://github.com/stsewd/tree-sitter-comment",
     "name": "comment",
     "displayName": "Comment",
-    "extensions": [],
     "scope": "comment",
-    "queryOnly": true,
-    "queries": {
-      "highlights": true
-    }
+    "file-types": []
   },
   {
     "name": "ecma",

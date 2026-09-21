@@ -1,8 +1,5 @@
 ((comment) @injection.content
-)
-
-((regex) @injection.content
-)
+  (#set! injection.language "comment"))
 
 ((heredoc_redirect
   (heredoc_body) @injection.content

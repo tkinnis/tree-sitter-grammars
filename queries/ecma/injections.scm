@@ -1,5 +1,5 @@
 (((comment) @_jsdoc_comment
-  (#match? @_jsdoc_comment "^/\\*\\*[^*].*\\*/$")) @injection.content
+  (#match? @_jsdoc_comment "^/\\*\\*[^*][\\s\\S]*\\*/$")) @injection.content
   (#set! injection.language "jsdoc"))
 
 ((comment) @injection.content
