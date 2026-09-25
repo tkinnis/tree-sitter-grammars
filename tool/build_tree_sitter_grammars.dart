@@ -103,8 +103,8 @@ Future<void> _build(
   _step('Extracting the runtime and ${_urlEntries(entries).length} grammar '
       'repositories at their pins');
   final runtimeDirectory = p.join(root, 'build', 'src', 'tree-sitter');
-  await extractCommit(runGit, p.join(root, 'tree-sitter'),
-      toolchain.treeSitterCommit, runtimeDirectory);
+  await extractCommit(p.join(root, 'tree-sitter'), toolchain.treeSitterCommit,
+      runtimeDirectory);
   final languageVersions =
       _runtimeLanguageVersions(runtimeDirectory, toolchain);
   await _extractGrammars(root, entries);
@@ -330,8 +330,7 @@ Future<void> _extractGrammars(
     try {
       await ensureObjectStore(runGit, store, url);
       await ensureCommit(runGit, store, commit, name);
-      await extractCommit(
-          runGit, store, commit, p.join(root, 'build', 'src', name));
+      await extractCommit(store, commit, p.join(root, 'build', 'src', name));
       return null;
     } on Exception catch (error) {
       return '$name: $error';

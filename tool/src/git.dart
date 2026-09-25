@@ -1,6 +1,7 @@
 /// Runs git against one named directory.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 /// Thrown when a git command exits non-zero.
@@ -41,39 +42,88 @@ const _repositoryLocationVariables = {
   'GIT_COMMON_DIR',
 };
 
-Map<String, String> get _environment => {
-      for (final MapEntry(:key, :value) in Platform.environment.entries)
+/// [parent] without the variables that would point git at another
+/// repository.
+Map<String, String> gitEnvironment(Map<String, String> parent) => {
+      for (final MapEntry(:key, :value) in parent.entries)
         if (!_repositoryLocationVariables.contains(key)) key: value,
     };
 
-/// Runs the real `git`, throwing a [GitException] on a non-zero exit.
-Future<String> runGit(String directory, List<String> arguments) async {
-  final result = await Process.run(
+/// [gitEnvironment] of [parent], further cut off from every configuration
+/// and attribute source outside the repository itself: no global or system
+/// configuration or attributes, no configuration passed through the
+/// environment, and no replacement objects.
+Map<String, String> isolatedGitEnvironment(Map<String, String> parent) => {
+      for (final MapEntry(:key, :value) in gitEnvironment(parent).entries)
+        if (!key.startsWith('GIT_CONFIG') && key != 'GIT_ATTR_SOURCE')
+          key: value,
+      'GIT_CONFIG_GLOBAL': '/dev/null',
+      'GIT_CONFIG_NOSYSTEM': '1',
+      'GIT_ATTR_NOSYSTEM': '1',
+      'GIT_NO_REPLACE_OBJECTS': '1',
+    };
+
+/// The result of one git invocation.
+typedef _GitResult = ({int exitCode, String stdout, String stderr});
+
+const _decoder = Utf8Decoder(allowMalformed: true);
+
+Future<_GitResult> _git(
+  String directory,
+  List<String> arguments,
+  Map<String, String> environment, {
+  String? input,
+}) async {
+  final process = await Process.start(
     'git',
     arguments,
     workingDirectory: directory,
-    environment: _environment,
+    environment: environment,
     includeParentEnvironment: false,
   );
-  if (result.exitCode != 0) {
-    throw GitException(
-      directory,
-      arguments,
-      result.exitCode,
-      result.stderr as String,
-    );
-  }
-  return result.stdout as String;
+  final stdout = process.stdout.transform(_decoder).join();
+  final stderr = process.stderr.transform(_decoder).join();
+  if (input != null) process.stdin.write(input);
+  await process.stdin.close();
+  return (
+    exitCode: await process.exitCode,
+    stdout: await stdout,
+    stderr: await stderr,
+  );
 }
 
-/// Whether `git` with [arguments] in [directory] exits zero.
-Future<bool> gitSucceeds(String directory, List<String> arguments) async {
-  final result = await Process.run(
-    'git',
-    arguments,
-    workingDirectory: directory,
-    environment: _environment,
-    includeParentEnvironment: false,
-  );
-  return result.exitCode == 0;
+String _stdout(_GitResult result, String directory, List<String> arguments) {
+  if (result.exitCode != 0) {
+    throw GitException(directory, arguments, result.exitCode, result.stderr);
+  }
+  return result.stdout;
 }
+
+/// Runs the real `git` with the user's configuration, throwing a
+/// [GitException] on a non-zero exit.
+Future<String> runGit(String directory, List<String> arguments) async =>
+    _stdout(
+      await _git(directory, arguments, gitEnvironment(Platform.environment)),
+      directory,
+      arguments,
+    );
+
+/// Runs the real `git` with [isolatedGitEnvironment] of [environment], by
+/// default this process's, writing [input] to its standard input; throws a
+/// [GitException] on a non-zero exit.
+Future<String> runIsolatedGit(
+  String directory,
+  List<String> arguments, {
+  Map<String, String>? environment,
+  String? input,
+}) async =>
+    _stdout(
+      await _git(
+        directory,
+        arguments,
+        isolatedGitEnvironment(environment ?? Platform.environment),
+        input: input,
+      ),
+      directory,
+      arguments,
+    );
