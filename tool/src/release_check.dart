@@ -28,6 +28,28 @@ List<String> apiFunctions(String header) {
 
 final _inherits = RegExp(r'^;\s*inherits:\s*(.+)$', multiLine: true);
 
+/// Thrown when an `; inherits:` line names a language that holds no file
+/// of the query type being composed.
+final class QueryInheritanceException implements Exception {
+  const QueryInheritanceException(this.message);
+
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+/// The one `; inherits:` name that may hold no file of the type naming
+/// it, as (language, query file, inherited language).
+///
+/// tsx's `locals.scm` keeps nvim-treesitter's `; inherits: typescript,jsx`
+/// line, the one tsx's folds, highlights and indents carry, and jsx has
+/// no `locals.scm`, here or in nvim-treesitter. JSX's element and
+/// attribute names are `identifier` and `property_identifier` nodes, which
+/// tsx's own `locals.scm` captures as references, so jsx has no locals to
+/// add.
+const _inheritsNothing = {('tsx', 'locals.scm', 'jsx')};
+
 /// The query [fileName] in [directory] with everything its first
 /// `; inherits:` line names merged in ahead of it, or null when
 /// [directory] holds no such file.
@@ -37,12 +59,19 @@ final _inherits = RegExp(r'^;\s*inherits:\s*(.+)$', multiLine: true);
 /// `queries/` directory beside the one holding [directory]; an inherited
 /// file is composed the same way; each file's own text follows what it
 /// inherits, separated by a blank line.
+///
+/// Throws a [QueryInheritanceException] when a named language holds no
+/// [fileName] in either place, which the editor would pass over without a
+/// word; tsx's `locals.scm` naming `jsx` is the one name allowed to hold
+/// none.
 String? composeQuery(String directory, String fileName) =>
     _compose(directory, fileName, null);
 
 /// Every file [composeQuery] reads to compose [fileName] in [directory]:
 /// the file itself and each file it inherits, directly or not; empty when
 /// [directory] holds no such file.
+///
+/// Throws a [QueryInheritanceException] where [composeQuery] does.
 Set<String> composedFiles(String directory, String fileName) {
   final read = <String>{};
   _compose(directory, fileName, read);
@@ -66,12 +95,17 @@ String? _compose(String directory, String fileName, Set<String>? read) {
   if (languages.isEmpty) return own;
   final parent = p.dirname(directory);
   final queryOnly = p.join(p.dirname(parent), 'queries');
+  final name = p.basename(directory);
   return [
     for (final language in languages)
       if (_compose(p.join(parent, language), fileName, read) ??
               _compose(p.join(queryOnly, language), fileName, read)
           case final inherited?)
-        inherited,
+        inherited
+      else if (!_inheritsNothing.contains((name, fileName, language)))
+        throw QueryInheritanceException(
+          '$name/$fileName inherits $language, which holds no $fileName',
+        ),
     own,
   ].join('\n\n');
 }

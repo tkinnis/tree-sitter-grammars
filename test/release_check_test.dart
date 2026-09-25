@@ -54,12 +54,55 @@ void ts_parser_delete(
       check(compose('tsx')).equals('(e)\n\n(ts)\n\n(j)\n\n; header\n\n(t)');
     });
 
-    test('a sibling wins over queries/, and a missing parent is skipped', () {
-      write('dylibs/a/h.scm', '; inherits: b, missing\n(a)');
+    test('a sibling wins over queries/', () {
+      write('dylibs/a/h.scm', '; inherits: b\n(a)');
       write('dylibs/b/h.scm', '(sibling)');
       write('queries/b/h.scm', '(query-only)');
 
       check(compose('a')).equals('(sibling)\n\n(a)');
+    });
+
+    test('refuses a named language that holds no such file', () {
+      write('dylibs/a/h.scm', '; inherits: b, missing\n(a)');
+      write('dylibs/b/h.scm', '(b)');
+      write('queries/missing/other.scm', '(other)');
+
+      for (final composition in [
+        () => compose('a'),
+        () => composedFiles(p.join(archive.path, 'dylibs', 'a'), 'h.scm'),
+      ]) {
+        check(composition)
+            .throws<QueryInheritanceException>()
+            .has((error) => error.message, 'message')
+            .equals('a/h.scm inherits missing, which holds no h.scm');
+      }
+    });
+
+    test('refuses a missing name in a file it inherits', () {
+      write('dylibs/a/h.scm', '; inherits: b\n(a)');
+      write('dylibs/b/h.scm', '; inherits: missing\n(b)');
+
+      check(() => compose('a')).throws<QueryInheritanceException>();
+    });
+
+    test('allows only tsx locals.scm to name jsx, which holds none', () {
+      write('dylibs/tsx/locals.scm', '; inherits: typescript,jsx\n(t)');
+      write('dylibs/typescript/locals.scm', '(ts)');
+      write('dylibs/tsx/h.scm', '; inherits: typescript,jsx\n(t)');
+      write('dylibs/typescript/h.scm', '(ts)');
+      write('dylibs/javascript/locals.scm', '; inherits: jsx\n(js)');
+      write('queries/jsx/folds.scm', '(j)');
+
+      check(
+        composeQuery(p.join(archive.path, 'dylibs', 'tsx'), 'locals.scm'),
+      ).equals('(ts)\n\n(t)');
+      check(() => compose('tsx')).throws<QueryInheritanceException>();
+      check(
+        () => composeQuery(
+          p.join(archive.path, 'dylibs', 'javascript'),
+          'locals.scm',
+        ),
+      ).throws<QueryInheritanceException>();
     });
 
     test('answers null for a file the directory does not hold', () {
@@ -93,6 +136,20 @@ void ts_parser_delete(
   });
 
   group("this repository's queries", () {
+    test('every file composes, each name it inherits holding the file', () {
+      for (final directory in Directory(
+        'queries',
+      ).listSync().whereType<Directory>()) {
+        for (final file in directory.listSync().whereType<File>()) {
+          if (!file.path.endsWith('.scm')) continue;
+          check(
+            because: file.path,
+            () => composeQuery(directory.path, p.basename(file.path)),
+          ).returnsNormally();
+        }
+      }
+    });
+
     test("php's folds and indents compose with php_only's", () {
       String compose(String file) =>
           composeQuery(p.join('queries', 'php'), file)!;

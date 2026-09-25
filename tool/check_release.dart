@@ -33,8 +33,9 @@
 ///   `ts_language_abi_version` lies between them.
 /// - Every query file of every grammar, composed with what its
 ///   `; inherits:` line names as the editor composes it, compiles with
-///   `ts_query_new`, and every query-only file is read by one of those
-///   compositions.
+///   `ts_query_new`; every language such a line names holds a file of the
+///   same type, tsx's `locals.scm` naming `jsx` apart; and every
+///   query-only file is read by one of those compositions.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -593,8 +594,14 @@ void _checkQueries(
     final language = languages[grammar.name];
     for (final file in _queryFiles(grammar.directory)) {
       files++;
-      read.addAll(composedFiles(grammar.directory, file));
-      final source = composeQuery(grammar.directory, file)!;
+      final String source;
+      try {
+        read.addAll(composedFiles(grammar.directory, file));
+        source = composeQuery(grammar.directory, file)!;
+      } on QueryInheritanceException catch (error) {
+        problems.add('$error');
+        continue;
+      }
       if (language == null) continue;
       try {
         final query = runtime.compile(language, source);
@@ -912,6 +919,8 @@ Map<String, Query> _compileAll(
   for (final file in files) {
     try {
       queries[file] = runtime.compile(language, composeQuery(directory, file)!);
+    } on QueryInheritanceException catch (error) {
+      print('$error, so it is not compared');
     } on QueryException catch (error) {
       print('${p.basename(directory)}/$file does not compile: $error');
     }
