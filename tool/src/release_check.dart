@@ -1,7 +1,7 @@
 /// The parts of `tool/check_release.dart` that read files and text: query
 /// composition, the patterns of a query's text, the outline a tags query's
-/// matches make, `api.h`'s function list, and the inputs of each grammar's
-/// test corpus.
+/// matches make, the injections an injections query's matches make,
+/// `api.h`'s function list, and the inputs of each grammar's test corpus.
 library;
 
 import 'dart:convert';
@@ -379,6 +379,78 @@ bool _contains(TagDefinition outer, TagDefinition inner) =>
     outer.start <= inner.start &&
     inner.end <= outer.end &&
     (outer.start, outer.end) != (inner.start, inner.end);
+
+/// One injection a match of an injections query makes, as the editor
+/// makes it: the language, the byte range of the whole node the match
+/// captures as `@injection.content`, and whether the pattern sets
+/// `injection.combined`.
+typedef Injection = ({String language, bool combined, int start, int end});
+
+final _setLanguage = RegExp(r'#set! "injection\.language" ("(?:[^"\\]|\\.)*")');
+final _setCombined = RegExp(r'#set! "injection\.combined"(?= #|$)');
+
+/// The injections among [matches], an injections query's captures one
+/// list per match over the UTF-8 [text].
+///
+/// A match injects each node it captures as `@injection.content` in the
+/// language its `@injection.language` capture's text names, or else its
+/// pattern's `#set! injection.language` directive, which every capture
+/// carries in its properties; a match that names no language, or an
+/// empty one, injects nothing.
+List<Injection> injections(List<List<Capture>> matches, List<int> text) => [
+  for (final captures in matches)
+    if (_injectionLanguageOf(captures, text) case final language?
+        when language.isNotEmpty)
+      for (final content in captures)
+        if (content.name == 'injection.content')
+          (
+            language: language,
+            combined: _setCombined.hasMatch(content.properties),
+            start: content.start,
+            end: content.end,
+          ),
+];
+
+String? _injectionLanguageOf(List<Capture> captures, List<int> text) {
+  if (captures.where((c) => c.name == 'injection.language').firstOrNull
+      case final capture?) {
+    return utf8.decode(
+      text.sublist(capture.start, capture.end),
+      allowMalformed: true,
+    );
+  }
+  return switch (_setLanguage.firstMatch(
+    captures.firstOrNull?.properties ?? '',
+  )) {
+    final set? => jsonDecode(set[1]!) as String,
+    null => null,
+  };
+}
+
+/// One line per injection of [found] over the UTF-8 [text]: its language,
+/// ` combined` when its pattern combines it, a space and its text
+/// JSON-encoded, ordered by start, the wider of two that start together
+/// first, and two over one range by language, the uncombined first.
+List<String> injectionLines(List<Injection> found, List<int> text) {
+  int order(Injection a, Injection b) => switch ((
+    a.start.compareTo(b.start),
+    b.end.compareTo(a.end),
+    a.language.compareTo(b.language),
+  )) {
+    (0, 0, 0) => (a.combined ? 1 : 0) - (b.combined ? 1 : 0),
+    (0, 0, final language) => language,
+    (0, final end, _) => end,
+    (final start, _, _) => start,
+  };
+  final sorted = [...found]..sort(order);
+  String textOf(int start, int end) =>
+      utf8.decode(text.sublist(start, end), allowMalformed: true);
+  return [
+    for (final (:language, :combined, :start, :end) in sorted)
+      '$language${combined ? ' combined' : ''} '
+          '${jsonEncode(textOf(start, end))}',
+  ];
+}
 
 /// One example of a tree-sitter test corpus.
 typedef CorpusExample = ({String name, String input, List<String> languages});

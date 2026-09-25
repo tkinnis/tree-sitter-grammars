@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - C#: `tags.scm` defines every namespace as `@definition.module`: a block namespace under any name, qualified ones included, and a file-scoped namespace over the compilation unit that holds the declarations after it, so every class and method nests under its namespace in the editor's outline and a test's declaring scope reads `Namespace.Class`
 - Outline tests: `tool/check_release.dart` parses every source under `test/outline/<grammar>/` and requires the outline of the definitions the grammar's composed `tags.scm` finds in it, nested by range as the editor nests its outline, to be the `.outline` file beside it; the first are three C# test files, for xUnit, NUnit and MSTest
+- Injection tests: `tool/check_release.dart` parses every source under `test/injections/<grammar>/` and requires what the grammar's composed `injections.scm` injects in it, as the editor injects it, to be the `.injections` file beside it: each injection's language, whether it is combined, and the whole text of the node it captures as `@injection.content`
 - `tool/check_release.dart` refuses an injection pattern that captures no `@injection.content`, and one that captures it and names no language in every grammar but the twelve `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (bash, go, html, java, kotlin, make, pascal, python, ruby, sql, xml and yaml, which hold 74), and requires every composed query to read as the patterns `ts_query_new` counts in it
 
 ### Fixed

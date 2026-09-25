@@ -46,6 +46,12 @@
 ///   missing node, and the outline of the definitions the grammar's
 ///   composed `tags.scm` finds in it, nested by range as the editor nests
 ///   its outline, is the `.outline` file beside it, line for line.
+/// - Every source under `test/injections/<grammar>/` parses with no error
+///   or missing node, and what the grammar's composed `injections.scm`
+///   injects in it, as the editor injects it, is the `.injections` file
+///   beside it, line for line: each injection's language, ` combined`
+///   when its pattern sets `injection.combined`, and the whole text of the
+///   node it captures as `@injection.content`, JSON-encoded.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -224,7 +230,7 @@ _check(
     problems,
   );
   _checkQueries(runtime, output, grammars, languages, problems);
-  _checkOutlines(root, runtime, grammars, languages, problems);
+  _checkQueryTests(root, runtime, grammars, languages, problems);
   _checkNotices(root, output, info, problems);
   return (runtime: runtime, grammars: grammars, sources: sourceRoot);
 }
@@ -682,63 +688,111 @@ void _checkInjectionLanguages(
   );
 }
 
-/// The directory of outline tests: `<grammar>/<source>` beside
-/// `<grammar>/<source>.outline`.
-const _outlineTests = 'test/outline';
+/// A kind of query test: every source under `<directory>/<grammar>/`,
+/// beside a `<source><suffix>` file whose lines must be what [lines] makes
+/// of the matches of the grammar's composed [queryFile] over the source's
+/// UTF-8 text.
+typedef _QueryTest = ({
+  String kind,
+  String directory,
+  String queryFile,
+  String suffix,
+  List<String> Function(List<List<Capture>> matches, List<int> text) lines,
+});
 
-/// Checks every source under [_outlineTests] in [root] with the composed
-/// `tags.scm` of the grammar its directory names: the source must parse
-/// with no error or missing node, and [outline] of the definitions the
-/// query finds in it must be the lines of the `.outline` file beside it.
-void _checkOutlines(
+/// The outline tests, whose `.outline` file is the [outline] of the
+/// definitions `tags.scm` finds, and the injection tests, whose
+/// `.injections` file is the [injectionLines] of what `injections.scm`
+/// injects.
+final _queryTests = <_QueryTest>[
+  (
+    kind: 'outline',
+    directory: 'test/outline',
+    queryFile: 'tags.scm',
+    suffix: '.outline',
+    lines: (matches, text) => outline(tagDefinitions(matches, text)),
+  ),
+  (
+    kind: 'injection',
+    directory: 'test/injections',
+    queryFile: 'injections.scm',
+    suffix: '.injections',
+    lines: (matches, text) => injectionLines(injections(matches, text), text),
+  ),
+];
+
+/// Runs every test of [_queryTests] in [root].
+void _checkQueryTests(
   String root,
   TreeSitterRuntime runtime,
   List<_Grammar> grammars,
   Map<String, Pointer<Void>> languages,
   List<String> problems,
 ) {
-  final tests = Directory(p.join(root, _outlineTests));
-  final directories = tests.existsSync()
+  for (final test in _queryTests) {
+    _checkQueryTest(test, root, runtime, grammars, languages, problems);
+  }
+}
+
+/// Checks every source of [test] in [root] with the composed query file of
+/// the grammar its directory names: the source must parse with no error or
+/// missing node, and give the lines of the file beside it.
+void _checkQueryTest(
+  _QueryTest test,
+  String root,
+  TreeSitterRuntime runtime,
+  List<_Grammar> grammars,
+  Map<String, Pointer<Void>> languages,
+  List<String> problems,
+) {
+  final (:kind, :directory, :queryFile, :suffix, lines: _) = test;
+  final tests = Directory(p.join(root, directory));
+  final grammarDirectories = tests.existsSync()
       ? (tests.listSync().whereType<Directory>().toList()
           ..sort((a, b) => a.path.compareTo(b.path)))
       : const <Directory>[];
   var good = 0;
   var total = 0;
-  for (final directory in directories) {
-    final name = p.basename(directory.path);
+  for (final grammarDirectory in grammarDirectories) {
+    final name = p.basename(grammarDirectory.path);
     final files = [
-      for (final file in directory.listSync().whereType<File>())
+      for (final file in grammarDirectory.listSync().whereType<File>())
         if (!p.basename(file.path).startsWith('.')) file.path,
     ];
-    final sources = files.where((f) => !f.endsWith('.outline')).toList()
-      ..sort();
+    final sources = files.where((f) => !f.endsWith(suffix)).toList()..sort();
     for (final orphan in files.where(
-      (f) => f.endsWith('.outline') && !sources.contains(p.withoutExtension(f)),
+      (f) => f.endsWith(suffix) && !sources.contains(p.withoutExtension(f)),
     )) {
-      problems.add('${p.relative(orphan, from: root)} outlines no source');
+      problems.add('${p.relative(orphan, from: root)} has no source');
     }
     total += sources.length;
     final grammar = grammars.where((g) => g.name == name).firstOrNull;
     final language = languages[name];
     if (grammar == null || language == null) {
-      problems.add('$_outlineTests/$name names no grammar the runtime opens');
+      problems.add('$directory/$name names no grammar the runtime opens');
       continue;
     }
     final Query query;
     try {
-      final tags = composeQuery(grammar.directory, 'tags.scm');
-      if (tags == null) {
-        problems.add('$_outlineTests/$name: $name has no tags.scm');
+      final source = composeQuery(grammar.directory, queryFile);
+      if (source == null) {
+        problems.add('$directory/$name: $name has no $queryFile');
         continue;
       }
-      query = runtime.compile(language, tags);
+      query = runtime.compile(language, source);
     } on Exception {
-      // _checkQueries lists why tags.scm does not compose or compile.
+      // _checkQueries lists why the query does not compose or compile.
       continue;
     }
     try {
       for (final source in sources) {
-        final problem = _outlineProblem(runtime, language, query, source);
+        final problem = _queryTestProblem(
+          test,
+          runtime,
+          language,
+          query,
+          source,
+        );
         if (problem == null) {
           good++;
         } else {
@@ -749,34 +803,33 @@ void _checkOutlines(
       query.delete();
     }
   }
-  print(
-    'outlines: $good/$total sources under $_outlineTests outline as expected',
-  );
+  print('$kind tests: $good/$total sources under $directory as expected');
 }
 
-/// What is wrong with the outline test [source], or null when it parses
-/// cleanly with [language] and [query]'s definitions outline it as the
-/// `.outline` file beside it says.
-String? _outlineProblem(
+/// What is wrong with [source], a source of [test], or null when it parses
+/// cleanly with [language] and the lines [test] makes of [query]'s matches
+/// are the file beside it.
+String? _queryTestProblem(
+  _QueryTest test,
   TreeSitterRuntime runtime,
   Pointer<Void> language,
   Query query,
   String source,
 ) {
-  final expected = File('$source.outline');
+  final expected = File('$source${test.suffix}');
   if (!expected.existsSync()) return 'no ${p.basename(expected.path)}';
   final text = File(source).readAsStringSync();
   final (:tree, :matches) = runtime.parseMatches(language, text, query);
   if (tree.contains('(ERROR') || tree.contains('(MISSING')) {
     return 'parses with an error or missing node';
   }
-  final found = outline(tagDefinitions(matches, utf8.encode(text)));
+  final found = test.lines(matches, utf8.encode(text));
   final lines = const LineSplitter().convert(expected.readAsStringSync());
   String at(List<String> lines, int index) =>
       index < lines.length ? jsonEncode(lines[index]) : 'nothing';
   for (var index = 0; index < found.length || index < lines.length; index++) {
     if (at(found, index) != at(lines, index)) {
-      return 'outline line ${index + 1} is ${at(found, index)}; '
+      return '${test.kind} line ${index + 1} is ${at(found, index)}; '
           '${p.basename(expected.path)} has ${at(lines, index)}';
     }
   }

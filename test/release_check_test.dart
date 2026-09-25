@@ -454,6 +454,69 @@ _ @any
     });
   });
 
+  group('injections', () {
+    const text = 'R"sql(select)sql" /* é */ #define A (1)';
+    Capture capture(String name, int start, int end, [String set = '']) =>
+        (name: name, start: start, end: end, properties: set);
+
+    test('reads the language from a capture or a #set! directive', () {
+      final found = injections([
+        [
+          capture('injection.language', 2, 5),
+          capture('injection.content', 6, 12),
+        ],
+        [
+          capture(
+            'injection.content',
+            18,
+            26,
+            '#set! "injection.language" "comment"',
+          ),
+        ],
+        [
+          capture(
+            'injection.content',
+            37,
+            40,
+            '#set! "injection.combined" #set! "injection.language" "c"',
+          ),
+        ],
+        [capture('injection.content', 0, 17)],
+        [capture('injection.language', 2, 5)],
+        [
+          capture('injection.language', 17, 17),
+          capture('injection.content', 0, 17),
+        ],
+      ], utf8.encode(text));
+
+      check(found).deepEquals([
+        (language: 'sql', combined: false, start: 6, end: 12),
+        (language: 'comment', combined: false, start: 18, end: 26),
+        (language: 'c', combined: true, start: 37, end: 40),
+      ]);
+    });
+
+    test('lines each by start, the wider first, with its text', () {
+      final lines = injectionLines([
+        (language: 'c', combined: true, start: 37, end: 40),
+        (language: 'c', combined: false, start: 37, end: 40),
+        (language: 'asm', combined: true, start: 37, end: 40),
+        (language: 'sql', combined: false, start: 6, end: 12),
+        (language: 'comment', combined: false, start: 18, end: 26),
+        (language: 'html', combined: false, start: 0, end: 17),
+      ], utf8.encode(text));
+
+      check(lines).deepEquals([
+        r'html "R\"sql(select)sql\""',
+        'sql "select"',
+        'comment "/* é */"',
+        'asm combined "(1)"',
+        'c "(1)"',
+        'c combined "(1)"',
+      ]);
+    });
+  });
+
   group('parseCorpus', () {
     test('reads names, inputs and languages', () {
       const corpus = '''
