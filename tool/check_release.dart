@@ -33,14 +33,18 @@
 /// archive with these, both under this runtime: every example of each
 /// grammar's test corpus and every highlight test input from the pinned
 /// sources is parsed with both, and each difference in the tree, or in
-/// the captures of a query file both archives carry, is printed. A match
+/// the captures of a query file both archives carry, is printed. A grammar
+/// pinned on a deploy branch is tested with the tests of its
+/// `sourceCommit`, read from its object store under `grammars/`. A match
 /// counts only when its pattern's text predicates hold: `#eq?`, `#match?`
 /// and `#any-of?` with their `not-` and `any-` forms, evaluated as
 /// tree-sitter documents them, a `#match?` pattern read as a Dart regular
 /// expression. Every capture carries its pattern's other predicates and
 /// directives, `#set!` among them, as text, so a changed regular
 /// expression, `#set!` value or other directive is a difference wherever
-/// the inputs reach it. It reports and does not fail.
+/// the inputs reach it. Every grammar with no inputs is listed, since the
+/// comparison cannot vouch for it; the comparison fails only when the
+/// other archive's manifest pins one of those at another commit.
 library;
 
 import 'dart:convert';
@@ -49,7 +53,9 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/git.dart';
 import 'src/grammar_pins.dart';
+import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/notices.dart';
 import 'src/release_check.dart';
@@ -67,6 +73,8 @@ typedef _Grammar = ({
   String directory,
   String symbol,
   String url,
+  String commit,
+  String? sourceCommit,
   String path,
   List<String> extensions,
 });
@@ -110,7 +118,9 @@ Future<void> main(List<String> args) async {
         runtime!,
         grammars,
         p.normalize(p.absolute(against)),
-        sources,
+        sourceRoot: sources,
+        root: root,
+        scratch: p.join(scratch.path, 'tests'),
       );
     }
   } on Exception catch (error) {
@@ -167,7 +177,13 @@ _check(
     for (final MapEntry(key: name, value: entry) in manifest.entries)
       if (entry case {
         'dylib_dir': final String directory,
-        'source': {'url': final String url, 'path': final String path},
+        'source':
+            {
+              'url': final String url,
+              'commit': final String commit,
+              'path': final String path,
+            } &&
+            final Map<String, Object?> source,
         'extensions': final List<Object?> extensions,
       })
         (
@@ -178,6 +194,8 @@ _check(
                   as String? ??
               '',
           url: url,
+          commit: commit,
+          sourceCommit: source['sourceCommit'] as String?,
           path: path,
           extensions: extensions.cast<String>(),
         ),
@@ -442,15 +460,30 @@ void _checkNotices(
 typedef _Input = ({String label, String text});
 
 /// Compares [grammars] with the same grammars in the archive extracted at
-/// [archive], parsing the inputs of the sources unpacked under
-/// [sourceRoot].
+/// [archive], parsing the inputs of the test trees [_testTrees] supplies
+/// from [sourceRoot], or from the object stores under [root] into
+/// [scratch].
+///
+/// Lists every grammar with no inputs, which the comparison cannot vouch
+/// for, and sets a failing exit code when the other archive's manifest
+/// pins one of those at another commit.
 Future<void> _compare(
   TreeSitterRuntime runtime,
   List<_Grammar> grammars,
-  String archive,
-  String sourceRoot,
-) async {
+  String archive, {
+  required String sourceRoot,
+  required String root,
+  required String scratch,
+}) async {
   print('\n── Comparing with $archive under this runtime');
+  final testTrees = await _testTrees(root, grammars, sourceRoot, scratch);
+  final theirManifest = File(p.join(archive, 'manifest.json'));
+  final theirPins = <String, String>{
+    if (theirManifest.existsSync())
+      for (final MapEntry(:key, :value) in _json(theirManifest.path).entries)
+        if (value case {'source': {'commit': final String commit}}) key: commit,
+  };
+  final uncompared = <_Grammar>[];
   var totalInputs = 0;
   final treeDifferences = <String, int>{};
   final queryDifferences = <String, int>{};
@@ -491,7 +524,11 @@ Future<void> _compare(
     );
     ourPredicates.addAll(ourQueries);
     theirPredicates.addAll(theirQueries);
-    final inputs = _inputs(grammar, grammars, sourceRoot);
+    final testTree = testTrees[repositoryName(grammar.url)];
+    final inputs = testTree == null
+        ? const <_Input>[]
+        : _inputs(grammar, grammars, testTree);
+    if (inputs.isEmpty) uncompared.add(grammar);
     totalInputs += inputs.length;
     var trees = 0;
     var captures = 0;
@@ -530,7 +567,7 @@ Future<void> _compare(
     if (captures > 0) queryDifferences[grammar.name] = captures;
     print(
       inputs.isEmpty
-          ? '${grammar.name}: no corpus or highlight tests at its pin'
+          ? '${grammar.name}: no corpus or highlight tests to parse'
           : '${grammar.name}: ${inputs.length} inputs, $trees tree '
                 'differences, $captures query-result differences',
     );
@@ -550,6 +587,66 @@ Future<void> _compare(
     'their other predicates and directives as text: '
     '${ourPredicates.carried} here, ${theirPredicates.carried} there',
   );
+  if (uncompared.isEmpty) return;
+  print(
+    'not compared, having no inputs: '
+    '${uncompared.map((g) => g.name).join(', ')}'
+    '${theirPins.isEmpty ? '; $archive records no pins, so any of these '
+              'may have changed unseen' : ''}',
+  );
+  final repinned = [
+    for (final grammar in uncompared)
+      if (theirPins[grammar.name] case final pin? when pin != grammar.commit)
+        grammar.name,
+  ];
+  if (repinned.isNotEmpty) {
+    stderr.writeln(
+      '✗ ${repinned.join(', ')}: pinned at another commit than in $archive, '
+      'with no inputs to compare',
+    );
+    exitCode = 1;
+  }
+}
+
+/// The tree each grammar repository's tests are read from, by repository
+/// name: its unpacked bundle under [sourceRoot], or, for a pin on a deploy
+/// branch, the tree of its `sourceCommit`, which carries the tests a
+/// deployed tree leaves out. That tree comes from `grammars/<repository>`
+/// under [root], fetched as needed, and is extracted into [scratch]. A
+/// repository whose tree cannot be supplied is printed and left out.
+Future<Map<String, String>> _testTrees(
+  String root,
+  List<_Grammar> grammars,
+  String sourceRoot,
+  String scratch,
+) async {
+  final trees = <String, String>{};
+  final seen = <String>{};
+  for (final grammar in grammars) {
+    final name = repositoryName(grammar.url);
+    if (!seen.add(name)) continue;
+    final sourceCommit = grammar.sourceCommit;
+    if (sourceCommit == null) {
+      trees[name] = p.join(sourceRoot, name);
+      continue;
+    }
+    final destination = p.join(
+      scratch,
+      '$name@${sourceCommit.substring(0, 8)}',
+    );
+    try {
+      final store = p.join(root, 'grammars', name);
+      await ensureObjectStore(runGit, store, grammar.url);
+      await ensureCommit(runGit, store, sourceCommit, name);
+      Directory(scratch).createSync(recursive: true);
+      await extractCommit(store, sourceCommit, destination);
+      trees[name] = destination;
+      print('$name: tests read at its source commit $sourceCommit');
+    } on Exception catch (error) {
+      print('$name: cannot read the tests at its source commit: $error');
+    }
+  }
+  return trees;
 }
 
 /// What the compared queries' patterns hold, for the summary.
@@ -589,16 +686,17 @@ Map<String, Query> _compileAll(
   return queries;
 }
 
-/// Every corpus example and highlight input of [grammar]'s repository that
-/// [grammar] parses: an example names its language with `:language(...)`
-/// or falls to its corpus's default grammar, and a highlight input goes to
-/// the grammar whose extensions include its own.
+/// Every corpus example and highlight input in [repository], the test tree
+/// of [grammar]'s repository, that [grammar] parses: an example names its
+/// language with `:language(...)` or falls to its corpus's default
+/// grammar, and a highlight input goes to the grammar whose extensions
+/// include its own.
 List<_Input> _inputs(
   _Grammar grammar,
   List<_Grammar> grammars,
-  String sourceRoot,
+  String repository,
 ) {
-  final repository = p.join(sourceRoot, repositoryName(grammar.url));
+  final labels = p.dirname(repository);
   final siblings = grammars.where((g) => g.url == grammar.url).toList();
   final firstName = _firstGrammarName(repository) ?? siblings.first.name;
   final inputs = <_Input>[];
@@ -608,7 +706,7 @@ List<_Input> _inputs(
       Directory(p.join(repository, base, 'corpus')),
     ].where((directory) => directory.existsSync()).firstOrNull;
     for (final file in corpus == null ? const <File>[] : _files(corpus)) {
-      final label = p.relative(file.path, from: sourceRoot);
+      final label = p.relative(file.path, from: labels);
       for (final example in parseCorpus(file.readAsStringSync())) {
         for (final language in example.languages) {
           final target = language.isEmpty ? defaultName : language;
@@ -627,7 +725,7 @@ List<_Input> _inputs(
           .firstOrNull;
       if ((owner ?? defaultName) == grammar.name) {
         inputs.add((
-          label: p.relative(file.path, from: sourceRoot),
+          label: p.relative(file.path, from: labels),
           text: utf8.decode(file.readAsBytesSync(), allowMalformed: true),
         ));
       }
