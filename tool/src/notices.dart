@@ -184,24 +184,31 @@ List<(String, String)> _readLicenses(
   String name,
   List<String> problems,
 ) {
-  final licenses = <(String, String)>[];
-  for (final path in paths) {
-    final text = _readText(p.join(directory, path));
-    if (text == null) {
-      problems.add('$name: no readable $path');
-    } else {
-      licenses.add((path, text));
-    }
-  }
-  return licenses;
+  return [
+    for (final path in paths)
+      if (_readText(directory, path, name, problems) case final text?)
+        (path, text),
+  ];
 }
 
-String? _readText(String path) {
-  final file = File(path);
-  if (!file.existsSync()) return null;
+/// The text of [path] under [directory], or null after recording in
+/// [problems], under [name], that it is missing or not UTF-8: a notice
+/// is reproduced verbatim or not at all.
+String? _readText(
+  String directory,
+  String path,
+  String name,
+  List<String> problems,
+) {
+  final file = File(p.join(directory, path));
+  if (!file.existsSync()) {
+    problems.add('$name: no $path');
+    return null;
+  }
   try {
     return utf8.decode(file.readAsBytesSync());
   } on FormatException {
+    problems.add('$name: $path is not UTF-8 text');
     return null;
   }
 }
@@ -229,6 +236,7 @@ String _grammarNotice(
   if (licenseFiles.isEmpty) {
     problems.add('$repository: no licence file at its root');
   }
+  final licenses = _readLicenses(directory, licenseFiles, repository, problems);
   final builds = input.builds.where((build) => build.entry == entry).toList();
   final extraNotices = [...?(entry['extraNotices'] as List?)?.cast<String>()];
   final copyrighted = <String, List<String>>{};
@@ -274,10 +282,8 @@ String _grammarNotice(
       '${_libraryList(builds)} from $url at ${entry['commit']}'
       '$deployedFrom. Licence: $license.\n\n',
     );
-  for (final file in licenseFiles) {
-    buffer.write(
-      _fenced(file, _readText(p.join(directory, file)) ?? '', level: 4),
-    );
+  for (final (file, text) in licenses) {
+    buffer.write(_fenced(file, text, level: 4));
   }
   for (final source in extraNotices) {
     final comments = copyrighted[source];

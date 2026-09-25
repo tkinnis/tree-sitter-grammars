@@ -121,6 +121,18 @@ void main() {
         .contains('tree-sitter-x: no licence file at its root');
   });
 
+  test('refuses a licence file that is not UTF-8 text', () {
+    final (input, _) = fixture();
+    File(path('src/tree-sitter-x/LICENSE')).writeAsBytesSync(
+      latin1.encode('Copyright (c) 2021 Patrick F\xf6rster\n'),
+    );
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems, 'problems')
+        .contains('tree-sitter-x: LICENSE is not UTF-8 text');
+  });
+
   test('refuses a compiled copyright comment extraNotices does not name', () {
     final (input, _) = fixture(helperComment: _bsd);
 
