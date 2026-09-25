@@ -18,6 +18,12 @@
 
 (invocation_expression function: (member_access_expression name: (identifier) @name)) @reference.send
 
-(namespace_declaration name: (identifier) @name) @definition.module
+(namespace_declaration name: (_) @name) @definition.module
+
+; A file-scoped namespace holds every declaration after it in the file,
+; which the grammar parses as the namespace's siblings, so its definition
+; is the compilation unit, whose range holds them.
+(compilation_unit
+  (file_scoped_namespace_declaration name: (_) @name)) @definition.module
 
 (namespace_declaration name: (identifier) @name) @module

@@ -134,6 +134,8 @@ class Inventory.StockTests
 method Inventory.StockTests.CountsWhatWasReceived
 ```
 
+A file-scoped namespace (`namespace Contoso.Ledger.Tests;`) holds the declarations after it, which the grammar parses as its siblings, so C#'s `tags.scm` defines it over the whole compilation unit, and they nest under it.
+
 ## Using Pre-built Binaries
 
 Download `grammars-macos-arm64.tar.gz` from [GitHub Releases](../../releases).

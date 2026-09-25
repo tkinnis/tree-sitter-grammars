@@ -1,0 +1,9 @@
+module Contoso.Ledger.Tests
+class Contoso.Ledger.Tests.LedgerTests
+method Contoso.Ledger.Tests.LedgerTests.CreateLedger
+method Contoso.Ledger.Tests.LedgerTests.BalancesAfterPosting
+method Contoso.Ledger.Tests.LedgerTests.PostsEveryAmount
+class Contoso.Ledger.Tests.LedgerTests.Reconciliation
+method Contoso.Ledger.Tests.LedgerTests.Reconciliation.MatchesTheStatement
+class Contoso.Ledger.Tests.Ledger
+method Contoso.Ledger.Tests.Ledger.Post

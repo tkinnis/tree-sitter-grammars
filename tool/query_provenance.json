@@ -147,7 +147,7 @@
   },
   "queries/c-sharp/tags.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-c-sharp",
       "commit": "bf99ce8e40358bd215b06727b07ecc3f1e575afb",

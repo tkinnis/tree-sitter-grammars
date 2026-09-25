@@ -2234,7 +2234,7 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `ada/textobjects.scm` | tree-sitter-ada | `queries/textobjects.scm` | `ba7951a8f3fb08f9ea923625153e7670c89f30b4` | MIT | modified in tree-sitter-grammars |
 | `bash/highlights.scm` | tree-sitter-bash | `queries/highlights.scm` | `422a07cb221b92c6b117e854efa8945a506b5214` | MIT | unchanged |
 | `c-sharp/highlights.scm` | tree-sitter-c-sharp | `queries/highlights.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | unchanged |
-| `c-sharp/tags.scm` | tree-sitter-c-sharp | `queries/tags.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | unchanged |
+| `c-sharp/tags.scm` | tree-sitter-c-sharp | `queries/tags.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | modified in tree-sitter-grammars |
 | `c/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |
 | `c/tags.scm` | tree-sitter-c | `queries/tags.scm` | `0d33f0422ad391c6d652283645d546ffa048f503` | MIT | unchanged |
 | `cpp/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |

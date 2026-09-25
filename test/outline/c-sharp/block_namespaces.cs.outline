@@ -1,0 +1,13 @@
+module Contoso.Billing
+module Contoso.Billing.Tests
+class Contoso.Billing.Tests.InvoiceTests
+method Contoso.Billing.Tests.InvoiceTests.TotalsEveryLine
+method Contoso.Billing.Tests.InvoiceTests.MultipliesQuantityByPrice
+class Contoso.Billing.Tests.InvoiceTests.WhenEmpty
+method Contoso.Billing.Tests.InvoiceTests.WhenEmpty.HasNoLines
+interface Contoso.Billing.IPriced
+class Contoso.Billing.Invoice
+method Contoso.Billing.Invoice.Sum
+module Contoso.Shipping.Tests
+class Contoso.Shipping.Tests.ParcelTests
+method Contoso.Shipping.Tests.ParcelTests.WeighsNothingEmpty
