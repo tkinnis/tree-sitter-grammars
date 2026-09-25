@@ -92,6 +92,21 @@ void ts_parser_delete(
     });
   });
 
+  group("this repository's queries", () {
+    test("php's folds and indents compose with php_only's", () {
+      String compose(String file) =>
+          composeQuery(p.join('queries', 'php'), file)!;
+
+      check(compose('indents.scm'))
+        ..contains('(array_creation_expression)')
+        ..contains('@indent.begin');
+      check(compose('folds.scm'))
+        ..contains('(function_static_declaration)')
+        ..contains('(compound_statement)')
+        ..not((folds) => folds.contains('(if_statement)'));
+    });
+  });
+
   group('parseCorpus', () {
     test('reads names, inputs and languages', () {
       const corpus = '''

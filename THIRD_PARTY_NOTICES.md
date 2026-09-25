@@ -2162,6 +2162,8 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `perl/injections.scm` | `queries/perl/injections.scm` | `57a8acf0c4ed5e7f6dda83c3f9b073f8a99a70f9` | by way of the grammar's file below |
 | `php/folds.scm` | `queries/php/folds.scm` | `3cb46f0c81a5640cd3b342e8a50e77058d7923d5` | modified in tree-sitter-grammars |
 | `php/indents.scm` | `runtime/queries/php/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
+| `php_only/folds.scm` | `runtime/queries/php_only/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
+| `php_only/indents.scm` | `runtime/queries/php_only/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `proto/folds.scm` | `runtime/queries/proto/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `proto/highlights.scm` | `runtime/queries/proto/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `proto/indents.scm` | `runtime/queries/proto/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |

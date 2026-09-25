@@ -1,0 +1,20 @@
+{
+  "displayName": "PHP Only",
+  "scope": "source.php_only",
+  "extensions": [],
+  "queryOnly": true,
+  "comments": {
+    "line": ["//", "#"],
+    "block": ["/*", "*/"],
+    "blockContinuation": " * "
+  },
+  "brackets": [
+    {"open": "{", "close": "}", "autoClose": true, "newline": true},
+    {"open": "(", "close": ")", "autoClose": true, "newline": false},
+    {"open": "[", "close": "]", "autoClose": true, "newline": false},
+    {"open": "\"", "close": "\"", "autoClose": true, "newline": false},
+    {"open": "'", "close": "'", "autoClose": true, "newline": false},
+    {"open": "/**", "close": " */", "autoClose": true, "newline": true},
+    {"open": "/*", "close": "*/", "autoClose": true, "newline": true}
+  ]
+}

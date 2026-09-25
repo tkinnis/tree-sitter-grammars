@@ -14,7 +14,7 @@ A local command builds the archive from pinned sources: the tree-sitter runtime 
 
 ## Supported Languages
 
-49 compiled grammars, three query-only languages that others inherit (`ecma`, `jsx`, `html_tags`) and plain text, including: Ada, Bash, C, C++, C#, CSS, Dart, Go, Haskell, HTML, Java, JavaScript, JSON, Kotlin, Lua, Markdown, Objective-C, OCaml, Pascal, Perl, PHP, Python, Ruby, Rust, Scala, SQL, Swift, TypeScript, XML, YAML and Zig.
+49 compiled grammars, four query-only languages that others inherit (`ecma`, `jsx`, `html_tags`, `php_only`) and plain text, including: Ada, Bash, C, C++, C#, CSS, Dart, Go, Haskell, HTML, Java, JavaScript, JSON, Kotlin, Lua, Markdown, Objective-C, OCaml, Pascal, Perl, PHP, Python, Ruby, Rust, Scala, SQL, Swift, TypeScript, XML, YAML and Zig.
 
 See `tool/grammars.json` for the complete list.
 
@@ -143,7 +143,7 @@ grammars-macos-arm64.tar.gz
 │   │   ├── config.json        # Language configuration
 │   │   └── *.scm              # Query files
 │   └── .../
-└── queries/                   # Query-only languages: ecma, html_tags, jsx
+└── queries/                   # Query-only languages: ecma, html_tags, jsx, php_only
     └── <lang>/
         ├── config.json
         └── *.scm

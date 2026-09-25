@@ -461,5 +461,16 @@
       "folds": true,
       "injections": true
     }
+  },
+  {
+    "name": "php_only",
+    "displayName": "PHP Only",
+    "extensions": [],
+    "scope": "source.php_only",
+    "queryOnly": true,
+    "queries": {
+      "folds": true,
+      "indents": true
+    }
   }
 ]
