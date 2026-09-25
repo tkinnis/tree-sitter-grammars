@@ -92,9 +92,10 @@ final class NoticesInput {
 /// Throws a [NoticesException] listing every problem: a grammar with no
 /// `license` field or no licence file at its root, a query file the
 /// provenance does not list, or a compiled source outside `src/tree_sitter/`
-/// whose comments mention a copyright without an `extraNotices` entry
-/// naming it (and any `extraNotices` entry naming a file with no such
-/// comment).
+/// that mentions a copyright anywhere without an `extraNotices` entry
+/// naming it (and any `extraNotices` entry naming a file with no copyright
+/// comment). A mention outside every comment is a problem too, since
+/// only a comment can be reproduced; the check errs toward stopping.
 String thirdPartyNotices(NoticesInput input) {
   final problems = [...input.provenance.problems];
   final runtimeLicenses = _readLicenses(
@@ -234,10 +235,17 @@ String _grammarNotice(
   for (final build in builds) {
     final sourceDirectory = p.posix.normalize(p.posix.join(build.path, 'src'));
     for (final source in compiledSources(directory, sourceDirectory)) {
-      final comments = copyrightComments(
-        File(p.join(directory, source)).readAsStringSync(),
-      );
-      if (comments.isNotEmpty) copyrighted[source] = comments;
+      final text = File(p.join(directory, source)).readAsStringSync();
+      if (!_copyright.hasMatch(text)) continue;
+      final comments = copyrightComments(text);
+      if (comments.isEmpty) {
+        problems.add(
+          '$repository: $source mentions a copyright outside any comment, '
+          'which the notices cannot reproduce; read it by hand',
+        );
+      } else {
+        copyrighted[source] = comments;
+      }
     }
   }
   for (final source in copyrighted.keys) {
@@ -295,18 +303,19 @@ String _libraryList(List<GrammarBuild> builds) {
   return '$list ${names.length == 1 ? 'is' : 'are'} compiled';
 }
 
-/// Every problem with the runtime's compiled sources: a copyright comment
-/// in a file outside `lib/src/unicode/`, whose licence the notices carry.
+/// Every problem with the runtime's compiled sources: a file outside
+/// `lib/src/unicode/`, whose licence the notices carry, that mentions a
+/// copyright.
 List<String> _runtimeCopyrightProblems(String runtimeDirectory) => [
   for (final source in includedFiles(runtimeDirectory, [
     'lib/src/lib.c',
   ], runtimeIncludeDirectories))
     if (!source.startsWith('lib/src/unicode/') &&
-        copyrightComments(
+        _copyright.hasMatch(
           File(p.join(runtimeDirectory, source)).readAsStringSync(),
-        ).isNotEmpty)
-      'tree-sitter: $source carries a copyright comment the notices '
-          'do not reproduce',
+        ))
+      'tree-sitter: $source mentions a copyright the notices do not '
+          'reproduce',
 ];
 
 /// The files a grammar's library compiles, relative to its repository

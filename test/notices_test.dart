@@ -47,6 +47,7 @@ void main() {
   /// header carrying [helperComment].
   (NoticesInput, Map<String, Object?>) fixture({
     String helperComment = '// helpers',
+    String parser = 'int parse(void);\n',
     List<String>? extraNotices,
     bool license = true,
   }) {
@@ -55,7 +56,7 @@ void main() {
     write('src/tree-sitter/lib/src/lib.c', '#include "./parser.c"\n');
     write('src/tree-sitter/lib/src/parser.c', '#include <stdio.h>\n');
     if (license) write('src/tree-sitter-x/LICENSE', 'grammar licence\n');
-    write('src/tree-sitter-x/src/parser.c', 'const char *s = "Copyright";\n');
+    write('src/tree-sitter-x/src/parser.c', parser);
     write('src/tree-sitter-x/src/scanner.c', '#include "helper.h"\n');
     write('src/tree-sitter-x/src/helper.h', '$helperComment\n');
     write(
@@ -136,6 +137,15 @@ void main() {
     );
 
     check(thirdPartyNotices(input)).contains(_bsd);
+  });
+
+  test('refuses a copyright mentioned outside any comment', () {
+    final (input, _) = fixture(parser: 'const char *s = "Copyright";\n');
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems.single, 'problem')
+        .contains('src/parser.c mentions a copyright outside any comment');
   });
 
   test('refuses an extraNotices entry naming no copyrighted source', () {

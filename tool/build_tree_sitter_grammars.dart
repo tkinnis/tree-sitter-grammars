@@ -400,6 +400,15 @@ void _writeNotices(String root, String outputDirectory, NoticesInput input) {
 /// Requires the `tree-sitter` submodule's checkout to be the toolchain's
 /// commit.
 Future<void> _requireRuntimeSubmodule(String root, Toolchain toolchain) async {
+  // Without its own .git, git would answer for this repository instead.
+  if (FileSystemEntity.typeSync(p.join(root, 'tree-sitter', '.git')) ==
+      FileSystemEntityType.notFound) {
+    throw const BuildException(
+      'the tree-sitter submodule is not checked out: run '
+      'git submodule update --init, or build from a release\'s source '
+      'bundles with --sources=<dir>',
+    );
+  }
   final head = (await runGit(p.join(root, 'tree-sitter'), [
     'rev-parse',
     'HEAD',

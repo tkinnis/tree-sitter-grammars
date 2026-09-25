@@ -91,6 +91,7 @@ Future<void> packBundle(
   Map<String, String>? environment,
 }) async {
   final prefix = _prefix(bundle);
+  File(bundle).parent.createSync(recursive: true);
   final tar = '$bundle.tar';
   await runIsolatedGit(directory, [
     '-c',

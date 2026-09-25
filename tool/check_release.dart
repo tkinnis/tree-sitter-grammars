@@ -204,7 +204,7 @@ Future<void> _checkSources(
         p.join(sourceRoot, source.name),
       );
       good++;
-    } on SourceBundleException catch (error) {
+    } on Exception catch (error) {
       problems.add('${source.name}: $error');
     }
   }
