@@ -1,9 +1,10 @@
 .DS_Store
 output/
+build/
+.cache/
 grammars/
 node_modules/
 .dart_tool/
 pubspec.lock
 *.tar.gz
 *.zip
-
