@@ -71,18 +71,50 @@ List<PinnedSource> pinnedSources(
 ];
 
 /// The executables every bundle is packed and unpacked with, named by path
-/// so a different `tar` or `gzip` earlier on `PATH` never writes the bytes.
+/// so a different `git`, `tar` or `gzip` earlier on `PATH` never writes the
+/// bytes. `/usr/bin/git` runs the git of the Xcode that `xcrun` selects,
+/// honouring `DEVELOPER_DIR`, as the build's clang does.
+const bundleGit = '/usr/bin/git';
 const _tar = '/usr/bin/tar';
 const _gzip = '/usr/bin/gzip';
+
+/// The first line of `--version` of each tool whose output lands in the
+/// bundles or the archive, by name: [bundleGit], which writes each bundle's
+/// tar, and `/usr/bin/gzip` and `/usr/bin/tar`, which compress the bundles
+/// and pack the archive.
+Future<Map<String, String>> packingToolVersions() async {
+  final versions = <String, String>{};
+  for (final (name, executable) in [
+    ('git', bundleGit),
+    ('gzip', _gzip),
+    ('tar', _tar),
+  ]) {
+    final result = await Process.run(executable, ['--version']);
+    if (result.exitCode != 0) {
+      throw SourceBundleException(
+        '$executable --version exited ${result.exitCode}: ${result.stderr}',
+      );
+    }
+    // Apple's gzip prints its version on standard error.
+    final text = '${result.stdout}'.trim().isEmpty
+        ? '${result.stderr}'
+        : '${result.stdout}';
+    versions[name] = text.trim().split('\n').first.trim();
+    if (versions[name]!.isEmpty) {
+      throw SourceBundleException('$executable --version printed nothing');
+    }
+  }
+  return versions;
+}
 
 /// Writes the tree of [commit] in the git repository [directory] to
 /// [bundle], under a top-level directory named for [bundle].
 ///
-/// `git archive` runs cut off from the user's and the system's
-/// configuration, with no attributes file, no line-ending conversion and a
-/// `tar.umask` of 0022; `gzip -n -9` compresses it with no name or time.
-/// The same commit therefore packs to the same bytes with the same git and
-/// gzip. [environment] replaces this process's environment as the one
+/// [bundleGit]'s `git archive` runs cut off from the user's and the
+/// system's configuration, with no attributes file, no line-ending
+/// conversion and a `tar.umask` of 0022; `gzip -n -9` compresses it with no
+/// name or time. The same commit therefore packs to the same bytes with the
+/// same git and gzip, whose versions [packingToolVersions] reads. [environment] replaces this process's environment as the one
 /// git's isolation starts from.
 Future<void> packBundle(
   String directory,
@@ -93,21 +125,26 @@ Future<void> packBundle(
   final prefix = _prefix(bundle);
   File(bundle).parent.createSync(recursive: true);
   final tar = '$bundle.tar';
-  await runIsolatedGit(directory, [
-    '-c',
-    'core.attributesFile=/dev/null',
-    '-c',
-    'core.autocrlf=false',
-    '-c',
-    'core.eol=lf',
-    '-c',
-    'tar.umask=0022',
-    'archive',
-    '--format=tar',
-    '--prefix=$prefix/',
-    '--output=${p.absolute(tar)}',
-    commit,
-  ], environment: environment);
+  await runIsolatedGit(
+    directory,
+    [
+      '-c',
+      'core.attributesFile=/dev/null',
+      '-c',
+      'core.autocrlf=false',
+      '-c',
+      'core.eol=lf',
+      '-c',
+      'tar.umask=0022',
+      'archive',
+      '--format=tar',
+      '--prefix=$prefix/',
+      '--output=${p.absolute(tar)}',
+      commit,
+    ],
+    environment: environment,
+    executable: bundleGit,
+  );
   try {
     final gzip = await Process.start(_gzip, ['-n', '-9', '-c', tar]);
     final written = gzip.stdout.pipe(File(bundle).openWrite());

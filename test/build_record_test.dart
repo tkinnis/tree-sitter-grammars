@@ -74,6 +74,11 @@ Map<String, Object?> _info(BuildFlags flags) =>
               languageVersion: 15,
               minCompatibleLanguageVersion: 13,
               sources: const {},
+              packingTools: const {
+                'git': 'git version 2.50.1 (Apple Git-155)',
+                'gzip': 'Apple gzip 457.140.3',
+                'tar': 'bsdtar 3.5.3',
+              },
             ),
           ),
         )
@@ -99,6 +104,14 @@ void main() {
       check(list.where((flag) => flag.contains('NDEBUG'))).isEmpty();
       check(list).contains('-mmacosx-version-min=13.0');
     }
+  });
+
+  test('build_info records the tools that write the bundles', () {
+    final toolchain = _info(flags)['toolchain']! as Map<String, Object?>;
+
+    check(toolchain['git']).equals('git version 2.50.1 (Apple Git-155)');
+    check(toolchain['gzip']).equals('Apple gzip 457.140.3');
+    check(toolchain['tar']).equals('bsdtar 3.5.3');
   });
 
   test('invocations built from the flags match what build_info records', () {

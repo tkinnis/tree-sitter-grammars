@@ -20,7 +20,9 @@ const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 /// The contents of `output/build_info.json`.
 ///
 /// [sources] records each source bundle the build compiled from, by
-/// repository name, as `bundleRecord` writes it.
+/// repository name, as `bundleRecord` writes it; [packingTools] the
+/// versions `packingToolVersions` reads of the git, gzip and tar that
+/// write the bundles and the archive.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -31,6 +33,7 @@ Map<String, Object?> buildInfo({
   required int languageVersion,
   required int minCompatibleLanguageVersion,
   required Map<String, Map<String, Object?>> sources,
+  required Map<String, String> packingTools,
 }) => {
   'release': release,
   'platform': 'macos-${toolchain.arch}',
@@ -56,6 +59,9 @@ Map<String, Object?> buildInfo({
     'sdk': compiler.sdkVersion,
     'sdkBuild': compiler.sdkBuildVersion,
     'sdkPath': compiler.sdkPath,
+    'git': packingTools['git'],
+    'gzip': packingTools['gzip'],
+    'tar': packingTools['tar'],
     'flags': {
       'workingDirectoryPlaceholder': workingDirectoryPlaceholder,
       'runtime': flags.runtime,

@@ -305,6 +305,7 @@ Future<void> _build(String root, _Options options) async {
     languageVersion: languageVersions.current,
     minCompatibleLanguageVersion: languageVersions.minCompatible,
     sources: sourceRecords,
+    packingTools: await packingToolVersions(),
   );
   File(
     p.join(outputDirectory, 'build_info.json'),

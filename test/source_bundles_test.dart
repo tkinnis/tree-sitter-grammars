@@ -57,6 +57,36 @@ void main() {
     check(File(a).readAsBytesSync()).deepEquals(File(b).readAsBytesSync());
   });
 
+  test('a git earlier on PATH never writes a bundle', () async {
+    final fake = File(path('fake/git'))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync('#!/bin/sh\nexit 7\n');
+    await Process.run('/bin/chmod', ['755', fake.path]);
+    final bundle = path('bundles/${source(first).bundleName}');
+    Directory(path('bundles')).createSync();
+
+    await packBundle(
+      upstream.path,
+      first,
+      bundle,
+      environment: {
+        ...Platform.environment,
+        'PATH': '${fake.parent.path}:${Platform.environment['PATH']}',
+      },
+    );
+
+    check(await bundleCommit(bundle)).equals(first);
+  });
+
+  test('the packing tools report their versions', () async {
+    final versions = await packingToolVersions();
+
+    check(versions.keys).unorderedEquals(['git', 'gzip', 'tar']);
+    check(versions['git']!).startsWith('git version ');
+    check(versions['gzip']!).contains('gzip');
+    check(versions['tar']!).contains('tar');
+  });
+
   test('a bundle unpacks to the commit\'s tree and names its commit', () async {
     final bundle = await pack(first, path('bundles'));
 

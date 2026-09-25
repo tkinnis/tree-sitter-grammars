@@ -64,7 +64,7 @@ dart pub get
 dart run tool/build_tree_sitter_grammars.dart
 ```
 
-The build starts from empty `build/` and `output/` directories. For the runtime and every grammar repository it packs a source bundle: the tree `git archive` writes at the pin, with git's user and system configuration shut out, compressed by `gzip -n -9` into `output/sources/<repository>-<commit>.tar.gz`. It uses `tree-sitter/` and `grammars/<repo>` only as git object stores (a grammar's store is created and fetched as needed; its working tree is never read), unpacks each bundle into `build/src/`, and checks every unpacked file against its committed blob. It compiles each library with `-O3` and tree-sitter's assertions on. `output/build_info.json` records the runtime, the compiler, the exact flags and the sha256 of every source bundle; `build/compile_commands.json` records every compiler invocation, and the build fails unless each one passed exactly the recorded flags.
+The build starts from empty `build/` and `output/` directories. For the runtime and every grammar repository it packs a source bundle: the tree `git archive` writes at the pin, run by `/usr/bin/git` (the git of the Xcode `xcrun` selects) with git's user and system configuration shut out, compressed by `/usr/bin/gzip -n -9` into `output/sources/<repository>-<commit>.tar.gz`. It uses `tree-sitter/` and `grammars/<repo>` only as git object stores (a grammar's store is created and fetched as needed; its working tree is never read), unpacks each bundle into `build/src/`, and checks every unpacked file against its committed blob. It compiles each library with `-O3` and tree-sitter's assertions on. `output/build_info.json` records the runtime, the compiler, the exact flags, the versions of the git, gzip and tar that write the bundles and the archive, and the sha256 of every source bundle; `build/compile_commands.json` records every compiler invocation, and the build fails unless each one passed exactly the recorded flags.
 
 The build writes into `build/out/` and moves it to `output/` only after every check passes, so `output/` exists only after a successful build.
 
@@ -103,7 +103,7 @@ Download `grammars-macos-arm64.tar.gz` from [GitHub Releases](../../releases).
 grammars-macos-arm64.tar.gz
 ├── libtree-sitter.dylib       # The tree-sitter runtime
 ├── manifest.json              # Every language, its library and its pinned source
-├── build_info.json            # The runtime, compiler, flags and source bundles the build used
+├── build_info.json            # The runtime, compiler, flags, packing tools and source bundles the build used
 ├── THIRD_PARTY_NOTICES.md     # Every licence of the runtime, the grammars and the queries
 ├── dylibs/
 │   ├── c/
@@ -248,7 +248,7 @@ git checkout v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets
 ```
 
-With `--sources`, the build reads no git object store and needs neither `grammars/` nor the `tree-sitter` submodule. Each bundle must have the sha256 the release's `build_info.json` records and must name its pinned commit in its header. The two grammars the build generates (latex and swift) still need the tree-sitter CLI, which the build downloads from tree-sitter's release and checks against the sha256 in `tool/toolchain.json`. The same Xcode produces the same bytes.
+With `--sources`, the build reads no git object store and needs neither `grammars/` nor the `tree-sitter` submodule. Each bundle must have the sha256 the release's `build_info.json` records and must name its pinned commit in its header. The two grammars the build generates (latex and swift) still need the tree-sitter CLI, which the build downloads from tree-sitter's release and checks against the sha256 in `tool/toolchain.json`. The same bytes come back from the same Xcode, whose clang compiles every library and whose git writes the source bundles, with the same macOS `/usr/bin/gzip` and `/usr/bin/tar`: `build_info.json` records all four, and since the archive carries `build_info.json` with every bundle's sha256, its bytes depend on them too.
 
 ## License
 

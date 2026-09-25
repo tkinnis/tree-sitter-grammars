@@ -71,9 +71,10 @@ Future<_GitResult> _git(
   List<String> arguments,
   Map<String, String> environment, {
   String? input,
+  String executable = 'git',
 }) async {
   final process = await Process.start(
-    'git',
+    executable,
     arguments,
     workingDirectory: directory,
     environment: environment,
@@ -106,20 +107,23 @@ Future<String> runGit(String directory, List<String> arguments) async =>
       arguments,
     );
 
-/// Runs the real `git` with [isolatedGitEnvironment] of [environment], by
-/// default this process's, writing [input] to its standard input; throws a
-/// [GitException] on a non-zero exit.
+/// Runs [executable], by default the `git` on `PATH`, with
+/// [isolatedGitEnvironment] of [environment], by default this process's,
+/// writing [input] to its standard input; throws a [GitException] on a
+/// non-zero exit.
 Future<String> runIsolatedGit(
   String directory,
   List<String> arguments, {
   Map<String, String>? environment,
   String? input,
+  String executable = 'git',
 }) async => _stdout(
   await _git(
     directory,
     arguments,
     isolatedGitEnvironment(environment ?? Platform.environment),
     input: input,
+    executable: executable,
   ),
   directory,
   arguments,
