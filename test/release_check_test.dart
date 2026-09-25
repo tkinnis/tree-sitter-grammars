@@ -67,15 +67,10 @@ void ts_parser_delete(
       write('dylibs/b/h.scm', '(b)');
       write('queries/missing/other.scm', '(other)');
 
-      for (final composition in [
-        () => compose('a'),
-        () => composedFiles(p.join(archive.path, 'dylibs', 'a'), 'h.scm'),
-      ]) {
-        check(composition)
-            .throws<QueryInheritanceException>()
-            .has((error) => error.message, 'message')
-            .equals('a/h.scm inherits missing, which holds no h.scm');
-      }
+      check(() => compose('a'))
+          .throws<QueryInheritanceException>()
+          .has((error) => error.message, 'message')
+          .equals('a/h.scm inherits missing, which holds no h.scm');
     });
 
     test('refuses a missing name in a file it inherits', () {
@@ -110,28 +105,99 @@ void ts_parser_delete(
         composeQuery(p.join(archive.path, 'dylibs', 'none'), 'h.scm'),
       ).isNull();
     });
+  });
 
-    test('composedFiles names every file the composition reads', () {
+  group('composeArchiveQueries', () {
+    late Directory archive;
+    late List<String> problems;
+
+    setUp(() {
+      archive = Directory.systemTemp.createTempSync('archive');
+      problems = [];
+    });
+    tearDown(() => archive.deleteSync(recursive: true));
+
+    void write(String relative, String text) =>
+        File(p.join(archive.path, relative))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync(text);
+
+    ArchiveQueries composeAll(List<String> grammars) => composeArchiveQueries(
+      archive.path,
+      [for (final name in grammars) p.join(archive.path, 'dylibs', name)],
+      problems,
+    );
+
+    test('composes every file, each query-only file read', () {
+      write('dylibs/tsx/h.scm', '; inherits: typescript,jsx\n(t)');
+      write('dylibs/typescript/h.scm', '; inherits: ecma\n(ts)');
+      write('dylibs/typescript/l.scm', '; inherits: ecma\n(tl)');
+      write('queries/ecma/h.scm', '(e)');
+      write('queries/ecma/l.scm', '(el)');
+      write('queries/jsx/h.scm', '(j)');
+
+      final queries = composeAll(['tsx', 'typescript']);
+
+      check(problems).isEmpty();
+      check(queries.fileCount).equals(3);
+      check([
+        for (final query in queries.composed)
+          (p.basename(query.directory), query.fileName, query.source),
+      ]).deepEquals([
+        ('tsx', 'h.scm', '(e)\n\n(ts)\n\n(j)\n\n(t)'),
+        ('typescript', 'h.scm', '(e)\n\n(ts)'),
+        ('typescript', 'l.scm', '(el)\n\n(tl)'),
+      ]);
+      check(queries.queryOnlyCount).equals(3);
+      check(queries.queryOnlyReadCount).equals(3);
+    });
+
+    test('lists a name that holds no file and composes the rest', () {
+      write('dylibs/php/folds.scm', '; inherits: php_only\n(p)');
+      write('dylibs/php/indents.scm', '; inherits: php_only\n(pi)');
+      write('queries/php_only/folds.scm', '(o)');
+
+      final queries = composeAll(['php']);
+
+      check(problems).deepEquals([
+        'php/indents.scm inherits php_only, which holds no indents.scm',
+      ]);
+      check(queries.fileCount).equals(2);
+      check([
+        for (final query in queries.composed) query.fileName,
+      ]).deepEquals(['folds.scm']);
+      check(queries.queryOnlyReadCount).equals(1);
+    });
+
+    test('lists a query-only file nothing inherits', () {
       write('dylibs/tsx/h.scm', '; inherits: typescript,jsx\n(t)');
       write('dylibs/typescript/h.scm', '; inherits: ecma\n(ts)');
       write('queries/ecma/h.scm', '(e)');
       write('queries/ecma/l.scm', '(unread)');
       write('queries/jsx/h.scm', '(j)');
 
-      check(
-        composedFiles(p.join(archive.path, 'dylibs', 'tsx'), 'h.scm'),
-      ).unorderedEquals([
-        for (final file in [
-          'dylibs/tsx/h.scm',
-          'dylibs/typescript/h.scm',
-          'queries/ecma/h.scm',
-          'queries/jsx/h.scm',
-        ])
-          p.join(archive.path, file),
+      final queries = composeAll(['tsx']);
+
+      check(problems).deepEquals([
+        "queries/ecma/l.scm: no grammar's l.scm inherits it, so nothing "
+            'reads it',
       ]);
+      check(queries.queryOnlyCount).equals(3);
+      check(queries.queryOnlyReadCount).equals(2);
+    });
+
+    test('counts what a composition read before a name holding nothing', () {
+      write('dylibs/tsx/h.scm', '; inherits: typescript,missing\n(t)');
+      write('dylibs/typescript/h.scm', '; inherits: ecma\n(ts)');
+      write('queries/ecma/h.scm', '(e)');
+
+      final queries = composeAll(['tsx']);
+
       check(
-        composedFiles(p.join(archive.path, 'dylibs', 'none'), 'h.scm'),
-      ).isEmpty();
+        problems,
+      ).deepEquals(['tsx/h.scm inherits missing, which holds no h.scm']);
+      check(queries.composed).isEmpty();
+      check(queries.queryOnlyReadCount).equals(1);
     });
   });
 

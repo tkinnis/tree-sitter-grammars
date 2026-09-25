@@ -568,17 +568,9 @@ Map<String, Pointer<Void>> _checkGrammars(
   return languages;
 }
 
-/// The query files of a grammar's directory, sorted.
-List<String> _queryFiles(String directory) => [
-  for (final entity in Directory(directory).listSync())
-    if (entity is File && entity.path.endsWith('.scm')) p.basename(entity.path),
-]..sort();
-
-/// Compiles every query file of every grammar, composed, and requires
-/// every file of a query-only language in [output]'s `queries/` to be read
-/// by one of those compositions: the editor reads such a file only through
-/// an `; inherits:` line, so one nothing inherits is never compiled or
-/// used.
+/// Composes every query file of every grammar as [composeArchiveQueries]
+/// does, which lists its problems, and compiles each composition with its
+/// grammar's language.
 void _checkQueries(
   TreeSitterRuntime runtime,
   String output,
@@ -586,54 +578,32 @@ void _checkQueries(
   Map<String, Pointer<Void>> languages,
   List<String> problems,
 ) {
-  var files = 0;
+  final grammarAt = {
+    for (final grammar in grammars) grammar.directory: grammar,
+  };
+  final queries = composeArchiveQueries(output, grammarAt.keys, problems);
   var compiled = 0;
   var patterns = 0;
-  final read = <String>{};
-  for (final grammar in grammars) {
-    final language = languages[grammar.name];
-    for (final file in _queryFiles(grammar.directory)) {
-      files++;
-      final String source;
-      try {
-        read.addAll(composedFiles(grammar.directory, file));
-        source = composeQuery(grammar.directory, file)!;
-      } on QueryInheritanceException catch (error) {
-        problems.add('$error');
-        continue;
-      }
-      if (language == null) continue;
-      try {
-        final query = runtime.compile(language, source);
-        patterns += query.patternCount;
-        query.delete();
-        compiled++;
-      } on QueryException catch (error) {
-        problems.add(
-          '${grammar.name}/$file: $error (composed line '
-          '${_lineAt(source, error.byteOffset)})',
-        );
-      }
+  for (final (:directory, :fileName, :source) in queries.composed) {
+    final name = grammarAt[directory]!.name;
+    final language = languages[name];
+    if (language == null) continue;
+    try {
+      final query = runtime.compile(language, source);
+      patterns += query.patternCount;
+      query.delete();
+      compiled++;
+    } on QueryException catch (error) {
+      problems.add(
+        '$name/$fileName: $error (composed line '
+        '${_lineAt(source, error.byteOffset)})',
+      );
     }
   }
-  final queryOnly = Directory(p.join(output, 'queries'));
-  final inheritable = [
-    if (queryOnly.existsSync())
-      for (final entity in queryOnly.listSync(recursive: true))
-        if (entity is File && entity.path.endsWith('.scm'))
-          p.normalize(entity.path),
-  ]..sort();
-  final unread = inheritable.where((file) => !read.contains(file)).toList();
-  for (final file in unread) {
-    problems.add(
-      '${p.relative(file, from: output)}: no grammar\'s '
-      '${p.basename(file)} inherits it, so nothing reads it',
-    );
-  }
   print(
-    'queries: $compiled/$files composed files compile, $patterns patterns; '
-    '${inheritable.length - unread.length}/${inheritable.length} query-only '
-    'files inherited',
+    'queries: $compiled/${queries.fileCount} composed files compile, '
+    '$patterns patterns; ${queries.queryOnlyReadCount}/'
+    '${queries.queryOnlyCount} query-only files inherited',
   );
 }
 
@@ -746,8 +716,8 @@ Future<void> _compare(
         _json(p.join(theirs, 'config.json'))['symbol'] as String? ??
         grammar.symbol;
     final their = openLanguage(theirLibrary, symbol);
-    final ourFiles = _queryFiles(grammar.directory).toSet();
-    final theirFiles = _queryFiles(theirs).toSet();
+    final ourFiles = queryFiles(grammar.directory).toSet();
+    final theirFiles = queryFiles(theirs).toSet();
     for (final file in ourFiles.difference(theirFiles)) {
       print('${grammar.name}/$file: only in this archive');
     }

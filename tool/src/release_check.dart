@@ -67,15 +67,77 @@ const _inheritsNothing = {('tsx', 'locals.scm', 'jsx')};
 String? composeQuery(String directory, String fileName) =>
     _compose(directory, fileName, null);
 
-/// Every file [composeQuery] reads to compose [fileName] in [directory]:
-/// the file itself and each file it inherits, directly or not; empty when
-/// [directory] holds no such file.
+/// The query files of a grammar's [directory], sorted.
+List<String> queryFiles(String directory) => [
+  for (final entity in Directory(directory).listSync())
+    if (entity is File && entity.path.endsWith('.scm')) p.basename(entity.path),
+]..sort();
+
+/// One query file of a grammar, composed as [composeQuery] composes it.
+typedef ComposedQuery = ({String directory, String fileName, String source});
+
+/// What [composeArchiveQueries] found in an archive: how many query files
+/// its grammars hold, those that composed, how many files its query-only
+/// languages hold, and how many of those a composition read.
+typedef ArchiveQueries = ({
+  int fileCount,
+  List<ComposedQuery> composed,
+  int queryOnlyCount,
+  int queryOnlyReadCount,
+});
+
+/// Composes every query file of each of [grammarDirectories] as
+/// [composeQuery] does, and requires every file of a query-only language
+/// in [archive]'s `queries/` to be read by one of those compositions.
 ///
-/// Throws a [QueryInheritanceException] where [composeQuery] does.
-Set<String> composedFiles(String directory, String fileName) {
+/// Adds to [problems] each [QueryInheritanceException] a composition
+/// throws, and each query-only file no composition reads: the editor reads
+/// such a file only through an `; inherits:` line, so one nothing inherits
+/// is never compiled or used. A file a composition reads before it throws
+/// counts as read.
+ArchiveQueries composeArchiveQueries(
+  String archive,
+  Iterable<String> grammarDirectories,
+  List<String> problems,
+) {
+  var fileCount = 0;
+  final composed = <ComposedQuery>[];
   final read = <String>{};
-  _compose(directory, fileName, read);
-  return read;
+  for (final directory in grammarDirectories) {
+    for (final fileName in queryFiles(directory)) {
+      fileCount++;
+      try {
+        final source = _compose(directory, fileName, read)!;
+        composed.add((
+          directory: directory,
+          fileName: fileName,
+          source: source,
+        ));
+      } on QueryInheritanceException catch (error) {
+        problems.add('$error');
+      }
+    }
+  }
+  final queryOnly = Directory(p.join(archive, 'queries'));
+  final inheritable = [
+    if (queryOnly.existsSync())
+      for (final entity in queryOnly.listSync(recursive: true))
+        if (entity is File && entity.path.endsWith('.scm'))
+          p.normalize(entity.path),
+  ]..sort();
+  final unread = inheritable.where((file) => !read.contains(file)).toList();
+  for (final file in unread) {
+    problems.add(
+      '${p.relative(file, from: archive)}: no grammar\'s '
+      '${p.basename(file)} inherits it, so nothing reads it',
+    );
+  }
+  return (
+    fileCount: fileCount,
+    composed: composed,
+    queryOnlyCount: inheritable.length,
+    queryOnlyReadCount: inheritable.length - unread.length,
+  );
 }
 
 String? _compose(String directory, String fileName, Set<String>? read) {
