@@ -6,6 +6,7 @@
 ///
 /// Usage:
 ///   dart run tool/compare_configs.dart
+library;
 
 import 'dart:convert';
 import 'dart:io';
