@@ -124,7 +124,8 @@ final class PinException implements Exception {
 /// the checkout's `HEAD` commit.
 ///
 /// Throws a [PinException] when the checkout's origin is not [url], or when
-/// no remote branch contains `HEAD`, so a pin never names a local commit.
+/// no branch of origin contains `HEAD`, so a pin never names a local commit
+/// or one only a fork carries.
 Future<String> pinFromCheckout(
   GitRunner git,
   String directory,
@@ -140,15 +141,17 @@ Future<String> pinFromCheckout(
   return head;
 }
 
-/// Throws a [PinException] unless a remote-tracking branch in [directory]
-/// contains [commit].
+/// Throws a [PinException] unless one of `origin`'s remote-tracking
+/// branches in [directory] contains [commit]; another remote's branch does
+/// not count.
 Future<void> requireOnOrigin(
   GitRunner git,
   String directory,
   String commit,
   String name,
 ) async {
-  final branches = await git(directory, ['branch', '-r', '--contains', commit]);
+  final branches = await git(
+      directory, ['branch', '-r', '--contains', commit, '--list', 'origin/*']);
   if (branches.trim().isEmpty) {
     throw PinException('$name: no branch on origin contains $commit');
   }

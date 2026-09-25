@@ -1,9 +1,12 @@
 import 'dart:io';
 
 import 'package:checks/checks.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/git.dart';
 import '../tool/src/grammar_pins.dart';
+import 'support/git_fixture.dart';
 
 const _sha = '0123456789abcdef0123456789abcdef01234567';
 const _other = 'fedcba9876543210fedcba9876543210fedcba98';
@@ -106,7 +109,7 @@ void main() {
       final git = _fakeGit({
         'remote get-url origin': '$url.git\n',
         'rev-parse HEAD': '$_sha\n',
-        'branch -r --contains $_sha': '  origin/master\n',
+        'branch -r --contains $_sha --list origin/*': '  origin/master\n',
       });
 
       check(await pinFromCheckout(git, 'grammars/x', url)).equals(_sha);
@@ -128,13 +131,51 @@ void main() {
       final git = _fakeGit({
         'remote get-url origin': url,
         'rev-parse HEAD': _sha,
-        'branch -r --contains $_sha': '',
+        'branch -r --contains $_sha --list origin/*': '',
       });
 
       await check(pinFromCheckout(git, 'grammars/x', url)).throws<PinException>(
         (it) => it
             .has((e) => e.message, 'message')
             .equals('tree-sitter-ocaml: no branch on origin contains $_sha'),
+      );
+    });
+  });
+
+  group('requireOnOrigin', () {
+    late Directory temporary;
+    late String store;
+    late String onOrigin;
+    late String onForkOnly;
+
+    setUpAll(() async {
+      temporary = Directory.systemTemp.createTempSync('pins_test');
+      final upstream =
+          await FixtureRepository.create(p.join(temporary.path, 'upstream'));
+      onOrigin = await upstream.commit({'grammar.js': bytes('a')});
+      final fork =
+          await FixtureRepository.create(p.join(temporary.path, 'fork'));
+      await fork.git(['pull', '--quiet', upstream.path, 'main']);
+      onForkOnly = await fork.commit({'grammar.js': bytes('b')});
+      store = (await FixtureRepository.create(p.join(temporary.path, 'store')))
+          .path;
+      await fixtureGit(store, ['remote', 'add', 'origin', upstream.path]);
+      await fixtureGit(store, ['remote', 'add', 'fork', fork.path]);
+      await fixtureGit(store, ['fetch', '--quiet', '--all']);
+    });
+
+    tearDownAll(() => temporary.deleteSync(recursive: true));
+
+    test('accepts a commit an origin branch contains', () async {
+      await requireOnOrigin(runGit, store, onOrigin, 'tree-sitter-x');
+    });
+
+    test('refuses a commit that only another remote contains', () async {
+      await check(requireOnOrigin(runGit, store, onForkOnly, 'tree-sitter-x'))
+          .throws<PinException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals('tree-sitter-x: no branch on origin contains $onForkOnly'),
       );
     });
   });
