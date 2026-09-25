@@ -73,11 +73,11 @@ typedef CorpusExample = ({String name, String input, List<String> languages});
 /// attribute lines, and a closing `=` line; when the file's first `=` line
 /// carries a suffix, only delimiters with that suffix count. A blank line
 /// in a header is allowed only between the name and its attributes, so a
-/// line of `=` inside an example's input is not read as a header. The input runs
-/// from the header to the longest `-` divider of the example's body (the
-/// last of equal length), less one trailing newline. [CorpusExample]'s
-/// `languages` holds each `:language(<name>)` attribute, or a single empty
-/// string for the corpus's default language.
+/// line of `=` inside an example's input is not read as a header. The
+/// input runs from the header to the longest `-` divider of the example's
+/// body (the last of equal length), less one trailing newline. Each
+/// example's `languages` holds each `:language(<name>)` attribute, or a
+/// single empty string for the corpus's default language.
 List<CorpusExample> parseCorpus(String text) {
   final lines = _splitInclusive(text);
   String? firstSuffix;

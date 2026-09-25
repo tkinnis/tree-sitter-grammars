@@ -428,11 +428,15 @@ String _querySection(
   String name(String file) => file.substring('queries/'.length);
   String state(bool changed) =>
       changed ? 'modified in tree-sitter-grammars' : 'unchanged';
+  String nvimState(QueryProvenance entry) =>
+      entry.upstream!.repo == nvimTreesitterUrl
+      ? state(entry.changed)
+      : 'by way of the grammar\'s file below';
   final nvim = [
     for (final file in files)
       if (nvimSource(file, provenance[file]!) case final source?)
         '| `${name(file)}` | `${source.path}` | `${source.commit}` | '
-            '${provenance[file]!.upstream!.repo == nvimTreesitterUrl ? state(provenance[file]!.changed) : 'by way of the grammar\'s file below'} |',
+            '${nvimState(provenance[file]!)} |',
   ];
   final grammar = [
     for (final file in files)

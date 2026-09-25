@@ -135,8 +135,8 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
   final rows = [
     for (final MapEntry(key: name, value: record) in sources.entries)
       if (record case final Map<String, Object?> record)
-        '| $name | `${record['commit']}` | `${p.basename('${record['file']}')}` '
-            '| `${record['sha256']}` |',
+        '| $name | `${record['commit']}` | '
+            '`${p.basename('${record['file']}')}` | `${record['sha256']}` |',
   ];
   return 'tree-sitter ${treeSitter['tag']} (${treeSitter['commit']}), '
       'macOS ${info['deploymentTarget']} and later on arm64.\n\n'

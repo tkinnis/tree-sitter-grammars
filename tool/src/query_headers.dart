@@ -5,9 +5,13 @@
 /// The header is the file's first lines, followed by one blank line:
 ///
 /// ```scheme
-/// ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/c/highlights.scm @ <commit>, Apache-2.0.
+/// ; Derived from nvim-treesitter <url>, <path> @ <commit>, Apache-2.0.
 /// ; Modified in tree-sitter-grammars.
 /// ```
+///
+/// where `<url>` is [nvimTreesitterUrl] and `<path>` the file's path in
+/// nvim-treesitter at `<commit>`, for example
+/// `runtime/queries/c/highlights.scm`.
 ///
 /// A file whose closest upstream is a grammar's own repository, which in turn
 /// carries nvim-treesitter's lines, names both, the grammar's file second:

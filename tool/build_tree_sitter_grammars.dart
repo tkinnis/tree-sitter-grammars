@@ -170,10 +170,12 @@ Future<void> _build(String root, _Options options) async {
   _delete(p.join(root, 'build'));
 
   final outputDirectory = p.join(root, 'build', 'out');
+  final origin = bundles == null
+      ? 'from their git object stores'
+      : 'from the source bundles in $bundles';
   _step(
     'Unpacking the runtime and ${_urlEntries(entries).length} grammar '
-    'repositories at their pins, '
-    '${bundles == null ? 'from their git object stores' : 'from the source bundles in $bundles'}',
+    'repositories at their pins, $origin',
   );
   final sourceRecords = await supplySources(
     root: root,
