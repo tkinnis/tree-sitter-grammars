@@ -825,6 +825,47 @@ void main() {
       },
     );
 
+    /// Gives [directory] under queries/ a highlights.scm written here.
+    void existingLanguage(String directory) {
+      _write(root, 'queries/$directory/highlights.scm', _otherQuery);
+      _write(
+        root,
+        'tool/query_provenance.json',
+        withProvenanceEntries(read('tool/query_provenance.json'), {
+          'queries/$directory/highlights.scm': _here,
+        }),
+      );
+    }
+
+    for (final (existing, requested) in [
+      ('c-sharp', 'c_sharp'),
+      ('c_sharp', 'c-sharp'),
+    ]) {
+      test(
+        'refuses $requested while queries/$existing/ holds the same language',
+        () async {
+          existingLanguage(existing);
+          final before = read('tool/query_provenance.json');
+
+          for (final force in [false, true]) {
+            await check(
+              run(request(language: requested, force: force)),
+            ).throws<BootstrapException>(
+              (it) => it
+                  .has((e) => e.message, 'message')
+                  .equals(
+                    'queries/$existing/ holds the language nvim-treesitter '
+                    'names c_sharp; bootstrap it with --language=$existing',
+                  ),
+            );
+          }
+          check(exists('queries/$requested')).isFalse();
+          check(exists('.cache')).isFalse();
+          check(read('tool/query_provenance.json')).equals(before);
+        },
+      );
+    }
+
     test('refuses a file where the language directory belongs', () async {
       _write(root, 'queries/mylang', _otherQuery);
 

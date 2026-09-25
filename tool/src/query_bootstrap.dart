@@ -121,8 +121,23 @@ String nvimStoreDirectory(String root) =>
 /// the current layout first: `runtime/queries/<name>`, and `queries/<name>`
 /// in commits from before the queries moved.
 List<String> nvimQueryDirectories(String language) {
-  final name = _nvimLanguageNames[language] ?? language;
+  final name = _nvimName(language);
   return ['runtime/queries/$name', 'queries/$name'];
+}
+
+/// The name nvim-treesitter gives [language].
+String _nvimName(String language) => _nvimLanguageNames[language] ?? language;
+
+/// The other spellings of [language] that name the same nvim-treesitter
+/// language: its nvim-treesitter name, and every language id that
+/// [_nvimLanguageNames] maps to that name; sorted.
+List<String> _otherSpellings(String language) {
+  final name = _nvimName(language);
+  return {
+    name,
+    for (final MapEntry(key: id, value: nvimName) in _nvimLanguageNames.entries)
+      if (nvimName == name) id,
+  }.where((spelling) => spelling != language).toList()..sort();
 }
 
 /// Fetches origin's `HEAD` and every branch of origin, with their whole
@@ -405,7 +420,11 @@ const _provenanceFile = 'tool/query_provenance.json';
 /// but nvim-treesitter's objects into [nvimStoreDirectory].
 ///
 /// Every path the plan depends on is read once, before the fetch, and
-/// must be a file or absent. Without `force`, `queries/<language>/` must
+/// must be a file or absent. Nothing may exist under `queries/` at
+/// another spelling of the language, one that nvim-treesitter names the
+/// same, such as `c_sharp` beside `c-sharp`, with or without `force`,
+/// since the run would write the language a second directory. Without
+/// `force`, `queries/<language>/` must
 /// not exist and `tool/query_provenance.json` must have no problem. With
 /// it, a file a bootstrap writes that has no entry, as a run stopped
 /// before its entries leaves one, is allowed; an existing file is
@@ -433,6 +452,19 @@ Future<BootstrapPlan> planBootstrap({
       break;
     default:
       throw BootstrapException('$directory is not a directory');
+  }
+  for (final spelling in _otherSpellings(request.language)) {
+    if (FileSystemEntity.typeSync(
+          p.join(root, 'queries', spelling),
+          followLinks: false,
+        ) !=
+        FileSystemEntityType.notFound) {
+      throw BootstrapException(
+        'queries/$spelling/ holds the language nvim-treesitter names '
+        '${_nvimName(request.language)}; bootstrap it with '
+        '--language=$spelling',
+      );
+    }
   }
   if (Directory(p.join(root, directory)).existsSync() && !request.force) {
     throw BootstrapException(
