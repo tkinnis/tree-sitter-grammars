@@ -5,7 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.1.0] - Unreleased
+## [1.2.0] - Unreleased
+
+### Added
+
+- C#: `tags.scm` defines every namespace as `@definition.module`: a block namespace under any name, qualified ones included, and a file-scoped namespace over the compilation unit that holds the declarations after it, so every class and method nests under its namespace in the editor's outline and a test's declaring scope reads `Namespace.Class`
+- Outline tests: `tool/check_release.dart` parses every source under `test/outline/<grammar>/` and requires the outline of the definitions the grammar's composed `tags.scm` finds in it, nested by range as the editor nests its outline, to be the `.outline` file beside it; the first are three C# test files, for xUnit, NUnit and MSTest
+- `tool/check_release.dart` refuses an injection pattern that captures `@injection.content` and names no language, in every grammar but the twelve `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (bash, go, html, java, kotlin, make, pascal, python, ruby, sql, xml and yaml, which hold 74), and requires every composed query to read as the patterns `ts_query_new` counts in it
+
+### Fixed
+
+- Objective-C: folds, highlights, indents, injections and locals take C's patterns through `; inherits: c` alone; each also held a copy of C's file (1,155 lines of injections), so every C pattern composed twice. The five files are nvim-treesitter's and tree-sitter-objc's text, unchanged
+- C++: indents and locals take C's patterns through `; inherits: c` alone, holding no copy of C's file
+- TSX: highlights and locals take TypeScript's patterns through `; inherits: typescript,jsx` alone, and injections inherits `typescript,jsx` in place of a copy of TypeScript's own patterns
+- C: a macro's body and a directive's argument are injected as C, in Objective-C too, which inherits C's injections; the re2c, doxygen and 70 printf patterns, which named no language and so injected nothing, are removed, since no grammar here compiles those languages
+- Markdown inline: an HTML tag is injected as `html`, combined, and a LaTeX block as `latex`, as nvim-treesitter's file has them
+- Javadoc: a description is injected as `html` and a Markdown description as `markdown_inline`; the two printf patterns of `@value` format strings, which named no language, are removed
+
+## [1.1.0] - 2026-09-25
 
 ### Added
 
