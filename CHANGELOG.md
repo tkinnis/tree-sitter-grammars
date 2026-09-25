@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The two `cpp` injection patterns that named a language no grammar carries (`"c++"`)
 - `queries/dot/`, which no grammar built or shipped
+- `queries/ecma/locals.scm`, which no grammar's `locals.scm` inherits, so the editor never read it
 - `tool/validate_queries_treesitter.dart`, which `tool/check_release.dart` replaces
 
 ## [1.0.4] - 2026-08-12

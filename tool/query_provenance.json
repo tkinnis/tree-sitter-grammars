@@ -526,15 +526,6 @@
       "path": "runtime/queries/ecma/injections.scm"
     }
   },
-  "queries/ecma/locals.scm": {
-    "origin": "nvim",
-    "changed": false,
-    "upstream": {
-      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
-      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
-      "path": "runtime/queries/ecma/locals.scm"
-    }
-  },
   "queries/go/folds.scm": {
     "origin": "nvim",
     "changed": true,

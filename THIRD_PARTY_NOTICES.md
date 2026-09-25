@@ -2091,7 +2091,6 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `ecma/highlights.scm` | `runtime/queries/ecma/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `ecma/indents.scm` | `runtime/queries/ecma/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `ecma/injections.scm` | `runtime/queries/ecma/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
-| `ecma/locals.scm` | `runtime/queries/ecma/locals.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `go/folds.scm` | `runtime/queries/go/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `go/indents.scm` | `runtime/queries/go/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `go/injections.scm` | `runtime/queries/go/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |

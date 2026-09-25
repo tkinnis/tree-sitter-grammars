@@ -75,7 +75,8 @@ final class GrammarBuild {
 }
 
 /// The grammars [entries] build, in `grammars.json` order, reading each
-/// repository's `tree-sitter.json` from [root]`/build/src/<repo>`.
+/// repository's `tree-sitter.json` from [sourceRoot]`/<repo>`, by default
+/// [root]`/build/src/<repo>`.
 ///
 /// An entry with a `name` builds that one grammar at its `path`. An entry
 /// with `grammars` builds the named grammars of its `tree-sitter.json`, in
@@ -83,8 +84,9 @@ final class GrammarBuild {
 /// `tree-sitter.json` lists.
 List<GrammarBuild> planGrammars(
   String root,
-  List<Map<String, Object?>> entries,
-) {
+  List<Map<String, Object?>> entries, {
+  String? sourceRoot,
+}) {
   final builds = <GrammarBuild>[];
   for (final entry in entries) {
     if (entry['url'] is! String) continue;
@@ -100,7 +102,10 @@ List<GrammarBuild> planGrammars(
       continue;
     }
     final repository = repositoryName(entry['url']! as String);
-    final declared = _treeSitterJsonGrammars(root, repository);
+    final declared = _treeSitterJsonGrammars(
+      sourceRoot ?? p.join(root, 'build', 'src'),
+      repository,
+    );
     final selected = (entry['grammars'] as List?)?.cast<String>();
     final chosen = selected == null
         ? declared
@@ -132,12 +137,10 @@ List<GrammarBuild> planGrammars(
 }
 
 List<Map<String, Object?>> _treeSitterJsonGrammars(
-  String root,
+  String sourceRoot,
   String repository,
 ) {
-  final file = File(
-    p.join(root, 'build', 'src', repository, 'tree-sitter.json'),
-  );
+  final file = File(p.join(sourceRoot, repository, 'tree-sitter.json'));
   if (!file.existsSync()) {
     throw GrammarPlanException(
       '$repository: no tree-sitter.json at its pin; '

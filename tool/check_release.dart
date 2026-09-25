@@ -16,6 +16,11 @@
 ///   pins.
 /// - `libtree-sitter.dylib` exports every function the runtime's `api.h`
 ///   declares, apart from the three it defines only with its wasm feature.
+/// - `manifest.json` holds exactly the entries `tool/grammars.json` plans,
+///   each of the kind it plans (a compiled grammar, planned as the build
+///   plans it from each bundle's `tree-sitter.json`, a query-only language
+///   or a no-op one), and every compiled grammar's entry names what the
+///   checks below read.
 /// - The runtime and every grammar library is a thin binary of the
 ///   toolchain's architecture with its `minos`, an `@rpath` install name
 ///   and no dependency beyond `libSystem`.
@@ -24,7 +29,8 @@
 ///   `config.json` `symbol`.
 /// - Every query file of every grammar, composed with what its
 ///   `; inherits:` line names as the editor composes it, compiles with
-///   `ts_query_new`.
+///   `ts_query_new`, and every query-only file is read by one of those
+///   compositions.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -55,6 +61,7 @@ import 'package:path/path.dart' as p;
 
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
+import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/notices.dart';
@@ -146,6 +153,9 @@ _check(
   required bool unpackGrammars,
 }) async {
   final toolchain = Toolchain.load(root);
+  final entries = parseGrammars(
+    File(p.join(root, 'tool', 'grammars.json')).readAsStringSync(),
+  );
   final info = _json(p.join(output, 'build_info.json'));
   final manifest = _json(p.join(output, 'manifest.json'));
   final treeSitter = info['treeSitter']! as Map<String, Object?>;
@@ -160,9 +170,9 @@ _check(
 
   final sourceRoot = p.join(scratch, 'src');
   await _checkSources(
-    root,
     output,
     toolchain,
+    entries,
     info,
     sourceRoot,
     problems,
@@ -173,47 +183,29 @@ _check(
   final runtime = TreeSitterRuntime.open(runtimePath);
   _checkExports(runtime, p.join(sourceRoot, 'tree-sitter'), problems);
 
-  final grammars = [
-    for (final MapEntry(key: name, value: entry) in manifest.entries)
-      if (entry case {
-        'dylib_dir': final String directory,
-        'source':
-            {
-              'url': final String url,
-              'commit': final String commit,
-              'path': final String path,
-            } &&
-            final Map<String, Object?> source,
-        'extensions': final List<Object?> extensions,
-      })
-        (
-          name: name,
-          directory: p.join(output, directory),
-          symbol:
-              _json(p.join(output, directory, 'config.json'))['symbol']
-                  as String? ??
-              '',
-          url: url,
-          commit: commit,
-          sourceCommit: source['sourceCommit'] as String?,
-          path: path,
-          extensions: extensions.cast<String>(),
-        ),
-  ];
+  final grammars = _checkManifest(
+    root,
+    output,
+    manifest,
+    entries,
+    sourceRoot,
+    problems,
+  );
   await _checkLibraries(runtimePath, grammars, toolchain, problems);
   final languages = _checkGrammars(runtime, grammars, problems);
-  _checkQueries(runtime, grammars, languages, problems);
+  _checkQueries(runtime, output, grammars, languages, problems);
   _checkNotices(root, output, info, problems);
   return (runtime: runtime, grammars: grammars, sources: sourceRoot);
 }
 
 /// Checks every bundle against `build_info.json` and the pins, and unpacks
 /// the runtime's into [sourceRoot], with every grammar's when
-/// [unpackGrammars].
+/// [unpackGrammars]; of a grammar bundle not unpacked, only its
+/// `tree-sitter.json`, which plans its grammars, is written there.
 Future<void> _checkSources(
-  String root,
   String output,
   Toolchain toolchain,
+  List<Map<String, Object?>> entries,
   Map<String, Object?> info,
   String sourceRoot,
   List<String> problems, {
@@ -224,18 +216,22 @@ Future<void> _checkSources(
     problems.add('build_info.json records no sources');
     return;
   }
-  final pinned = pinnedSources(
-    toolchain,
-    parseGrammars(
-      File(p.join(root, 'tool', 'grammars.json')).readAsStringSync(),
-    ),
-  );
+  final pinned = pinnedSources(toolchain, entries);
   final bundles = p.join(output, sourcesDirectoryName);
   var good = 0;
   for (final source in pinned) {
     try {
       await checkRecordedBundle(bundles, source, recorded);
       if (!unpackGrammars && source.url != runtimeRepositoryUrl) {
+        final plan = await bundleFile(
+          p.join(bundles, source.bundleName),
+          'tree-sitter.json',
+        );
+        if (plan != null) {
+          File(p.join(sourceRoot, source.name, 'tree-sitter.json'))
+            ..parent.createSync(recursive: true)
+            ..writeAsStringSync(plan);
+        }
         good++;
         continue;
       }
@@ -264,6 +260,100 @@ Future<void> _checkSources(
     'sources: $good/${pinned.length} bundles carry their recorded sha256 '
     'and pinned commit',
   );
+}
+
+/// Checks that every entry of [manifest] is the kind of entry `grammars.json`
+/// [entries] plan for its name, and returns the compiled grammars, whose
+/// `tree-sitter.json` files are under [sourceRoot].
+///
+/// An entry with a `dylib_dir` is a compiled grammar's and must name its
+/// `source` (url, commit and path) and its `extensions`; one with
+/// `queryOnly` is a query-only language's; any other is a no-op
+/// language's. Each must be the kind `grammars.json` plans for its name. Every name planned and missing, and every
+/// entry unplanned or unreadable, is a problem, so no entry drops out of
+/// the checks that follow unseen.
+List<_Grammar> _checkManifest(
+  String root,
+  String output,
+  Map<String, Object?> manifest,
+  List<Map<String, Object?>> entries,
+  String sourceRoot,
+  List<String> problems,
+) {
+  final expected = <String, String>{
+    for (final entry in entries)
+      if (entry['noop'] == true)
+        entry['name']! as String: 'no-op'
+      else if (entry['queryOnly'] == true)
+        entry['name']! as String: 'query-only',
+  };
+  try {
+    for (final build in planGrammars(root, entries, sourceRoot: sourceRoot)) {
+      expected[build.name] = 'grammar';
+    }
+  } on GrammarPlanException catch (error) {
+    problems.add('grammars.json: $error');
+  }
+  final grammars = <_Grammar>[];
+  var good = 0;
+  for (final MapEntry(key: name, value: entry) in manifest.entries) {
+    final kind = switch (entry) {
+      {'queryOnly': true} => 'query-only',
+      {'dylib_dir': _} => 'grammar',
+      _ => 'no-op',
+    };
+    if (expected[name] != kind) {
+      problems.add(
+        'manifest.json: $name is a $kind entry; grammars.json plans '
+        '${expected[name] ?? 'no entry'} for it',
+      );
+      continue;
+    }
+    if (kind != 'grammar') {
+      good++;
+      continue;
+    }
+    if (entry case {
+      'dylib_dir': final String directory,
+      'source':
+          {
+            'url': final String url,
+            'commit': final String commit,
+            'path': final String path,
+          } &&
+          final Map<String, Object?> source,
+      'extensions': final List<Object?> extensions,
+    }) {
+      final config = File(p.join(output, directory, 'config.json'));
+      grammars.add((
+        name: name,
+        directory: p.join(output, directory),
+        symbol: config.existsSync()
+            ? _json(config.path)['symbol'] as String? ?? ''
+            : '',
+        url: url,
+        commit: commit,
+        sourceCommit: source['sourceCommit'] as String?,
+        path: path,
+        extensions: extensions.cast<String>(),
+      ));
+      good++;
+    } else {
+      problems.add(
+        'manifest.json: $name has no dylib_dir, source url, commit and path, '
+        'or extensions to check it by',
+      );
+    }
+  }
+  final missing = expected.keys.where((name) => !manifest.containsKey(name));
+  for (final name in missing) {
+    problems.add('manifest.json has no entry for $name');
+  }
+  print(
+    'manifest: $good/${expected.length} entries are what grammars.json '
+    'plans, ${grammars.length} of them compiled grammars',
+  );
+  return grammars;
 }
 
 void _checkExports(
@@ -366,8 +456,14 @@ List<String> _queryFiles(String directory) => [
     if (entity is File && entity.path.endsWith('.scm')) p.basename(entity.path),
 ]..sort();
 
+/// Compiles every query file of every grammar, composed, and requires
+/// every file of a query-only language in [output]'s `queries/` to be read
+/// by one of those compositions: the editor reads such a file only through
+/// an `; inherits:` line, so one nothing inherits is never compiled or
+/// used.
 void _checkQueries(
   TreeSitterRuntime runtime,
+  String output,
   List<_Grammar> grammars,
   Map<String, Pointer<Void>> languages,
   List<String> problems,
@@ -375,10 +471,12 @@ void _checkQueries(
   var files = 0;
   var compiled = 0;
   var patterns = 0;
+  final read = <String>{};
   for (final grammar in grammars) {
     final language = languages[grammar.name];
     for (final file in _queryFiles(grammar.directory)) {
       files++;
+      read.addAll(composedFiles(grammar.directory, file));
       final source = composeQuery(grammar.directory, file)!;
       if (language == null) continue;
       try {
@@ -394,7 +492,25 @@ void _checkQueries(
       }
     }
   }
-  print('queries: $compiled/$files composed files compile, $patterns patterns');
+  final queryOnly = Directory(p.join(output, 'queries'));
+  final inheritable = [
+    if (queryOnly.existsSync())
+      for (final entity in queryOnly.listSync(recursive: true))
+        if (entity is File && entity.path.endsWith('.scm'))
+          p.normalize(entity.path),
+  ]..sort();
+  final unread = inheritable.where((file) => !read.contains(file)).toList();
+  for (final file in unread) {
+    problems.add(
+      '${p.relative(file, from: output)}: no grammar\'s '
+      '${p.basename(file)} inherits it, so nothing reads it',
+    );
+  }
+  print(
+    'queries: $compiled/$files composed files compile, $patterns patterns; '
+    '${inheritable.length - unread.length}/${inheritable.length} query-only '
+    'files inherited',
+  );
 }
 
 int _lineAt(String source, int byteOffset) {

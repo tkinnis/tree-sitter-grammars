@@ -67,6 +67,29 @@ void ts_parser_delete(
         composeQuery(p.join(archive.path, 'dylibs', 'none'), 'h.scm'),
       ).isNull();
     });
+
+    test('composedFiles names every file the composition reads', () {
+      write('dylibs/tsx/h.scm', '; inherits: typescript,jsx\n(t)');
+      write('dylibs/typescript/h.scm', '; inherits: ecma\n(ts)');
+      write('queries/ecma/h.scm', '(e)');
+      write('queries/ecma/l.scm', '(unread)');
+      write('queries/jsx/h.scm', '(j)');
+
+      check(
+        composedFiles(p.join(archive.path, 'dylibs', 'tsx'), 'h.scm'),
+      ).unorderedEquals([
+        for (final file in [
+          'dylibs/tsx/h.scm',
+          'dylibs/typescript/h.scm',
+          'queries/ecma/h.scm',
+          'queries/jsx/h.scm',
+        ])
+          p.join(archive.path, file),
+      ]);
+      check(
+        composedFiles(p.join(archive.path, 'dylibs', 'none'), 'h.scm'),
+      ).isEmpty();
+    });
   });
 
   group('parseCorpus', () {

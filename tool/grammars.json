@@ -398,8 +398,7 @@
       "highlights": true,
       "indents": true,
       "folds": true,
-      "injections": true,
-      "locals": true
+      "injections": true
     }
   },
   {

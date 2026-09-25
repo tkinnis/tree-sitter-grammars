@@ -146,6 +146,22 @@ Future<void> unpackBundle(String bundle, String destination) async {
   }
 }
 
+/// The text of [path], relative to the repository root, in [bundle], or null
+/// when the bundle holds no such file.
+Future<String?> bundleFile(String bundle, String path) async {
+  final member = '${_prefix(bundle)}/$path';
+  final result = await Process.run(_tar, [
+    '-xzOf',
+    bundle,
+    member,
+  ], stdoutEncoding: utf8);
+  if (result.exitCode == 0) return result.stdout as String;
+  if ('${result.stderr}'.contains('Not found in archive')) return null;
+  throw SourceBundleException(
+    'tar could not read $member from $bundle: ${result.stderr}',
+  );
+}
+
 /// The commit id `git archive` recorded in [bundle]'s first header, read by
 /// `git get-tar-commit-id`, or null when it records none.
 Future<String?> bundleCommit(String bundle) async {

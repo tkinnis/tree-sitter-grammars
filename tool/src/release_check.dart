@@ -37,9 +37,22 @@ final _inherits = RegExp(r'^;\s*inherits:\s*(.+)$', multiLine: true);
 /// `queries/` directory beside the one holding [directory]; an inherited
 /// file is composed the same way; each file's own text follows what it
 /// inherits, separated by a blank line.
-String? composeQuery(String directory, String fileName) {
+String? composeQuery(String directory, String fileName) =>
+    _compose(directory, fileName, null);
+
+/// Every file [composeQuery] reads to compose [fileName] in [directory]:
+/// the file itself and each file it inherits, directly or not; empty when
+/// [directory] holds no such file.
+Set<String> composedFiles(String directory, String fileName) {
+  final read = <String>{};
+  _compose(directory, fileName, read);
+  return read;
+}
+
+String? _compose(String directory, String fileName, Set<String>? read) {
   final file = File(p.join(directory, fileName));
   if (!file.existsSync()) return null;
+  read?.add(p.normalize(file.path));
   final content = file.readAsStringSync();
   final match = _inherits.firstMatch(content);
   if (match == null) return content;
@@ -55,8 +68,8 @@ String? composeQuery(String directory, String fileName) {
   final queryOnly = p.join(p.dirname(parent), 'queries');
   return [
     for (final language in languages)
-      if (composeQuery(p.join(parent, language), fileName) ??
-              composeQuery(p.join(queryOnly, language), fileName)
+      if (_compose(p.join(parent, language), fileName, read) ??
+              _compose(p.join(queryOnly, language), fileName, read)
           case final inherited?)
         inherited,
     own,
