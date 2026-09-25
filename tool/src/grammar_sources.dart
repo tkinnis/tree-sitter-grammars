@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'files_digest.dart';
 import 'git.dart';
 import 'grammar_pins.dart';
 import 'pool.dart';
@@ -211,6 +212,22 @@ Future<List<String>> _hashObjects(_Git git, List<String> paths) async {
   return hashes;
 }
 
+/// Throws a [GrammarSourceException] unless [files] have the digest
+/// [source]'s pin records, adding [hint] to its message.
+Future<void> _requireFiles(
+  PinnedSource source,
+  List<TreeFile> files,
+  String hint,
+) async {
+  final digest = await filesDigest(files);
+  if (digest != source.filesSha256) {
+    throw GrammarSourceException(
+      'its ${files.length} files have filesSha256 $digest; the pin records '
+      '${source.filesSha256}; $hint',
+    );
+  }
+}
+
 /// Unpacks the runtime and every grammar repository at its pin into
 /// [sourceRoot]`/<repository>`, writing each one's source bundle into
 /// [bundleDirectory], and returns what `build_info.json` records of the
@@ -221,8 +238,13 @@ Future<List<String>> _hashObjects(_Git git, List<String> paths) async {
 /// for a grammar, created and fetched as needed) through [extractCommit].
 /// With it, each bundle comes from that directory instead, checked against
 /// the `build_info.json` there by [checkRecordedBundle]; no object store is
-/// read. Throws a [GrammarSourceException] listing every repository that
-/// could not be supplied.
+/// read. Either way the files of every tree must have the `filesSha256` the
+/// pin records in `tool/grammars.json` or `tool/toolchain.json`: in the
+/// object store the commit's listing is read, and a bundle's unpacked files
+/// are hashed, so a bundle is held to the value committed at the tag, not
+/// to the `build_info.json` downloaded beside it. Throws a
+/// [GrammarSourceException] listing every repository that could not be
+/// supplied.
 Future<Map<String, Map<String, Object?>>> supplySources({
   required String root,
   required Toolchain toolchain,
@@ -262,6 +284,11 @@ Future<Map<String, Map<String, Object?>>> supplySources({
         );
         File(p.join(recordedBundles, source.bundleName)).copySync(bundle);
         await unpackBundle(bundle, destination);
+        await _requireFiles(
+          source,
+          await unpackedFiles(destination),
+          'the bundle is not the source the pin names',
+        );
         return (record: bundleRecord(source, digest), problem: null);
       }
       final String store;
@@ -273,6 +300,12 @@ Future<Map<String, Map<String, Object?>>> supplySources({
         await ensureCommit(runGit, store, source.commit, source.name);
       }
       await extractCommit(store, source.commit, destination, bundle: bundle);
+      await _requireFiles(
+        source,
+        await committedFiles(store, source.commit),
+        'if the pin is right, record its digest with '
+        'dart run tool/pin_grammars.dart --record-files',
+      );
       return (
         record: bundleRecord(source, await fileSha256(bundle)),
         problem: null,

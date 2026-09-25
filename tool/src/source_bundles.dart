@@ -39,12 +39,16 @@ final class PinnedSource {
     required this.name,
     required this.url,
     required this.commit,
+    required this.filesSha256,
   });
 
   /// The repository's name, which names its directory under `build/src/`.
   final String name;
   final String url;
   final String commit;
+
+  /// The digest of the files [commit]'s tree holds, which the pin records.
+  final String filesSha256;
 
   /// The bundle's file name, which is also its top-level directory with
   /// `.tar.gz` removed.
@@ -60,6 +64,7 @@ List<PinnedSource> pinnedSources(
     name: repositoryName(runtimeRepositoryUrl),
     url: runtimeRepositoryUrl,
     commit: toolchain.treeSitterCommit,
+    filesSha256: toolchain.treeSitterFilesSha256,
   ),
   for (final entry in entries)
     if (entry['url'] case final String url)
@@ -67,6 +72,7 @@ List<PinnedSource> pinnedSources(
         name: repositoryName(url),
         url: url,
         commit: entry['commit']! as String,
+        filesSha256: entry['filesSha256']! as String,
       ),
 ];
 

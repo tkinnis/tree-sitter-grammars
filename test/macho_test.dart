@@ -13,6 +13,8 @@ import '../tool/src/toolchain.dart';
 const _toolchain = Toolchain(
   treeSitterTag: 'v0.27.0',
   treeSitterCommit: '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+  treeSitterFilesSha256:
+      '8284859e50207152e5df621e49086ea169020c47ef342489f5f8c06b7082f2ea',
   cliVersion: '0.27.0',
   cliAsset: 'tree-sitter-macos-arm64.gz',
   cliSha256: '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e',

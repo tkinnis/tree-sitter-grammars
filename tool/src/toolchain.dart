@@ -21,6 +21,7 @@ final class Toolchain {
   const Toolchain({
     required this.treeSitterTag,
     required this.treeSitterCommit,
+    required this.treeSitterFilesSha256,
     required this.cliVersion,
     required this.cliAsset,
     required this.cliSha256,
@@ -53,6 +54,11 @@ final class Toolchain {
         treeSitter,
         'treeSitter.commit',
         RegExp(r'^[0-9a-f]{40}$'),
+      ),
+      treeSitterFilesSha256: _string(
+        treeSitter,
+        'treeSitter.filesSha256',
+        RegExp(r'^[0-9a-f]{64}$'),
       ),
       cliVersion: _string(
         cli,
@@ -93,6 +99,10 @@ final class Toolchain {
 
   /// The 40-hex commit [treeSitterTag] names.
   final String treeSitterCommit;
+
+  /// The digest of the files [treeSitterCommit]'s tree holds, as
+  /// `files_digest.dart` computes it.
+  final String treeSitterFilesSha256;
 
   /// The CLI release that generates grammars which commit no `parser.c`.
   final String cliVersion;

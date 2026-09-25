@@ -10,6 +10,8 @@ import 'support/git_fixture.dart';
 
 const _sha = '0123456789abcdef0123456789abcdef01234567';
 const _other = 'fedcba9876543210fedcba9876543210fedcba98';
+const _files =
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
 
 /// Answers git commands from a table keyed by the joined arguments.
 Future<String> Function(String, List<String>) _fakeGit(
@@ -31,11 +33,20 @@ void main() {
 
   test('an unpinned, unlicensed or abbreviated entry is reported', () {
     final problems = pinProblems([
-      {'url': 'https://github.com/a/tree-sitter-a', 'license': 'MIT'},
-      {'url': 'https://github.com/b/tree-sitter-b', 'commit': _sha},
+      {
+        'url': 'https://github.com/a/tree-sitter-a',
+        'filesSha256': _files,
+        'license': 'MIT',
+      },
+      {
+        'url': 'https://github.com/b/tree-sitter-b',
+        'commit': _sha,
+        'filesSha256': _files,
+      },
       {
         'url': 'https://github.com/c/tree-sitter-c',
         'commit': _sha.substring(0, 12),
+        'filesSha256': _files.substring(0, 40),
         'license': 'MIT',
         'sourceCommit': 'deploy',
       },
@@ -46,6 +57,7 @@ void main() {
       'tree-sitter-a: commit must be 40 lowercase hex digits',
       "tree-sitter-b: license must name the grammar's licence",
       'tree-sitter-c: commit must be 40 lowercase hex digits',
+      'tree-sitter-c: filesSha256 must be 64 lowercase hex digits',
       'tree-sitter-c: sourceCommit must be 40 lowercase hex digits',
     ]);
   });
@@ -55,11 +67,13 @@ void main() {
       {
         'url': 'https://github.com/a/tree-sitter-a',
         'commit': _sha,
+        'filesSha256': _files,
         'license': 'MIT',
       },
       {
         'url': 'https://github.com/a/tree-sitter-a.git/',
         'commit': _sha,
+        'filesSha256': _files,
         'license': 'MIT',
       },
     ]);
@@ -73,6 +87,7 @@ void main() {
         'url': 'https://github.com/a/tree-sitter-a',
         'highlights': 'queries/highlights.scm',
         'license': 'MIT',
+        'filesSha256': _files,
         'commit': _sha,
       },
     ]);
@@ -82,6 +97,7 @@ void main() {
       '  {\n'
       '    "url": "https://github.com/a/tree-sitter-a",\n'
       '    "commit": "$_sha",\n'
+      '    "filesSha256": "$_files",\n'
       '    "license": "MIT",\n'
       '    "highlights": "queries/highlights.scm"\n'
       '  }\n'
@@ -96,14 +112,20 @@ void main() {
       'sourceCommit': _other,
     };
 
-    check(withPin(entry, _sha))
+    check(withPin(entry, _sha, filesSha256: _files))
       ..has((pinned) => pinned['commit'], 'commit').equals(_sha)
+      ..has((pinned) => pinned['filesSha256'], 'filesSha256').equals(_files)
       ..has(
         (pinned) => pinned.containsKey('sourceCommit'),
         'has sourceCommit',
       ).isFalse();
     check(
-      withPin(entry, _sha, sourceCommit: _sha)['sourceCommit'],
+      withPin(
+        entry,
+        _sha,
+        filesSha256: _files,
+        sourceCommit: _sha,
+      )['sourceCommit'],
     ).equals(_sha);
   });
 

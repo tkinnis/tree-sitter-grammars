@@ -2,6 +2,7 @@
   "treeSitter": {
     "tag": "v0.27.0",
     "commit": "6070dbfefd326bd735e5683eb128cc1b57dad0c0",
+    "filesSha256": "8284859e50207152e5df621e49086ea169020c47ef342489f5f8c06b7082f2ea",
     "extraNotices": [
       "lib/src/portable/endian.h"
     ]

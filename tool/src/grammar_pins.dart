@@ -3,6 +3,10 @@
 /// Every entry with a `url` builds a grammar and carries:
 ///
 /// - `commit`: the 40-hex upstream commit the build extracts.
+/// - `filesSha256`: the digest of the files `commit`'s tree holds, as
+///   `files_digest.dart` computes it, which every supplied tree is checked
+///   against, whether it comes from the object store or a release's source
+///   bundle.
 /// - `sourceCommit` (optional): the commit on the upstream's source branch
 ///   that `commit` was deployed from, for a pin on a deploy branch.
 /// - `license`: the SPDX identifier of the grammar's licence.
@@ -18,10 +22,12 @@ import 'dart:convert';
 import 'git.dart';
 
 final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
+final _digestPattern = RegExp(r'^[0-9a-f]{64}$');
 
 /// The pin fields, in the order they follow `url` in each entry.
 const pinFields = [
   'commit',
+  'filesSha256',
   'sourceCommit',
   'license',
   'generate',
@@ -87,6 +93,10 @@ List<String> pinProblems(List<Map<String, Object?>> entries) {
     final commit = entry['commit'];
     if (commit is! String || !_commitPattern.hasMatch(commit)) {
       problems.add('$name: commit must be 40 lowercase hex digits');
+    }
+    final filesSha256 = entry['filesSha256'];
+    if (filesSha256 is! String || !_digestPattern.hasMatch(filesSha256)) {
+      problems.add('$name: filesSha256 must be 64 lowercase hex digits');
     }
     final sourceCommit = entry['sourceCommit'];
     if (sourceCommit != null &&
@@ -166,22 +176,28 @@ Future<void> requireOnOrigin(
   }
 }
 
-/// Returns [entry] pinned at [commit], replacing any earlier pin.
+/// Returns [entry] pinned at [commit], whose files have the digest
+/// [filesSha256], replacing any earlier pin.
 ///
 /// A [sourceCommit] is recorded when given; otherwise any earlier
 /// `sourceCommit` is dropped, because it described the earlier pin.
 Map<String, Object?> withPin(
   Map<String, Object?> entry,
   String commit, {
+  required String filesSha256,
   String? sourceCommit,
 }) {
   if (!_commitPattern.hasMatch(commit)) {
     throw PinException('$commit is not a 40-hex commit');
   }
+  if (!_digestPattern.hasMatch(filesSha256)) {
+    throw PinException('$filesSha256 is not a 64-hex digest');
+  }
   if (sourceCommit != null && !_commitPattern.hasMatch(sourceCommit)) {
     throw PinException('$sourceCommit is not a 40-hex commit');
   }
-  final pinned = {...entry, 'commit': commit}..remove('sourceCommit');
+  final pinned = {...entry, 'commit': commit, 'filesSha256': filesSha256}
+    ..remove('sourceCommit');
   if (sourceCommit != null) pinned['sourceCommit'] = sourceCommit;
   return pinned;
 }

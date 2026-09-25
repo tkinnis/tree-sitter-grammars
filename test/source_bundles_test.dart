@@ -5,6 +5,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/files_digest.dart';
 import '../tool/src/grammar_sources.dart';
 import '../tool/src/source_bundles.dart';
 import '../tool/src/toolchain.dart';
@@ -41,6 +42,7 @@ void main() {
     name: 'tree-sitter-x',
     url: 'https://github.com/example/tree-sitter-x',
     commit: commit,
+    filesSha256: '0' * 64,
   );
 
   Future<String> pack(String commit, String directory) async {
@@ -150,7 +152,11 @@ void main() {
   test('supplySources refuses a directory with no build_info.json', () async {
     final toolchain = Toolchain.parse(
       jsonEncode({
-        'treeSitter': {'tag': 'v0.27.0', 'commit': first},
+        'treeSitter': {
+          'tag': 'v0.27.0',
+          'commit': first,
+          'filesSha256': '0' * 64,
+        },
         'treeSitterCli': {
           'version': '0.27.0',
           'asset': 'tree-sitter-macos-arm64.gz',
@@ -173,6 +179,106 @@ void main() {
     ).throws<GrammarSourceException>(
       (it) =>
           it.has((e) => e.message, 'message').contains('no build_info.json'),
+    );
+  });
+
+  group('supplySources holds every tree to the digest its pin records', () {
+    late FixtureRepository runtime;
+    late String pinned;
+    late String other;
+
+    setUp(() async {
+      runtime = await FixtureRepository.create(path('root/tree-sitter'));
+      pinned = await runtime.commit({'lib/api.h': bytes('int ts(void);\n')});
+      other = await runtime.commit({'lib/api.h': bytes('int ts(int);\n')});
+    });
+
+    Toolchain toolchain(String filesSha256) => Toolchain.parse(
+      jsonEncode({
+        'treeSitter': {
+          'tag': 'v0.27.0',
+          'commit': pinned,
+          'filesSha256': filesSha256,
+        },
+        'treeSitterCli': {
+          'version': '0.27.0',
+          'asset': 'tree-sitter-macos-arm64.gz',
+          'sha256': _cliSha256,
+        },
+        'macos': {'arch': 'arm64', 'deploymentTarget': '13.0'},
+      }),
+    );
+
+    Future<Map<String, Map<String, Object?>>> supply(
+      Toolchain toolchain, {
+      String? recordedBundles,
+    }) => supplySources(
+      root: path('root'),
+      toolchain: toolchain,
+      entries: const [],
+      sourceRoot: path('src'),
+      bundleDirectory: path('out'),
+      recordedBundles: recordedBundles,
+    );
+
+    Future<String> digestOf(String commit) async =>
+        filesDigest(await committedFiles(runtime.path, commit));
+
+    test('an object store tree with the recorded digest is supplied', () async {
+      final records = await supply(toolchain(await digestOf(pinned)));
+
+      check(records['tree-sitter']!['commit']).equals(pinned);
+    });
+
+    test('an object store tree with another digest is refused', () async {
+      await check(supply(toolchain('0' * 64))).throws<GrammarSourceException>(
+        (it) => it.has((e) => e.message, 'message')
+          ..contains('the pin records ${'0' * 64}')
+          ..contains('--record-files'),
+      );
+    });
+
+    test(
+      'a forged bundle that matches its build_info.json is refused',
+      () async {
+        final pin = toolchain(await digestOf(pinned));
+        final name = PinnedSource(
+          name: 'tree-sitter',
+          url: runtimeRepositoryUrl,
+          commit: pinned,
+          filesSha256: pin.treeSitterFilesSha256,
+        ).bundleName;
+        Directory(path('downloads')).createSync();
+        final bundle = path('downloads/$name');
+        // Other content, packed under the pinned bundle's name, with the
+        // commit in its header rewritten to the pinned one.
+        await packBundle(runtime.path, other, bundle);
+        final tar = latin1.decode(gzip.decode(File(bundle).readAsBytesSync()));
+        File(bundle).writeAsBytesSync(
+          gzip.encode(latin1.encode(tar.replaceAll(other, pinned))),
+        );
+        final recorded = {
+          'tree-sitter': {
+            'url': runtimeRepositoryUrl,
+            'commit': pinned,
+            'file': 'sources/$name',
+            'sha256': await fileSha256(bundle),
+          },
+        };
+        File(
+          path('downloads/build_info.json'),
+        ).writeAsStringSync(jsonEncode({'sources': recorded}));
+        final source = pinnedSources(pin, const []).single;
+
+        await checkRecordedBundle(path('downloads'), source, recorded);
+        await check(
+          supply(pin, recordedBundles: path('downloads')),
+        ).throws<GrammarSourceException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .contains('the bundle is not the source the pin names'),
+        );
+      },
     );
   });
 }

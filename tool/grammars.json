@@ -11,31 +11,37 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-c",
     "commit": "ae19b676b13bdcc13b7665397e6d9b14975473dd",
+    "filesSha256": "4ebd73e7f657925106649186952ad47bf4c41d463055f240cca996211265ad2d",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-cpp",
     "commit": "12bd6f7e96080d2e70ec51d4068f2f66120dde35",
+    "filesSha256": "f4d76807304e24a57a5f24e7dec9c7accbf82c1b7dbd93bfdda72f6039898c2c",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-c-sharp",
     "commit": "f05a2ca99d329de2e6c32f26a21c6169b2bfcbb7",
+    "filesSha256": "347ed087516efe1b66af013a27e4bb46a1548ee16fb85df30d8ab9e509541b55",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-css",
     "commit": "dda5cfc5722c429eaba1c910ca32c2c0c5bb1a3f",
+    "filesSha256": "1b6b9f3b96fb6ed642101bc940b42bde75ebe84ffeb729ba7fa8fb410a8d2552",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-go",
     "commit": "2346a3ab1bb3857b48b29d779a1ef9799a248cd7",
+    "filesSha256": "0c4b9791c2c4b9c80964575453ad1fe289a2b122622c8ce4929298ddd118c68a",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-haskell",
     "commit": "0975ef72fc3c47b530309ca93937d7d143523628",
+    "filesSha256": "a4d4544eb96bddc2eb4984bab1e5f88d82f318b57495e4633de188e1dbf3a57c",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm",
@@ -44,16 +50,19 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-html",
     "commit": "73a3947324f6efddf9e17c0ea58d454843590cc0",
+    "filesSha256": "e427f5e18a4e7e6a60e5572b66acdde4f40bc0bedf89817208dd12b2a86cfb35",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-java",
     "commit": "e10607b45ff745f5f876bfa3e94fbcc6b44bdc11",
+    "filesSha256": "77a295b813f0c5437bee9b2725f244c9ae36878deb650b160f77ca5c4686e74e",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-javascript",
     "commit": "58404d8cf191d69f2674a8fd507bd5776f46cb11",
+    "filesSha256": "10f1b8c0a6c1b0864329fee73881c9d27b2f504253740608f5ef384e9bf6c178",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm",
@@ -63,16 +72,19 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-jsdoc",
     "commit": "658d18dcdddb75c760363faa4963427a7c6b52db",
+    "filesSha256": "8dde0fb01ceeab6728653e943dadd94c65128f27c4571da2c1063de0d4726f57",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-json",
     "commit": "001c28d7a29832b06b0e831ec77845553c89b56d",
+    "filesSha256": "fe66ffd310dbebadc517e967f6551a50d50575f7a4472f31ce53b28670335acd",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-ocaml",
     "commit": "3ef7c00b29e41e3a0c1d18e82ea37c64d72b93fc",
+    "filesSha256": "10eb9dae234b5b409ec8caf8f80da29b6b6e6eef261e0243d87faaff455e1522",
     "license": "MIT",
     "grammars": [
       "ocaml"
@@ -81,6 +93,7 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-php",
     "commit": "7d07b41ce2d442ca9a90ed85d0075eccc17ae315",
+    "filesSha256": "72d016ec1a2c408c770b157e8aee0027f8900caf355fc3abded2923feba4d464",
     "license": "MIT",
     "grammars": [
       "php"
@@ -89,16 +102,19 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-python",
     "commit": "26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64",
+    "filesSha256": "ee2bc67958510899676295c0478102fbe1b2707d1195884090eddde11e9a5c14",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-regex",
     "commit": "b2ac15e27fce703d2f37a79ccd94a5c0cbe9720b",
+    "filesSha256": "be65907931ec1dbdd5783f107e84ea05b560d8e490cba98f7085dcf850aa57ba",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-ruby",
     "commit": "ab6dca77a8184abc94af6e3e82538741b5078d63",
+    "filesSha256": "c1f5f7f11d3b59cd9be715be5f97d5475f91c93f53c1d085c67048c4b36a8df8",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm",
@@ -107,11 +123,13 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-rust",
     "commit": "261b20226c04ef601adbdf185a800512a5f66291",
+    "filesSha256": "40e2855ecbe3a45e668d1ce541de9ea6fd81e0cf7edb936fe5e50999d4272e4d",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-scala",
     "commit": "97aead18d97708190a51d4f551ea9b05b60641c9",
+    "filesSha256": "8139955849cfc44c7a486bab3f2c3ad9756a46425fb25512cb5e0c2ad7f7baab",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "indents": "queries/indents.scm",
@@ -121,6 +139,7 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-typescript",
     "commit": "75b3874edb2dc714fb1fd77a32013d0f8699989f",
+    "filesSha256": "3f65aaf37b5bb649c2fc8405665e866893f5a02316a9ec32e3194ea60beec502",
     "license": "MIT",
     "grammars": [
       "typescript",
@@ -130,11 +149,13 @@
   {
     "url": "https://github.com/UserNobody14/tree-sitter-dart",
     "commit": "d4d8f3e337d8be23be27ffc35a0aef972343cd54",
+    "filesSha256": "78d5316553e895258e949601b664175813610daa0c775969e590454767b2e39d",
     "license": "MIT"
   },
   {
     "url": "https://github.com/briot/tree-sitter-ada",
     "commit": "6b58259a08b1a22ba0247a7ce30be384db618da6",
+    "filesSha256": "009ef89966cdb8530ae418e448ff0bf52f3ebc556bb520f16faae728c6c9b45d",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm",
@@ -144,12 +165,14 @@
   {
     "url": "https://github.com/tree-sitter/tree-sitter-bash",
     "commit": "a06c2e4415e9bc0346c6b86d401879ffb44058f7",
+    "filesSha256": "6112dee9f9e0a565b740dd65ecd2e9c3dcf627a0af3ddb495a3ec67bd0ed5cfa",
     "license": "MIT",
     "highlights": "queries/highlights.scm"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-make",
     "commit": "5e9e8f8ff3387b0edcaa90f46ddf3629f4cfeb1d",
+    "filesSha256": "d6a26e5fcd16ad702701445df035e370fee8bbbc70b4d71f22a3f8055f13cc9a",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "filenames": [
@@ -161,16 +184,19 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-yaml",
     "commit": "7708026449bed86239b1cd5bce6e3c34dbca6415",
+    "filesSha256": "9684d1aebce4191b551575896720e6693a3306ae3286a308e3e117041398f2e2",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-toml",
     "commit": "64b56832c2cffe41758f28e05c756a3a98d16f41",
+    "filesSha256": "c3a634a5fa29a4f13856f21ec3b567bfe4536789e850d381872fc203826b8f57",
     "license": "MIT"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-commonlisp",
     "commit": "32323509b3d9fe96607d151c2da2c9009eb13a2f",
+    "filesSha256": "dfb5e60c6dbdfe820fba5f285c27e7fa8c3d6ef68df60f304461f0a61da05263",
     "license": "MIT",
     "name": "commonlisp",
     "scope": "source.cl",
@@ -183,6 +209,7 @@
   {
     "url": "https://github.com/DerekStride/tree-sitter-sql",
     "commit": "5129061608da71146c813e13c32a54f4b13645c8",
+    "filesSha256": "b4a346aabf260b63e2ec183690be9bb663561a4524858c5ee3965dca2ff5da21",
     "sourceCommit": "39489e8728db978f832b24873e995023fcd8e5c3",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
@@ -191,6 +218,7 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-csv",
     "commit": "f6bf6e35eb0b95fbadea4bb39cb9709507fcb181",
+    "filesSha256": "824fbafae90a079d15ecba60541064e03efc584c45e0b363e44d0694af21b308",
     "license": "MIT",
     "name": "csv",
     "path": "csv",
@@ -203,6 +231,7 @@
   {
     "url": "https://github.com/the-mikedavis/tree-sitter-diff",
     "commit": "2520c3f934b3179bb540d23e0ef45f75304b5fed",
+    "filesSha256": "664ba526b496cf0cd5dbf4df225d06dd29ffb2ee74027aa152bd5d827b55fdbe",
     "license": "MIT",
     "name": "diff",
     "scope": "source.diff",
@@ -215,11 +244,13 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-lua",
     "commit": "e284fcec45ead0d477e326fccd2cd4a68a89dae4",
+    "filesSha256": "1f61405a729529a5494eb95dc93d72f56357f2d84e4ac2ca5e9be0c7d754ff94",
     "license": "MIT"
   },
   {
     "url": "https://github.com/cathaysia/tree-sitter-idl",
     "commit": "e6b8b4d2ba285caacf6f9e931f1f637f5bc02b03",
+    "filesSha256": "07967bd527eb980818c643b824926a288b27bb215ec409f722db76118a474cb6",
     "license": "Apache-2.0",
     "highlights": "queries/highlights.scm",
     "indents": "queries/indents.scm",
@@ -228,17 +259,20 @@
   {
     "url": "https://github.com/rmuir/tree-sitter-javadoc",
     "commit": "373fbd84f35aff70031426ed6edf3cdf52b93532",
+    "filesSha256": "f9dbc8abe3a4b66ac12dac5dde840da443f9391bd36ed601c24aa54a26d0f7e6",
     "license": "MIT"
   },
   {
     "url": "https://github.com/fwcd/tree-sitter-kotlin",
     "commit": "57fb4560ba8641865bc0baa6b3f413b236112c4c",
+    "filesSha256": "1027cd66f748a18ed351bcf783c7b0c09a0e5184a5c4cc53076d7f0c24206676",
     "license": "MIT",
     "highlights": "queries/highlights.scm"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-objc",
     "commit": "181a81b8f23a2d593e7ab4259981f50122909fda",
+    "filesSha256": "78e5677f2003f191ef6c212c80966bc3194d5bb012d07bdf4811f1b2a4d8d966",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "indents": "queries/indents.scm",
@@ -249,6 +283,7 @@
   {
     "url": "https://github.com/alex-pinkus/tree-sitter-swift",
     "commit": "8abb3e8b33256d89127a35e87480736f74755ff9",
+    "filesSha256": "3fbf973bb338a2b546491cd5da9beb3c20c75345c33eefe6ae06f5f926536c69",
     "license": "MIT",
     "generate": true,
     "highlights": "queries/highlights.scm",
@@ -262,6 +297,7 @@
   {
     "url": "https://github.com/Isopod/tree-sitter-pascal",
     "commit": "042119eca2e18a60e56317fb06ee3ba5c32cb447",
+    "filesSha256": "09dcbdc084c412d4ed3134835b617b00bd8910972d8053b72be81520adfc6bc9",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm"
@@ -269,6 +305,7 @@
   {
     "url": "https://github.com/tree-sitter-perl/tree-sitter-perl",
     "commit": "0c24d001dd1921e418fb933d208a7bd7dd3f923a",
+    "filesSha256": "0c16764d5ea570e617b595db17e0f684be6f67b7a6eb5124d0cb9d020e44008e",
     "sourceCommit": "ad74e6db234c35d537de9358799a8e0cc4f5dee0",
     "license": "MIT",
     "extraNotices": [
@@ -281,6 +318,7 @@
   {
     "url": "https://github.com/treywood/tree-sitter-proto",
     "commit": "e9f6b43f6844bd2189b50a422d4e2094313f6aa3",
+    "filesSha256": "d7bc4625b5233a896c368bc29b012812f333271c7457549961fbf29619e99118",
     "license": "MIT",
     "name": "proto",
     "scope": "source.proto",
@@ -293,12 +331,14 @@
   {
     "url": "https://github.com/6cdh/tree-sitter-scheme",
     "commit": "b5c701148501fa056302827442b5b4956f1edc03",
+    "filesSha256": "c1cae24605ba96e2ac92671cf45fc7021093a2bdcc22c54671d026fb618d1b90",
     "license": "MIT",
     "highlights": "queries/highlights.scm"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-thrift",
     "commit": "68fd0d80943a828d9e6f49c58a74be1e9ca142cf",
+    "filesSha256": "c8037ea4f6453540d3093b07856858636e2179f19308043a65c2a6fb82f2d195",
     "license": "MIT",
     "name": "thrift",
     "scope": "source.thrift",
@@ -314,6 +354,7 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-xml",
     "commit": "5000ae8f22d11fbe93939b05c1e37cf21117162d",
+    "filesSha256": "740224fac6844d4500335957ae5bb5382e77f132fe5d9ca3f5a004e03502f382",
     "license": "MIT",
     "grammars": [
       "xml",
@@ -323,6 +364,7 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-zig",
     "commit": "6479aa13f32f701c383083d8b28360ebd682fb7d",
+    "filesSha256": "96cf9f0a437492c42482bd58054adb14b72292bff987647922d7c8fa5b531408",
     "license": "MIT",
     "highlights": "queries/highlights.scm",
     "locals": "queries/locals.scm",
@@ -333,6 +375,7 @@
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
     "commit": "2dfd57f547f06ca5631a80f601e129d73fc8e9f0",
+    "filesSha256": "e0ea6666e3e5e85d861b0e071b4d2cbca3e0632941f4adc5e135b8fca78b846c",
     "license": "MIT",
     "grammars": [
       "markdown",
@@ -342,6 +385,7 @@
   {
     "url": "https://github.com/mikkihugo/tree-sitter-mermaid",
     "commit": "939e7b23159637ff836561e18c93e2a2e406acf0",
+    "filesSha256": "8ca3193cda692f8c11e05c99a028f4f28354f3f392137990100e6d42176a298c",
     "license": "MIT",
     "name": "mermaid",
     "scope": "source.mermaid",
@@ -354,6 +398,7 @@
   {
     "url": "https://github.com/latex-lsp/tree-sitter-latex",
     "commit": "7e0ecdc02926c7b9b2e0c76003d4fe7b0944f957",
+    "filesSha256": "780497881f43b4913f4100f22689ddc974361391d687708a73219755144d9fe6",
     "license": "MIT",
     "generate": true,
     "name": "latex",
@@ -382,6 +427,7 @@
   {
     "url": "https://github.com/stsewd/tree-sitter-comment",
     "commit": "66272d2b6c73fb61157541b69dd0a7ce7b42a5ad",
+    "filesSha256": "6c3160bc14c1adb6c4ca4d886b4813a4bdc85dc3aad6eb2991f79acaba844482",
     "license": "MIT",
     "name": "comment",
     "displayName": "Comment",

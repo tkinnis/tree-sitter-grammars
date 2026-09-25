@@ -25,6 +25,8 @@ String _sha256(List<int> bytes, String scratch) {
 Toolchain _toolchain(String sha256) => Toolchain(
   treeSitterTag: 'v0.27.0',
   treeSitterCommit: '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+  treeSitterFilesSha256:
+      '8284859e50207152e5df621e49086ea169020c47ef342489f5f8c06b7082f2ea',
   cliVersion: '0.27.0',
   cliAsset: 'tree-sitter-macos-arm64.gz',
   cliSha256: sha256,

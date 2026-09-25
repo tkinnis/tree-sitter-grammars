@@ -82,10 +82,13 @@ dart run tool/check_release.dart --against=<archive>  # also compares grammars
 ### Pinning Grammars
 
 ```bash
-dart run tool/pin_grammars.dart --check                  # every url entry has a 40-hex commit and a license
+dart run tool/pin_grammars.dart --check                  # every url entry has a 40-hex commit, a filesSha256 and a license
 dart run tool/pin_grammars.dart --set tree-sitter-c=<sha>  # move one pin; the commit must be on a branch of origin
 dart run tool/pin_grammars.dart --from-checkouts          # pin every grammar at its grammars/<repo> HEAD
+dart run tool/pin_grammars.dart --record-files           # record filesSha256 afresh for every pin, the runtime's included
 ```
+
+Every pin records, beside its commit, the `filesSha256` of the files its tree holds: the sha256 of one `<mode> <blob id>\t<path>` record per file, each ending in a NUL, sorted by path, with submodule entries left out (a source bundle carries no files for them). `--set` and `--from-checkouts` record it from the object store; the runtime's is in `tool/toolchain.json`. The build checks every tree it compiles against it, so a pin and its files cannot drift apart unseen.
 
 ### Tests
 
@@ -248,7 +251,7 @@ git checkout v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets
 ```
 
-With `--sources`, the build reads no git object store and needs neither `grammars/` nor the `tree-sitter` submodule. Each bundle must have the sha256 the release's `build_info.json` records and must name its pinned commit in its header. The two grammars the build generates (latex and swift) still need the tree-sitter CLI, which the build downloads from tree-sitter's release and checks against the sha256 in `tool/toolchain.json`. The same bytes come back from the same Xcode, whose clang compiles every library and whose git writes the source bundles, with the same macOS `/usr/bin/gzip` and `/usr/bin/tar`: `build_info.json` records all four, and since the archive carries `build_info.json` with every bundle's sha256, its bytes depend on them too.
+With `--sources`, the build reads no git object store and needs neither `grammars/` nor the `tree-sitter` submodule. Each bundle must have the sha256 the release's `build_info.json` records and must name its pinned commit in its header, and its unpacked files must have the `filesSha256` that `tool/grammars.json` or `tool/toolchain.json` records at the checked-out tag. That last check holds a bundle to the tagged repository rather than to the `build_info.json` downloaded beside it. The two grammars the build generates (latex and swift) still need the tree-sitter CLI, which the build downloads from tree-sitter's release and checks against the sha256 in `tool/toolchain.json`. The same bytes come back from the same Xcode, whose clang compiles every library and whose git writes the source bundles, with the same macOS `/usr/bin/gzip` and `/usr/bin/tar`: `build_info.json` records all four, and since the archive carries `build_info.json` with every bundle's sha256, its bytes depend on them too.
 
 ## License
 
