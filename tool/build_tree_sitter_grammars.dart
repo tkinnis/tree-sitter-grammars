@@ -133,18 +133,7 @@ Future<void> main(List<String> args) async {
 
 Future<void> _build(String root, _Options options) async {
   final (:release, :dryRun, :publish, :sources) = options;
-  final bundles = sources == null ? null : p.normalize(p.absolute(sources));
-  if (bundles != null) {
-    for (final owned in ['build', 'output']) {
-      final directory = p.join(root, owned);
-      if (p.equals(bundles, directory) || p.isWithin(directory, bundles)) {
-        throw BuildException(
-          '--sources=$sources is inside $owned/, which the build deletes; '
-          'keep the bundles elsewhere',
-        );
-      }
-    }
-  }
+  final bundles = sources == null ? null : _sourcesDirectory(root, sources);
   // output/ holds only a build that passed every check: it is removed
   // before anything can fail, and the build fills build/out/ and moves it
   // into place last.
@@ -364,6 +353,37 @@ Future<void> _build(String root, _Options options) async {
       );
     }
   }
+}
+
+/// [sources], the directory `--sources` names, as the file system spells
+/// it, with every symbolic link resolved.
+///
+/// Throws a [BuildException] when it cannot be resolved, or when it is or
+/// lies inside `build/` or `output/` under [root], which the build deletes.
+/// Both sides are compared resolved, so neither a link nor another case of
+/// the same name on a case-insensitive volume slips past.
+String _sourcesDirectory(String root, String sources) {
+  final String resolved;
+  try {
+    resolved = Directory(sources).resolveSymbolicLinksSync();
+  } on FileSystemException catch (error) {
+    throw BuildException(
+      '--sources=$sources cannot be resolved: '
+      '${error.osError?.message ?? error.message}',
+    );
+  }
+  for (final owned in ['build', 'output']) {
+    final directory = Directory(p.join(root, owned));
+    if (!directory.existsSync()) continue;
+    final canonical = directory.resolveSymbolicLinksSync();
+    if (p.equals(resolved, canonical) || p.isWithin(canonical, resolved)) {
+      throw BuildException(
+        '--sources=$sources is inside $owned/, which the build deletes; '
+        'keep the bundles elsewhere',
+      );
+    }
+  }
+  return resolved;
 }
 
 void _step(String title) => print('\n── $title');

@@ -79,4 +79,37 @@ void main() {
     check(result.stderr as String).contains('is inside output/');
     check(bundles.existsSync()).isTrue();
   });
+
+  for (final (label, spelling) in [
+    ('another case of output/', (String root) => '$root/OUTPUT/sources'),
+    ('a link to output/', (String root) => '$root/link/sources'),
+  ]) {
+    test('refuses source bundles named through $label', () async {
+      final root = temporary.path;
+      _copyTools(root);
+      final bundles = Directory(p.join(root, 'output', 'sources'))
+        ..createSync(recursive: true);
+      Link(p.join(root, 'link')).createSync(p.join(root, 'output'));
+      final path = spelling(root);
+      final resolvable = Directory(path).existsSync();
+
+      final result = await _build(root, ['--sources=$path']);
+
+      check(result.exitCode).equals(1);
+      check(
+        result.stderr as String,
+      ).contains(resolvable ? 'is inside output/' : 'cannot be resolved');
+      check(bundles.existsSync()).isTrue();
+    });
+  }
+
+  test('refuses source bundles that do not exist', () async {
+    final root = temporary.path;
+    _copyTools(root);
+
+    final result = await _build(root, ['--sources=$root/missing']);
+
+    check(result.exitCode).equals(1);
+    check(result.stderr as String).contains('cannot be resolved');
+  });
 }
