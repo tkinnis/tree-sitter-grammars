@@ -444,15 +444,6 @@
       "path": "runtime/queries/diff/injections.scm"
     }
   },
-  "queries/dot/highlights.scm": {
-    "origin": "nvim",
-    "changed": true,
-    "upstream": {
-      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
-      "commit": "bc319bd0c2dba4ddfda7549042adeb6758b57c4a",
-      "path": "queries/dot/highlights.scm"
-    }
-  },
   "queries/dtd/folds.scm": {
     "origin": "nvim",
     "changed": false,
