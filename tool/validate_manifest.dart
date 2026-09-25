@@ -1,12 +1,15 @@
+/// Checks a built `manifest.json` against the fields
+/// `tool/manifest_schema.json` describes.
+///
+/// Usage: `dart run tool/validate_manifest.dart output/manifest.json`
+///
+/// Exits 1 on any error. Every compiled grammar (an entry with `dylib_dir`)
+/// must name its `source`, including the 40-hex commit it was built from.
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
-/// Validates a language manifest against the JSON schema
-///
-/// This provides basic validation since Dart doesn't have great JSON Schema support.
-/// For full validation, use a tool like `ajv-cli`:
-///   npm install -g ajv-cli
-///   ajv validate -s tool/manifest_schema.json -d output/manifest.json
 void main(List<String> args) {
   if (args.isEmpty) {
     print('Usage: dart tool/validate_manifest.dart <manifest_path>');
@@ -191,6 +194,34 @@ void main(List<String> args) {
         }
       }
 
+      // Validate source (required on every compiled grammar)
+      if (isTreeSitterLanguage && !data.containsKey('source')) {
+        print('✗ $languageId: Missing required field "source"');
+        errorCount++;
+      }
+      if (data.containsKey('source')) {
+        for (final problem in _sourceProblems(data['source'])) {
+          print('✗ $languageId: $problem');
+          errorCount++;
+        }
+      }
+
+      // Validate queryOnly
+      if (data.containsKey('queryOnly') && data['queryOnly'] is! bool) {
+        print('✗ $languageId: queryOnly must be a boolean');
+        errorCount++;
+      }
+
+      // Validate filenames
+      if (data.containsKey('filenames')) {
+        final filenames = data['filenames'];
+        if (filenames is! List ||
+            filenames.any((name) => name is! String || name.isEmpty)) {
+          print('✗ $languageId: filenames must be an array of file names');
+          errorCount++;
+        }
+      }
+
       // Check for unknown fields
       final knownFields = [
         'displayName',
@@ -199,8 +230,10 @@ void main(List<String> args) {
         'extensions',
         'filenames',
         'queries',
+        'queryOnly',
         'dylib_dir',
         'queries_dir',
+        'source',
       ];
       for (final field in data.keys) {
         if (!knownFields.contains(field)) {
@@ -234,4 +267,45 @@ void main(List<String> args) {
     print(stackTrace);
     exit(1);
   }
+}
+
+final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
+
+/// Every problem with a compiled grammar's `source` object.
+List<String> _sourceProblems(Object? source) {
+  if (source is! Map<String, dynamic>) return ['source must be an object'];
+  final url = source['url'];
+  final commit = source['commit'];
+  final sourceCommit = source['sourceCommit'];
+  final path = source['path'];
+  final abi = source['abi'];
+  final license = source['license'];
+  const known = {
+    'url',
+    'commit',
+    'sourceCommit',
+    'path',
+    'parser',
+    'abi',
+    'license',
+  };
+  return [
+    if (url is! String || !url.startsWith('https://'))
+      'source.url must be an https URL',
+    if (commit is! String || !_commitPattern.hasMatch(commit))
+      'source.commit must be 40 lowercase hex digits',
+    if (sourceCommit != null &&
+        (sourceCommit is! String || !_commitPattern.hasMatch(sourceCommit)))
+      'source.sourceCommit must be 40 lowercase hex digits',
+    if (path is! String || path.isEmpty) 'source.path must be a path',
+    if (!const {'committed', 'generated'}.contains(source['parser']))
+      'source.parser must be "committed" or "generated"',
+    // The language ABIs the pinned runtime, tree-sitter v0.27.0, loads.
+    if (abi is! int || abi < 13 || abi > 15)
+      'source.abi must be a language ABI from 13 to 15',
+    if (license is! String || license.isEmpty)
+      'source.license must name a licence',
+    for (final field in source.keys)
+      if (!known.contains(field)) 'source has unknown field "$field"',
+  ];
 }
