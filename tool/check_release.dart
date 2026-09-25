@@ -33,8 +33,14 @@
 /// archive with these, both under this runtime: every example of each
 /// grammar's test corpus and every highlight test input from the pinned
 /// sources is parsed with both, and each difference in the tree, or in
-/// the captures of a query file both archives carry, is printed. It
-/// reports and does not fail.
+/// the captures of a query file both archives carry, is printed. A match
+/// counts only when its pattern's text predicates hold: `#eq?`, `#match?`
+/// and `#any-of?` with their `not-` and `any-` forms, evaluated as
+/// tree-sitter documents them, a `#match?` pattern read as a Dart regular
+/// expression. Every capture carries its pattern's other predicates and
+/// directives, `#set!` among them, as text, so a changed regular
+/// expression, `#set!` value or other directive is a difference wherever
+/// the inputs reach it. It reports and does not fail.
 library;
 
 import 'dart:convert';
@@ -450,6 +456,8 @@ Future<void> _compare(
   final queryDifferences = <String, int>{};
   var ourPatterns = 0;
   var theirPatterns = 0;
+  final ourPredicates = _PredicateTally();
+  final theirPredicates = _PredicateTally();
   for (final grammar in grammars) {
     final theirs = p.join(archive, 'dylibs', grammar.name);
     final theirLibrary = p.join(theirs, 'lib${grammar.name}.dylib');
@@ -481,6 +489,8 @@ Future<void> _compare(
       0,
       (sum, q) => sum + q.patternCount,
     );
+    ourPredicates.addAll(ourQueries);
+    theirPredicates.addAll(theirQueries);
     final inputs = _inputs(grammar, grammars, sourceRoot);
     totalInputs += inputs.length;
     var trees = 0;
@@ -534,6 +544,32 @@ Future<void> _compare(
     'patterns in the query files both carry: $ourPatterns here, '
     '$theirPatterns there',
   );
+  print(
+    'text predicates evaluated on each match: ${ourPredicates.evaluated} '
+    'here, ${theirPredicates.evaluated} there; patterns whose captures carry '
+    'their other predicates and directives as text: '
+    '${ourPredicates.carried} here, ${theirPredicates.carried} there',
+  );
+}
+
+/// What the compared queries' patterns hold, for the summary.
+final class _PredicateTally {
+  var evaluated = 0;
+  var carried = 0;
+
+  /// Adds every pattern of [queries], printing each regular expression
+  /// Dart refused, which is compared as text instead.
+  void addAll(Map<String, Query> queries) {
+    for (final MapEntry(key: file, value: query) in queries.entries) {
+      for (final pattern in query.predicates) {
+        evaluated += pattern.evaluated;
+        if (pattern.properties.isNotEmpty) carried++;
+        for (final regex in pattern.refusedRegexes) {
+          print('$file: Dart refuses ${jsonEncode(regex)}; compared as text');
+        }
+      }
+    }
+  }
 }
 
 Map<String, Query> _compileAll(
@@ -644,20 +680,20 @@ String _firstDifference(String a, String b) {
 }
 
 /// The captures in only one of [ours] and [theirs], or null when they hold
-/// the same captures the same number of times.
+/// the same captures the same number of times. A capture is its name, its
+/// node's byte range and the unevaluated predicates and directives of the
+/// pattern that made it, so a changed `#set!` is a difference too.
 String? _captureDifference(
   List<Capture> ours,
   List<Capture> theirs,
   String text,
 ) {
-  String key(Capture capture) =>
-      '${capture.name}@${capture.start}-${capture.end}';
-  final counts = <String, int>{};
+  final counts = <Capture, int>{};
   for (final capture in ours) {
-    counts[key(capture)] = (counts[key(capture)] ?? 0) + 1;
+    counts[capture] = (counts[capture] ?? 0) + 1;
   }
   for (final capture in theirs) {
-    counts[key(capture)] = (counts[key(capture)] ?? 0) - 1;
+    counts[capture] = (counts[capture] ?? 0) - 1;
   }
   final onlyOurs = [
     for (final MapEntry(:key, :value) in counts.entries)
@@ -669,15 +705,18 @@ String? _captureDifference(
   ];
   if (onlyOurs.isEmpty && onlyTheirs.isEmpty) return null;
   final bytes = utf8.encode(text);
-  String show(String capture) {
-    final range = capture.substring(capture.lastIndexOf('@') + 1).split('-');
-    final start = int.parse(range[0]).clamp(0, bytes.length);
-    final end = int.parse(range[1]).clamp(start, bytes.length);
+  String show(Capture capture) {
+    final start = capture.start.clamp(0, bytes.length);
+    final end = capture.end.clamp(start, bytes.length);
     final snippet = utf8.decode(
       bytes.sublist(start, end.clamp(start, start + 40)),
       allowMalformed: true,
     );
-    return '$capture ${jsonEncode(snippet)}';
+    final properties = capture.properties.isEmpty
+        ? ''
+        : ' ${capture.properties}';
+    return '${capture.name}@${capture.start}-${capture.end}$properties '
+        '${jsonEncode(snippet)}';
   }
 
   return [

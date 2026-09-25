@@ -8,6 +8,8 @@ import 'dart:io';
 
 import 'package:ffi/ffi.dart';
 
+import 'query_predicates.dart';
+
 /// `TSNode`, passed and returned by value.
 final class TSNode extends Struct {
   @Array(4)
@@ -42,6 +44,18 @@ final class TSQueryMatch extends Struct {
   external Pointer<TSQueryCapture> captures;
 }
 
+/// `TSQueryPredicateStep`.
+final class TSQueryPredicateStep extends Struct {
+  @Uint32()
+  external int type;
+  @Uint32()
+  external int valueId;
+}
+
+/// `TSQueryPredicateStepTypeDone`, `…Capture` and `…String`.
+const _stepDone = 0;
+const _stepCapture = 1;
+
 /// The names `TSQueryError` gives its values, by value.
 const queryErrorNames = [
   'None',
@@ -67,8 +81,9 @@ final class QueryException implements Exception {
   String toString() => '$error error at byte $byteOffset';
 }
 
-/// One capture a query matched: its name and the byte range of its node.
-typedef Capture = ({String name, int start, int end});
+/// One capture a query matched: its name, the byte range of its node, and
+/// the [PatternPredicates.properties] of the pattern that made it.
+typedef Capture = ({String name, int start, int end, String properties});
 
 /// A tree-sitter runtime library.
 final class TreeSitterRuntime {
@@ -231,7 +246,25 @@ final class TreeSitterRuntime {
           .lookupFunction<
             Bool Function(Pointer<Void>, Pointer<TSQueryMatch>),
             bool Function(Pointer<Void>, Pointer<TSQueryMatch>)
-          >('ts_query_cursor_next_match');
+          >('ts_query_cursor_next_match'),
+      _queryPredicatesForPattern = library
+          .lookupFunction<
+            Pointer<TSQueryPredicateStep> Function(
+              Pointer<Void>,
+              Uint32,
+              Pointer<Uint32>,
+            ),
+            Pointer<TSQueryPredicateStep> Function(
+              Pointer<Void>,
+              int,
+              Pointer<Uint32>,
+            )
+          >('ts_query_predicates_for_pattern'),
+      _queryStringValueForId = library
+          .lookupFunction<
+            Pointer<Utf8> Function(Pointer<Void>, Uint32, Pointer<Uint32>),
+            Pointer<Utf8> Function(Pointer<Void>, int, Pointer<Uint32>)
+          >('ts_query_string_value_for_id');
 
   /// The opened library.
   final DynamicLibrary library;
@@ -274,6 +307,14 @@ final class TreeSitterRuntime {
   final void Function(Pointer<Void>, Pointer<Void>, TSNode) _queryCursorExec;
   final bool Function(Pointer<Void>, Pointer<TSQueryMatch>)
   _queryCursorNextMatch;
+  final Pointer<TSQueryPredicateStep> Function(
+    Pointer<Void>,
+    int,
+    Pointer<Uint32>,
+  )
+  _queryPredicatesForPattern;
+  final Pointer<Utf8> Function(Pointer<Void>, int, Pointer<Uint32>)
+  _queryStringValueForId;
 
   /// Whether the library exports [symbol], named without its leading
   /// underscore.
@@ -330,7 +371,9 @@ final class TreeSitterRuntime {
 
   /// Parses [text] with [language], returning the tree as an S-expression,
   /// every node of it (anonymous ones too) as [dumpTree] lists them, and
-  /// every capture of each of [queries] over it, keyed by name.
+  /// every capture of each of [queries] over it, keyed by name: the
+  /// captures of every match that satisfies its pattern's text predicates,
+  /// as [Query.predicates] reads them.
   ///
   /// Throws a [StateError] when the parser refuses the language or returns
   /// no tree.
@@ -359,7 +402,7 @@ final class TreeSitterRuntime {
         nodes: dumpTree(root),
         captures: {
           for (final MapEntry(key: name, value: query) in queries.entries)
-            name: _captures(query._pointer, root),
+            name: _captures(query, root, bytes),
         },
       );
     } finally {
@@ -403,38 +446,96 @@ final class TreeSitterRuntime {
     }
   }
 
-  List<Capture> _captures(Pointer<Void> query, TSNode root) {
+  List<Capture> _captures(Query query, TSNode root, List<int> source) {
     final cursor = _queryCursorNew();
     final match = malloc<TSQueryMatch>();
-    final length = malloc<Uint32>();
-    final names = <int, String>{};
     try {
-      _queryCursorExec(cursor, query, root);
+      _queryCursorExec(cursor, query._pointer, root);
       final captures = <Capture>[];
       while (_queryCursorNextMatch(cursor, match)) {
-        for (var i = 0; i < match.ref.captureCount; i++) {
-          final capture = match.ref.captures[i];
-          final name = names.putIfAbsent(
-            capture.index,
-            () => _queryCaptureNameForId(
-              query,
-              capture.index,
-              length,
-            ).toDartString(length: length.value),
-          );
+        final pattern = query.predicates[match.ref.patternIndex];
+        final matched = [
+          for (var i = 0; i < match.ref.captureCount; i++)
+            (
+              id: match.ref.captures[i].index,
+              start: _nodeStartByte(match.ref.captures[i].node),
+              end: _nodeEndByte(match.ref.captures[i].node),
+            ),
+        ];
+        if (pattern.evaluated > 0) {
+          final texts = <int, List<String>>{};
+          for (final (:id, :start, :end) in matched) {
+            (texts[id] ??= []).add(
+              utf8.decode(source.sublist(start, end), allowMalformed: true),
+            );
+          }
+          if (!pattern.accepts(texts)) continue;
+        }
+        for (final (:id, :start, :end) in matched) {
           captures.add((
-            name: name,
-            start: _nodeStartByte(capture.node),
-            end: _nodeEndByte(capture.node),
+            name: query.captureName(id),
+            start: start,
+            end: end,
+            properties: pattern.properties,
           ));
         }
       }
       return captures;
     } finally {
-      malloc
-        ..free(match)
-        ..free(length);
+      malloc.free(match);
       _queryCursorDelete(cursor);
+    }
+  }
+
+  /// The predicates and directives of every pattern of [query], in order.
+  List<PatternPredicates> _readPredicates(Query query) {
+    final count = malloc<Uint32>();
+    final length = malloc<Uint32>();
+    try {
+      return [
+        for (var pattern = 0; pattern < query.patternCount; pattern++)
+          PatternPredicates(() {
+            final steps = _queryPredicatesForPattern(
+              query._pointer,
+              pattern,
+              count,
+            );
+            final predicates = <QueryPredicate>[];
+            var arguments = <PredicateArgument>[];
+            String? name;
+            for (var i = 0; i < count.value; i++) {
+              final step = steps[i];
+              if (step.type == _stepDone) {
+                if (name != null || arguments.isNotEmpty) {
+                  predicates.add((name: name ?? '', arguments: arguments));
+                }
+                name = null;
+                arguments = [];
+              } else if (step.type == _stepCapture) {
+                arguments.add((
+                  capture: step.valueId,
+                  text: query.captureName(step.valueId),
+                ));
+              } else {
+                final value = _queryStringValueForId(
+                  query._pointer,
+                  step.valueId,
+                  length,
+                ).toDartString(length: length.value);
+                if (name == null && arguments.isEmpty) {
+                  name = value;
+                } else {
+                  arguments.add((capture: null, text: value));
+                }
+              }
+            }
+            return predicates;
+          }()),
+      ];
+    } finally {
+      malloc
+        ..free(count)
+        ..free(length);
     }
   }
 }
@@ -445,9 +546,28 @@ final class Query {
 
   final TreeSitterRuntime _runtime;
   final Pointer<Void> _pointer;
+  final _captureNames = <int, String>{};
 
   /// `ts_query_pattern_count`.
   final int patternCount;
+
+  /// What a comparison makes of each pattern's predicates and directives,
+  /// by pattern index, read from `ts_query_predicates_for_pattern` once.
+  late final List<PatternPredicates> predicates = _runtime._readPredicates(
+    this,
+  );
+
+  /// The name of the capture [id].
+  String captureName(int id) => _captureNames.putIfAbsent(id, () {
+    final length = malloc<Uint32>();
+    try {
+      return _runtime
+          ._queryCaptureNameForId(_pointer, id, length)
+          .toDartString(length: length.value);
+    } finally {
+      malloc.free(length);
+    }
+  });
 
   /// Frees the query.
   void delete() => _runtime._queryDelete(_pointer);
