@@ -59,8 +59,9 @@
 /// `--against=<archive>` then compares the grammars of another extracted
 /// archive with these, both under this runtime: every example of each
 /// grammar's test corpus and every highlight test input from the pinned
-/// sources is parsed with both, and each difference in the tree, or in
-/// the captures of a query file both archives carry, is printed. A grammar
+/// sources is parsed with both, tsx parsing TypeScript's and JavaScript's
+/// as well, and each difference in the tree, or in the captures of a query
+/// file both archives carry, is printed. A grammar
 /// pinned on a deploy branch is tested with the tests of its
 /// `sourceCommit`, read from its object store under `grammars/`. A match
 /// counts only when its pattern's text predicates hold: `#eq?`, `#match?`
@@ -898,10 +899,19 @@ void _checkNotices(
 /// One input a grammar's tests parse.
 typedef _Input = ({String label, String text});
 
+/// The grammars whose syntax takes in other grammars', each with those
+/// grammars, whose inputs the comparison parses with it as well. TSX is
+/// TypeScript with JSX: TypeScript's corpus names tsx in one example, and
+/// JavaScript's corpus holds the JSX.
+const _alsoParses = {
+  'tsx': ['typescript', 'javascript'],
+};
+
 /// Compares [grammars] with the same grammars in the archive extracted at
 /// [archive], parsing the inputs of the test trees [_testTrees] supplies
 /// from [sourceRoot], or from the object stores under [root] into
-/// [scratch].
+/// [scratch]; a grammar in [_alsoParses] parses the inputs of the grammars
+/// it names too.
 ///
 /// Lists every grammar with no inputs, which the comparison cannot vouch
 /// for, and sets a failing exit code when the other archive's manifest
@@ -963,10 +973,17 @@ Future<void> _compare(
     );
     ourPredicates.addAll(ourQueries);
     theirPredicates.addAll(theirQueries);
-    final testTree = testTrees[repositoryName(grammar.url)];
-    final inputs = testTree == null
-        ? const <_Input>[]
-        : _inputs(grammar, grammars, testTree);
+    List<_Input> inputsOf(_Grammar owner) =>
+        switch (testTrees[repositoryName(owner.url)]) {
+          final testTree? => _inputs(owner, grammars, testTree),
+          null => const [],
+        };
+    final inputs = [
+      ...inputsOf(grammar),
+      for (final name in _alsoParses[grammar.name] ?? const <String>[])
+        for (final other in grammars.where((g) => g.name == name))
+          ...inputsOf(other),
+    ];
     if (inputs.isEmpty) uncompared.add(grammar);
     totalInputs += inputs.length;
     var trees = 0;

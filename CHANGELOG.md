@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Injection tests: `tool/check_release.dart` parses every source under `test/injections/<grammar>/` and requires what the grammar's composed `injections.scm` injects in it, as the editor injects it, to be the `.injections` file beside it: each injection's language, whether it is combined, and the whole text of the node it captures as `@injection.content`; the first are three Javadoc comments and a C, a C++ and an Objective-C source of macros and directives
 - `tool/check_release.dart` refuses an injection pattern that captures no `@injection.content`, and one that captures it and names no language in every grammar but the twelve `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (bash, go, html, java, kotlin, make, pascal, python, ruby, sql, xml and yaml, which hold 74), and requires every composed query to read as the patterns `ts_query_new` counts in it
 
+### Changed
+
+- `tool/check_release.dart --against` parses TypeScript's and JavaScript's inputs with tsx as well as the one example TypeScript's corpus names tsx in, since TSX is TypeScript with JSX
+
 ### Fixed
 
 - Objective-C: folds, highlights, indents and locals take C's patterns through `; inherits: c` alone, and are nvim-treesitter's and tree-sitter-objc's text, unchanged. Each also held a copy of C's file, so C's patterns composed twice; folds' copy left out `for`, `while` and `do`
