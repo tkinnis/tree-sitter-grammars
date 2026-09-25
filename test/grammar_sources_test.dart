@@ -113,13 +113,19 @@ void main() {
     });
 
     test('ignores global attributes and configuration of the user', () async {
-      File(path('attributes'))
-          .writeAsStringSync('* text eol=crlf\n*.h export-ignore\n');
-      File(path('gitconfig')).writeAsStringSync(
-          '[core]\n\tattributesFile = ${path('attributes')}\n'
-          '\tautocrlf = true\n');
-      final hostile = {
+      const hostile = '* text eol=crlf\n*.h export-ignore\n';
+      File(path('attributes')).writeAsStringSync(hostile);
+      Directory(path('xdg/git')).createSync(recursive: true);
+      File(path('xdg/git/attributes')).writeAsStringSync(hostile);
+      final config = '[core]\n\tattributesFile = ${path('attributes')}\n'
+          '\tautocrlf = true\n';
+      File(path('gitconfig')).writeAsStringSync(config);
+      Directory(path('home')).createSync();
+      File(path('home/.gitconfig')).writeAsStringSync(config);
+      final environment = {
         ...Platform.environment,
+        'HOME': path('home'),
+        'XDG_CONFIG_HOME': path('xdg'),
         'GIT_CONFIG_GLOBAL': path('gitconfig'),
         'GIT_CONFIG_PARAMETERS':
             "'core.attributesfile'='${path('attributes')}'",
@@ -129,10 +135,19 @@ void main() {
       };
 
       await extractCommit(upstream.path, commit, path('out'),
-          environment: hostile);
+          environment: environment);
 
       check(File(path('out/src/parser.c')).readAsStringSync()).equals(_parser);
       check(File(path('out/src/tree_sitter/parser.h')).existsSync()).isTrue();
+    });
+
+    test('reads the pinned commit, never a replacement for it', () async {
+      final other = await upstream.commit({'src/parser.c': bytes('other\n')});
+      await upstream.git(['replace', commit, other]);
+
+      await extractCommit(upstream.path, commit, path('out'));
+
+      check(File(path('out/src/parser.c')).readAsStringSync()).equals(_parser);
     });
 
     test('refuses bytes the repository\'s own attributes convert', () async {
