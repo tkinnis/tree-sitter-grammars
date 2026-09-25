@@ -98,7 +98,7 @@ void main() {
     (entry['upstream']! as Map<String, Object?>)['commit'] = '0123abc';
     final json = jsonEncode({
       'queries/c/highlights.scm': entry,
-      'queries/c/tags.scm': {..._hereEntry, 'origin': 'zed', 'note': 'x'},
+      'queries/c/tags.scm': {..._hereEntry, 'origin': 'elsewhere', 'note': 'x'},
     });
 
     final reading = readQueryProvenance(
