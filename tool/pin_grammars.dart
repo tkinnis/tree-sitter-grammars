@@ -39,7 +39,11 @@ import 'package:path/path.dart' as p;
 import 'src/files_digest.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
+import 'src/generated_sources.dart';
+import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
+import 'src/toolchain.dart';
+import 'src/tree_sitter_cli.dart';
 
 Future<void> main(List<String> args) async {
   final root = p.dirname(p.dirname(p.fromUri(Platform.script)));
@@ -177,19 +181,31 @@ Future<List<Map<String, Object?>>> _set(
       commit,
       filesSha256: await filesDigest(await committedFiles(directory, commit)),
       sourceCommit: sourceCommit,
+      generatedSha256: entries[index]['generate'] == true
+          ? await _generatedDigest(
+              root,
+              Toolchain.load(root),
+              entries[index],
+              directory,
+              commit,
+            )
+          : null,
     );
   } on GitException catch (error) {
     throw PinException('$name: $error');
   } on GrammarSourceException catch (error) {
     throw PinException(error.message);
-  } on FilesDigestException catch (error) {
+  } on PinException {
+    rethrow;
+  } on Exception catch (error) {
     throw PinException('$name: $error');
   }
   return [...entries]..[index] = pinned;
 }
 
-/// [entries] with each grammar's `filesSha256` read afresh from its object
-/// store at its pin, after writing the runtime's into `tool/toolchain.json`.
+/// [entries] with each grammar's `filesSha256`, and a generated grammar's
+/// `generatedSha256`, read afresh at its pin, after writing the runtime's
+/// `filesSha256` into `tool/toolchain.json`.
 ///
 /// A store that lacks its pinned commit fetches exactly that commit. Throws
 /// a [PinException] listing every repository that could not be read,
@@ -199,25 +215,30 @@ Future<List<Map<String, Object?>>> _recordFiles(
   List<Map<String, Object?>> entries,
 ) async {
   final refusals = <String>[];
-  Future<String?> digest(String name, String store, String commit) async {
-    try {
-      return await filesDigest(await committedFiles(store, commit));
-    } on Exception catch (error) {
-      refusals.add('$name: $error');
-      return null;
-    }
-  }
-
   // Read as JSON, not as a Toolchain, which requires the digest this
   // records.
   final toolchainFile = File(p.join(root, 'tool', 'toolchain.json'));
   final json = jsonDecode(toolchainFile.readAsStringSync()) as Map;
   final treeSitter = json['treeSitter'] as Map;
-  final runtime = await digest(
-    'tree-sitter',
-    p.join(root, 'tree-sitter'),
-    treeSitter['commit'] as String,
-  );
+  final String runtime;
+  try {
+    runtime = await filesDigest(
+      await committedFiles(
+        p.join(root, 'tree-sitter'),
+        treeSitter['commit'] as String,
+      ),
+    );
+  } on Exception catch (error) {
+    throw PinException('tree-sitter: $error');
+  }
+  json['treeSitter'] = {
+    for (final MapEntry(:key, :value) in treeSitter.entries)
+      if (key != 'filesSha256') ...{
+        key: value,
+        if (key == 'commit') 'filesSha256': runtime,
+      },
+  };
+  final toolchain = Toolchain.parse(jsonEncode(json));
   final pinned = <Map<String, Object?>>[];
   for (final entry in entries) {
     if (entry case {'url': final String url, 'commit': final String commit}) {
@@ -226,19 +247,19 @@ Future<List<Map<String, Object?>>> _recordFiles(
       try {
         await ensureObjectStore(runGit, store, url);
         await ensureCommit(runGit, store, commit, name);
-      } on Exception catch (error) {
-        refusals.add('$name: $error');
-        continue;
-      }
-      if (await digest(name, store, commit) case final files?) {
         pinned.add(
           withPin(
             entry,
             commit,
-            filesSha256: files,
+            filesSha256: await filesDigest(await committedFiles(store, commit)),
             sourceCommit: entry['sourceCommit'] as String?,
+            generatedSha256: entry['generate'] == true
+                ? await _generatedDigest(root, toolchain, entry, store, commit)
+                : null,
           ),
         );
+      } on Exception catch (error) {
+        refusals.add('$name: $error');
       }
     } else {
       pinned.add(entry);
@@ -252,16 +273,53 @@ Future<List<Map<String, Object?>>> _recordFiles(
       ].join('\n  '),
     );
   }
-  json['treeSitter'] = {
-    for (final MapEntry(:key, :value) in treeSitter.entries)
-      if (key != 'filesSha256') ...{
-        key: value,
-        if (key == 'commit') 'filesSha256': runtime,
-      },
-  };
   toolchainFile.writeAsStringSync(
     '${const JsonEncoder.withIndent('  ').convert(json)}\n',
   );
   print('tree-sitter: filesSha256 $runtime');
   return pinned;
+}
+
+/// The digest of what the pinned CLI of [toolchain] generates for the
+/// generated grammar [entry] at [commit], extracted from its object store
+/// [store], at the language ABI of the runtime `toolchain.json` pins.
+Future<String> _generatedDigest(
+  String root,
+  Toolchain toolchain,
+  Map<String, Object?> entry,
+  String store,
+  String commit,
+) async {
+  final api = await runGit(p.join(root, 'tree-sitter'), [
+    'show',
+    '${toolchain.treeSitterCommit}:lib/include/tree_sitter/api.h',
+  ]);
+  final scratch = Directory.systemTemp.createTempSync('pin_generate');
+  try {
+    final sourceRoot = p.join(scratch.path, 'src');
+    await extractCommit(
+      store,
+      commit,
+      p.join(sourceRoot, repositoryName(entry['url']! as String)),
+    );
+    final builds = planGrammars(root, [entry], sourceRoot: sourceRoot);
+    if (builds.length != 1) {
+      throw PinException(
+        'a generated entry builds one grammar, not '
+        '${builds.map((b) => b.name).join(', ')}',
+      );
+    }
+    final digest = await generatedDigest(
+      root: root,
+      toolchain: toolchain,
+      build: builds.single,
+      sourceRoot: sourceRoot,
+      abi: apiLanguageVersions(api).current,
+      scratch: p.join(scratch.path, 'gen'),
+    );
+    print('${builds.single.name}: generatedSha256 $digest');
+    return digest;
+  } finally {
+    scratch.deleteSync(recursive: true);
+  }
 }

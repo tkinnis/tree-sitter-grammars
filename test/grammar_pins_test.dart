@@ -62,6 +62,39 @@ void main() {
     ]);
   });
 
+  test('a generated grammar and only one records generatedSha256', () {
+    final problems = pinProblems([
+      {
+        'url': 'https://github.com/a/tree-sitter-a',
+        'commit': _sha,
+        'filesSha256': _files,
+        'license': 'MIT',
+        'generate': true,
+      },
+      {
+        'url': 'https://github.com/b/tree-sitter-b',
+        'commit': _sha,
+        'filesSha256': _files,
+        'license': 'MIT',
+        'generatedSha256': _files,
+      },
+      {
+        'url': 'https://github.com/c/tree-sitter-c',
+        'commit': _sha,
+        'filesSha256': _files,
+        'license': 'MIT',
+        'generate': true,
+        'generatedSha256': _files,
+      },
+    ]);
+
+    check(problems).deepEquals([
+      "tree-sitter-a: a generated grammar's generatedSha256 must be 64 "
+          'lowercase hex digits',
+      'tree-sitter-b: generatedSha256 belongs only to a generated grammar',
+    ]);
+  });
+
   test('two spellings of one repository are listed more than once', () {
     final problems = pinProblems([
       {
@@ -127,6 +160,9 @@ void main() {
         sourceCommit: _sha,
       )['sourceCommit'],
     ).equals(_sha);
+    check(
+      withPin({...entry, 'generatedSha256': _files}, _sha, filesSha256: _files),
+    ).not((it) => it.containsKey('generatedSha256'));
   });
 
   group('pinFromCheckout', () {

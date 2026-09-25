@@ -12,6 +12,10 @@
 /// - `license`: the SPDX identifier of the grammar's licence.
 /// - `generate` (optional): true when the grammar commits no `src/parser.c`
 ///   and the build generates it from `src/grammar.json`.
+/// - `generatedSha256` (with `generate`): the digest, as `files_digest.dart`
+///   computes it, of the files the pinned CLI generates for the pin at the
+///   runtime's language ABI, which the generated sources are checked
+///   against whether generated or taken from a release's bundle.
 /// - `extraNotices` (optional): compiled source files carrying a licence
 ///   comment of their own, beyond the grammar's licence file, which the
 ///   notices reproduce.
@@ -31,6 +35,7 @@ const pinFields = [
   'sourceCommit',
   'license',
   'generate',
+  'generatedSha256',
   'extraNotices',
 ];
 
@@ -111,6 +116,18 @@ List<String> pinProblems(List<Map<String, Object?>> entries) {
     if (generate != null && generate is! bool) {
       problems.add('$name: generate must be a boolean');
     }
+    final generated = entry['generatedSha256'];
+    if (generate == true &&
+        (generated is! String || !_digestPattern.hasMatch(generated))) {
+      problems.add(
+        '$name: a generated grammar\'s generatedSha256 must be 64 lowercase '
+        'hex digits',
+      );
+    } else if (generate != true && generated != null) {
+      problems.add(
+        '$name: generatedSha256 belongs only to a generated grammar',
+      );
+    }
     final extraNotices = entry['extraNotices'];
     if (extraNotices != null &&
         (extraNotices is! List ||
@@ -179,13 +196,15 @@ Future<void> requireOnOrigin(
 /// Returns [entry] pinned at [commit], whose files have the digest
 /// [filesSha256], replacing any earlier pin.
 ///
-/// A [sourceCommit] is recorded when given; otherwise any earlier
-/// `sourceCommit` is dropped, because it described the earlier pin.
+/// A [sourceCommit] and a [generatedSha256] are recorded when given;
+/// otherwise any earlier one is dropped, because it described the earlier
+/// pin.
 Map<String, Object?> withPin(
   Map<String, Object?> entry,
   String commit, {
   required String filesSha256,
   String? sourceCommit,
+  String? generatedSha256,
 }) {
   if (!_commitPattern.hasMatch(commit)) {
     throw PinException('$commit is not a 40-hex commit');
@@ -197,7 +216,9 @@ Map<String, Object?> withPin(
     throw PinException('$sourceCommit is not a 40-hex commit');
   }
   final pinned = {...entry, 'commit': commit, 'filesSha256': filesSha256}
-    ..remove('sourceCommit');
+    ..remove('sourceCommit')
+    ..remove('generatedSha256');
   if (sourceCommit != null) pinned['sourceCommit'] = sourceCommit;
+  if (generatedSha256 != null) pinned['generatedSha256'] = generatedSha256;
   return pinned;
 }

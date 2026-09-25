@@ -286,6 +286,7 @@
     "filesSha256": "3fbf973bb338a2b546491cd5da9beb3c20c75345c33eefe6ae06f5f926536c69",
     "license": "MIT",
     "generate": true,
+    "generatedSha256": "f729d21bcee5624bd3caaa057117d0a800f5690034dc3b075232d8e00792949c",
     "highlights": "queries/highlights.scm",
     "tags": "queries/tags.scm",
     "indents": "queries/indents.scm",
@@ -401,6 +402,7 @@
     "filesSha256": "780497881f43b4913f4100f22689ddc974361391d687708a73219755144d9fe6",
     "license": "MIT",
     "generate": true,
+    "generatedSha256": "3614508b31b81b68e8e88f4f35a6a94a297b6b36f7ee3923cbc3e92c75382b5b",
     "name": "latex",
     "scope": "text.tex.latex",
     "file-types": [

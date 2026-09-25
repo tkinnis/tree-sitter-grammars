@@ -11,9 +11,10 @@
 /// check exits 1 after listing each failure:
 ///
 /// - Every source bundle in `<output>/sources/` has the sha256
-///   `build_info.json` records and names its pinned commit, and the
-///   bundles are exactly the runtime and the grammars `tool/grammars.json`
-///   pins.
+///   `build_info.json` records and names its pinned commit, every bundle
+///   of generated sources has its recorded sha256, and `sources/` holds
+///   exactly the bundles of the runtime and the grammars
+///   `tool/grammars.json` pins, and of the grammars it generates.
 /// - `libtree-sitter.dylib` exports every function the runtime's `api.h`
 ///   declares, apart from the three it defines only with its wasm feature.
 /// - `manifest.json` holds exactly the entries `tool/grammars.json` plans,
@@ -59,6 +60,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
 import 'src/grammar_plan.dart';
@@ -183,14 +185,15 @@ _check(
   final runtime = TreeSitterRuntime.open(runtimePath);
   _checkExports(runtime, p.join(sourceRoot, 'tree-sitter'), problems);
 
-  final grammars = _checkManifest(
-    root,
-    output,
-    manifest,
-    entries,
-    sourceRoot,
-    problems,
-  );
+  List<GrammarBuild> plan = const [];
+  try {
+    plan = planGrammars(root, entries, sourceRoot: sourceRoot);
+  } on GrammarPlanException catch (error) {
+    problems.add('grammars.json: $error');
+  }
+  await _checkGenerated(output, info, plan, problems);
+  _checkBundleFiles(output, toolchain, entries, plan, problems);
+  final grammars = _checkManifest(output, manifest, entries, plan, problems);
   await _checkLibraries(runtimePath, grammars, toolchain, problems);
   final languages = _checkGrammars(runtime, grammars, problems);
   _checkQueries(runtime, output, grammars, languages, problems);
@@ -250,21 +253,82 @@ Future<void> _checkSources(
   if (extra.isNotEmpty) {
     problems.add('build_info.json records unpinned sources $extra');
   }
-  final files = Directory(bundles).existsSync()
-      ? Directory(bundles).listSync().length
-      : 0;
-  if (files != pinned.length) {
-    problems.add('$bundles holds $files files for ${pinned.length} pins');
-  }
   print(
     'sources: $good/${pinned.length} bundles carry their recorded sha256 '
     'and pinned commit',
   );
 }
 
+/// Checks the bundle of generated sources of every grammar of [plan] that
+/// is generated against the `generated` record of `build_info.json`
+/// [info]: it must be the one bundle recorded for it, with its sha256.
+Future<void> _checkGenerated(
+  String output,
+  Map<String, Object?> info,
+  List<GrammarBuild> plan,
+  List<String> problems,
+) async {
+  final recorded = info['generated'];
+  if (recorded is! Map<String, Object?>) {
+    problems.add('build_info.json records no generated sources');
+    return;
+  }
+  final generated = plan.where((build) => build.generate).toList();
+  var good = 0;
+  for (final build in generated) {
+    try {
+      await checkRecordedGenerated(
+        p.join(output, sourcesDirectoryName),
+        build,
+        recorded,
+      );
+      good++;
+    } on Exception catch (error) {
+      problems.add('$error');
+    }
+  }
+  final extra = recorded.keys.toSet().difference({
+    for (final build in generated) build.name,
+  });
+  if (extra.isNotEmpty) {
+    problems.add('build_info.json records ungenerated grammars $extra');
+  }
+  print(
+    'generated: $good/${generated.length} bundles of generated sources '
+    'carry their recorded sha256',
+  );
+}
+
+/// Requires `sources/` in [output] to hold exactly the source bundles of
+/// the pins and the generated bundles of [plan].
+void _checkBundleFiles(
+  String output,
+  Toolchain toolchain,
+  List<Map<String, Object?>> entries,
+  List<GrammarBuild> plan,
+  List<String> problems,
+) {
+  final expected = {
+    for (final source in pinnedSources(toolchain, entries)) source.bundleName,
+    for (final build in plan)
+      if (build.generate) generatedBundleName(build.name, build.commit),
+  };
+  final directory = Directory(p.join(output, sourcesDirectoryName));
+  final found = {
+    if (directory.existsSync())
+      for (final entity in directory.listSync()) p.basename(entity.path),
+  };
+  for (final name in found.difference(expected)) {
+    problems.add('$sourcesDirectoryName/$name is no bundle of this build');
+  }
+  for (final name in expected.difference(found)) {
+    problems.add('$sourcesDirectoryName/ holds no $name');
+  }
+}
+
 /// Checks that every entry of [manifest] is the kind of entry `grammars.json`
-/// [entries] plan for its name, and returns the compiled grammars, whose
-/// `tree-sitter.json` files are under [sourceRoot].
+/// [entries] plan for its name, [plan] listing the compiled grammars, and
+/// returns those.
 ///
 /// An entry with a `dylib_dir` is a compiled grammar's and must name its
 /// `source` (url, commit and path) and its `extensions`; one with
@@ -273,11 +337,10 @@ Future<void> _checkSources(
 /// entry unplanned or unreadable, is a problem, so no entry drops out of
 /// the checks that follow unseen.
 List<_Grammar> _checkManifest(
-  String root,
   String output,
   Map<String, Object?> manifest,
   List<Map<String, Object?>> entries,
-  String sourceRoot,
+  List<GrammarBuild> plan,
   List<String> problems,
 ) {
   final expected = <String, String>{
@@ -287,12 +350,8 @@ List<_Grammar> _checkManifest(
       else if (entry['queryOnly'] == true)
         entry['name']! as String: 'query-only',
   };
-  try {
-    for (final build in planGrammars(root, entries, sourceRoot: sourceRoot)) {
-      expected[build.name] = 'grammar';
-    }
-  } on GrammarPlanException catch (error) {
-    problems.add('grammars.json: $error');
+  for (final build in plan) {
+    expected[build.name] = 'grammar';
   }
   final grammars = <_Grammar>[];
   var good = 0;

@@ -20,7 +20,9 @@ const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 /// The contents of `output/build_info.json`.
 ///
 /// [sources] records each source bundle the build compiled from, by
-/// repository name, as `bundleRecord` writes it; [packingTools] the
+/// repository name, as `bundleRecord` writes it; [generated] each bundle of
+/// generated sources, by grammar, as `generatedRecord` writes it;
+/// [packingTools] the
 /// versions `packingToolVersions` reads of the git, gzip and tar that
 /// write the bundles and the archive.
 Map<String, Object?> buildInfo({
@@ -33,6 +35,7 @@ Map<String, Object?> buildInfo({
   required int languageVersion,
   required int minCompatibleLanguageVersion,
   required Map<String, Map<String, Object?>> sources,
+  required Map<String, Map<String, Object?>> generated,
   required Map<String, String> packingTools,
 }) => {
   'release': release,
@@ -70,6 +73,7 @@ Map<String, Object?> buildInfo({
     },
   },
   'sources': sources,
+  'generated': generated,
 };
 
 /// Encodes [info] as `output/build_info.json` is written.

@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A source bundle for the runtime and each pinned grammar repository, recorded by sha256 in `build_info.json`; `--sources=<dir>` rebuilds a release from its downloaded assets alone
 - `filesSha256` on every pin, the digest of the files its tree holds, recorded by `tool/pin_grammars.dart` (`--record-files` records all of them); every tree the build compiles, from an object store or a downloaded bundle, is checked against it
 - `--publish`, which creates the GitHub release of a pushed tag with the archive, its sha256, `build_info.json` and every source bundle, and refuses a release that exists
+- A bundle of what the pinned CLI generates for latex and swift, held to the `generatedSha256` their entries record and attached to every release, so a rebuild from a release's assets runs no CLI
 
 ### Changed
 

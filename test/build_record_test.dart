@@ -76,6 +76,7 @@ Map<String, Object?> _info(BuildFlags flags) =>
               languageVersion: 15,
               minCompatibleLanguageVersion: 13,
               sources: const {},
+              generated: const {},
               packingTools: const {
                 'git': 'git version 2.50.1 (Apple Git-155)',
                 'gzip': 'Apple gzip 457.140.3',

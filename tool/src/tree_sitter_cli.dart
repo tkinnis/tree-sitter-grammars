@@ -84,6 +84,27 @@ Future<void> _download(Uri url, String destination) async {
   }
 }
 
+/// `TREE_SITTER_LANGUAGE_VERSION` and
+/// `TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION` as the runtime's `api.h`,
+/// whose text is [apiHeader], defines them.
+///
+/// Throws a [CliException] when it defines either one otherwise.
+({int current, int minCompatible}) apiLanguageVersions(String apiHeader) {
+  int define(String name) {
+    final match = RegExp(
+      '^#define $name (\\d+)\$',
+      multiLine: true,
+    ).firstMatch(apiHeader);
+    if (match == null) throw CliException('api.h does not define $name');
+    return int.parse(match.group(1)!);
+  }
+
+  return (
+    current: define('TREE_SITTER_LANGUAGE_VERSION'),
+    minCompatible: define('TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION'),
+  );
+}
+
 /// Generates the parser of the grammar in [grammarDirectory] from its
 /// `src/grammar.json` into [outputDirectory], at language ABI [abi].
 ///
