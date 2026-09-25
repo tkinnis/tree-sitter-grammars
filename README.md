@@ -211,7 +211,7 @@ Each language has a `config.json` with metadata and editor settings:
 
 ## Creating Releases
 
-A release is built on this machine and uploaded by hand.
+A release is built and published from this machine, with no CI.
 
 1. Tag a clean `HEAD` with an annotated tag:
 
@@ -227,12 +227,16 @@ dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 
 It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of `HEAD`'s commit, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
 
-3. Push the tag and upload the archive, `build_info.json` and every source bundle with the GitHub CLI:
+It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, and every repository's pinned commit with its source bundle and that bundle's sha256.
+
+3. Push the tag, then build again with `--publish`:
 
 ```bash
 git push origin v1.1.0
-gh release create v1.1.0 output/grammars-macos-arm64.tar.gz output/build_info.json output/sources/*.tar.gz --verify-tag --title v1.1.0 --notes "..."
+dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --publish
 ```
+
+`--publish` creates the GitHub release of the pushed tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json` and every source bundle, then reads the release back and fails unless GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
 
 ### Rebuilding a Release from Its Source Bundles
 

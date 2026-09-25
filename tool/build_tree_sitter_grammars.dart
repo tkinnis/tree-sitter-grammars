@@ -5,7 +5,8 @@
 ///
 /// ```sh
 /// dart run tool/build_tree_sitter_grammars.dart [--sources=<dir>]
-/// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z [--dry-run]
+/// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
+///     [--dry-run | --publish]
 /// ```
 ///
 /// Every build starts from empty `build/` and `output/` directories. The
@@ -27,7 +28,11 @@
 /// `output/grammars-macos-arm64.tar.gz`. `--dry-run` skips only the tag
 /// requirement and packs the same bytes into
 /// `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset
-/// has.
+/// has. Packing also writes the archive's sha256 beside it and the release
+/// notes into `output/release-notes.md`. `--publish` then creates the
+/// GitHub release of the pushed tag with the archive, its sha256,
+/// `build_info.json` and every source bundle attached; it refuses a
+/// release that exists, so an asset is never replaced.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
 /// every check passes, so a failed build leaves no `output/`. Any failure
@@ -48,6 +53,7 @@ import 'src/macho.dart';
 import 'src/manifest.dart';
 import 'src/notices.dart';
 import 'src/pool.dart';
+import 'src/publish.dart';
 import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/release.dart';
@@ -58,10 +64,15 @@ import 'src/tree_sitter_cli.dart';
 
 const _usage =
     'usage: dart run tool/build_tree_sitter_grammars.dart '
-    '[--sources=<dir>] [--release=vX.Y.Z [--dry-run]]';
+    '[--sources=<dir>] [--release=vX.Y.Z [--dry-run | --publish]]';
 
 /// What the command line asks the build to do.
-typedef _Options = ({String? release, bool dryRun, String? sources});
+typedef _Options = ({
+  String? release,
+  bool dryRun,
+  bool publish,
+  String? sources,
+});
 
 /// Reads [args], or returns null when they are not a command the build
 /// takes.
@@ -69,6 +80,7 @@ _Options? _parseArguments(List<String> args) {
   String? release;
   String? sources;
   var dryRun = false;
+  var publish = false;
   for (final arg in args) {
     if (arg.startsWith('--release=') && release == null) {
       release = arg.substring('--release='.length);
@@ -76,13 +88,16 @@ _Options? _parseArguments(List<String> args) {
       sources = arg.substring('--sources='.length);
     } else if (arg == '--dry-run' && !dryRun) {
       dryRun = true;
+    } else if (arg == '--publish' && !publish) {
+      publish = true;
     } else {
       return null;
     }
   }
-  if (dryRun && release == null) return null;
+  if ((dryRun || publish) && release == null) return null;
+  if (dryRun && publish) return null;
   if (sources != null && sources.isEmpty) return null;
-  return (release: release, dryRun: dryRun, sources: sources);
+  return (release: release, dryRun: dryRun, publish: publish, sources: sources);
 }
 
 /// Thrown to stop the build with a message.
@@ -116,7 +131,7 @@ Future<void> main(List<String> args) async {
 }
 
 Future<void> _build(String root, _Options options) async {
-  final (:release, :dryRun, :sources) = options;
+  final (:release, :dryRun, :publish, :sources) = options;
   final bundles = sources == null ? null : p.normalize(p.absolute(sources));
   if (bundles != null) {
     for (final owned in ['build', 'output']) {
@@ -323,6 +338,18 @@ Future<void> _build(String root, _Options options) async {
       dryRun: dryRun,
     );
     print('  ${archive.path}\n  sha256 ${archive.sha256}');
+    final notes = p.join(output.path, 'release-notes.md');
+    File(notes).writeAsStringSync(releaseNotes(info, archive.sha256));
+    print('  $notes');
+    if (publish) {
+      _step('Publishing $release to $releaseRepository');
+      final assets = await _releaseAssets(output.path, archive, info);
+      await publishRelease(tag: release, assets: assets, notesFile: notes);
+      print(
+        '  published ${assets.length} assets; GitHub reports the digest '
+        'of each as the local sha256',
+      );
+    }
   }
 }
 
@@ -570,6 +597,25 @@ Future<void> _checkRelease(String root, String outputDirectory) async {
       'check_release.dart exited ${result.exitCode}\n${result.stderr}',
     );
   }
+}
+
+/// Every file a release attaches, mapped to its sha256: the archive, its
+/// `.sha256`, `build_info.json` and every source bundle.
+Future<Map<String, String>> _releaseAssets(
+  String outputDirectory,
+  ({String path, String sha256}) archive,
+  Map<String, Object?> info,
+) async {
+  final sidecar = '${archive.path}.sha256';
+  final buildInfo = p.join(outputDirectory, 'build_info.json');
+  return {
+    archive.path: archive.sha256,
+    sidecar: await fileSha256(sidecar),
+    buildInfo: await fileSha256(buildInfo),
+    for (final record in (info['sources']! as Map).values)
+      p.join(outputDirectory, (record as Map)['file'] as String):
+          record['sha256'] as String,
+  };
 }
 
 /// Packs `output/` into [releaseArchiveName], or into [dryRunArchiveName]
