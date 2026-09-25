@@ -1245,7 +1245,7 @@
   },
   "queries/objc/folds.scm": {
     "origin": "nvim",
-    "changed": true,
+    "changed": false,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
@@ -1254,7 +1254,7 @@
   },
   "queries/objc/highlights.scm": {
     "origin": "both",
-    "changed": true,
+    "changed": false,
     "upstream": {
       "repo": "https://github.com/tree-sitter-grammars/tree-sitter-objc",
       "commit": "a360943e0f108b7d0935924a4eb772ce1a6aaec7",
@@ -1268,7 +1268,7 @@
   },
   "queries/objc/indents.scm": {
     "origin": "nvim",
-    "changed": true,
+    "changed": false,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
@@ -1277,7 +1277,7 @@
   },
   "queries/objc/injections.scm": {
     "origin": "nvim",
-    "changed": true,
+    "changed": false,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
@@ -1286,7 +1286,7 @@
   },
   "queries/objc/locals.scm": {
     "origin": "nvim",
-    "changed": true,
+    "changed": false,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
@@ -2054,7 +2054,7 @@
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
       "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
-      "path": "queries/highlights.scm"
+      "path": "queries/highlights-jsx.scm"
     }
   },
   "queries/tsx/indents.scm": {
@@ -2067,23 +2067,18 @@
     }
   },
   "queries/tsx/injections.scm": {
-    "origin": "grammar",
+    "origin": "nvim",
     "changed": true,
     "upstream": {
-      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
-      "commit": "1c751f8a4420f880b65b461bcf617ad2126ebc58",
-      "path": "queries/injections.scm"
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/tsx/injections.scm"
     }
   },
   "queries/tsx/locals.scm": {
-    "origin": "both",
-    "changed": true,
+    "origin": "nvim",
+    "changed": false,
     "upstream": {
-      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
-      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
-      "path": "queries/locals.scm"
-    },
-    "nvimUpstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
       "path": "runtime/queries/tsx/locals.scm"

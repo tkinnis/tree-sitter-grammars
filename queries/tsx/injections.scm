@@ -1,23 +1,4 @@
-; Parse the contents of tagged template literals using
-; a language inferred from the tag.
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/tsx/injections.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Modified in tree-sitter-grammars.
 
-(call_expression
-  function: [
-    (identifier) @injection.language
-    (member_expression
-      property: (property_identifier) @injection.language)
-  ]
-  arguments: (template_string (string_fragment) @injection.content)
-  (#set! injection.combined)
-  (#set! injection.include-children))
-
-
-
-; Parse Ember/Glimmer/Handlebars/HTMLBars/etc. template literals
-; e.g.: await render(hbs`<SomeComponent />`)
-(call_expression
-  function: ((identifier) @_name
-             (#eq? @_name "hbs"))
-  arguments: ((template_string) @glimmer
-              (#offset! @glimmer 0 1 0 -1)))
-; inherits: ecma,jsx
+; inherits: typescript,jsx
