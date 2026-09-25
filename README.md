@@ -89,9 +89,12 @@ dart run tool/check_release.dart --against=<archive>  # also compares grammars
 ```bash
 dart run tool/pin_grammars.dart --check                  # every url entry has a 40-hex commit, a filesSha256 and a license
 dart run tool/pin_grammars.dart --set tree-sitter-c=<sha>  # move one pin; the commit must be on a branch of origin
-dart run tool/pin_grammars.dart --from-checkouts          # pin every grammar at its grammars/<repo> HEAD
+dart run tool/pin_grammars.dart --set tree-sitter-perl=<deploy sha> --source-commit=<source sha>  # pin a deploy branch
+dart run tool/pin_grammars.dart --from-checkouts          # move each pin forward to its grammars/<repo> HEAD
 dart run tool/pin_grammars.dart --record-files           # record filesSha256 afresh for every pin, the runtime's included
 ```
+
+Three pins are not their checkout's `HEAD`, on purpose: perl and sql are pinned to their deploy branches (`release` and `gh-pages`), which commit the generated `parser.c`, with `sourceCommit` naming the commit each was deployed from, and swift is pinned ahead of its checkout, to the commit whose scanner allocates at least one byte. A deploy pin moves only with `--set <repo>=<deploy commit> --source-commit=<source commit>`; both commits must be on a branch of origin. `--from-checkouts` moves a pin only forward, to a `HEAD` that contains it, and keeps each of these three, naming the `--set` that moves it; a generated grammar it moves gets its `generatedSha256` afresh. Every mode but `--check` writes `tool/grammars.json` only when the result passes `--check`, and writes nothing otherwise.
 
 Every pin records, beside its commit, the `filesSha256` of the files its tree holds: the sha256 of one `<mode> <blob id>\t<path>` record per file, each ending in a NUL, sorted by path, with submodule entries left out (a source bundle carries no files for them). `--set` and `--from-checkouts` record it from the object store; the runtime's is in `tool/toolchain.json`. The build checks every tree it compiles against it, so a pin and its files cannot drift apart unseen. A generated grammar's entry also records `generatedSha256`, the same digest of the files the pinned CLI generates for the pin at the runtime's language ABI; `--set` and `--record-files` generate them to record it, and the build requires it of what it generates or takes from a release.
 
