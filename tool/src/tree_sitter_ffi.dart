@@ -381,6 +381,42 @@ final class TreeSitterRuntime {
     Pointer<Void> language,
     String text,
     Map<String, Query> queries,
+  ) => _parsed(
+    language,
+    text,
+    (root, bytes) => (
+      tree: _sexp(root),
+      nodes: dumpTree(root),
+      captures: {
+        for (final MapEntry(key: name, value: query) in queries.entries)
+          name: [for (final match in _matches(query, root, bytes)) ...match],
+      },
+    ),
+  );
+
+  /// Parses [text] with [language], returning the tree as an S-expression
+  /// and the captures of every match of [query] over it that satisfies its
+  /// pattern's text predicates, one list per match, in the order the
+  /// query cursor reports them.
+  ///
+  /// Throws a [StateError] when the parser refuses the language or returns
+  /// no tree.
+  ({String tree, List<List<Capture>> matches}) parseMatches(
+    Pointer<Void> language,
+    String text,
+    Query query,
+  ) => _parsed(
+    language,
+    text,
+    (root, bytes) => (tree: _sexp(root), matches: _matches(query, root, bytes)),
+  );
+
+  /// What [read] makes of the root of [text] parsed with [language] and of
+  /// [text]'s UTF-8 bytes, read before the tree is deleted.
+  T _parsed<T>(
+    Pointer<Void> language,
+    String text,
+    T Function(TSNode root, List<int> bytes) read,
   ) {
     final parser = _parserNew();
     final bytes = utf8.encode(text);
@@ -393,22 +429,20 @@ final class TreeSitterRuntime {
       input.asTypedList(bytes.length).setAll(0, bytes);
       tree = _parserParseString(parser, nullptr, input.cast(), bytes.length);
       if (tree == nullptr) throw StateError('ts_parser_parse_string: NULL');
-      final root = _treeRootNode(tree);
-      final string = _nodeString(root);
-      final sexp = string.toDartString();
-      malloc.free(string);
-      return (
-        tree: sexp,
-        nodes: dumpTree(root),
-        captures: {
-          for (final MapEntry(key: name, value: query) in queries.entries)
-            name: _captures(query, root, bytes),
-        },
-      );
+      return read(_treeRootNode(tree), bytes);
     } finally {
       if (tree != nullptr) _treeDelete(tree);
       malloc.free(input);
       _parserDelete(parser);
+    }
+  }
+
+  String _sexp(TSNode root) {
+    final string = _nodeString(root);
+    try {
+      return string.toDartString();
+    } finally {
+      malloc.free(string);
     }
   }
 
@@ -446,12 +480,14 @@ final class TreeSitterRuntime {
     }
   }
 
-  List<Capture> _captures(Query query, TSNode root, List<int> source) {
+  /// The captures of every match of [query] under [root] that satisfies
+  /// its pattern's text predicates, one list per match.
+  List<List<Capture>> _matches(Query query, TSNode root, List<int> source) {
     final cursor = _queryCursorNew();
     final match = malloc<TSQueryMatch>();
     try {
       _queryCursorExec(cursor, query._pointer, root);
-      final captures = <Capture>[];
+      final matches = <List<Capture>>[];
       while (_queryCursorNextMatch(cursor, match)) {
         final pattern = query.predicates[match.ref.patternIndex];
         final matched = [
@@ -471,16 +507,17 @@ final class TreeSitterRuntime {
           }
           if (!pattern.accepts(texts)) continue;
         }
-        for (final (:id, :start, :end) in matched) {
-          captures.add((
-            name: query.captureName(id),
-            start: start,
-            end: end,
-            properties: pattern.properties,
-          ));
-        }
+        matches.add([
+          for (final (:id, :start, :end) in matched)
+            (
+              name: query.captureName(id),
+              start: start,
+              end: end,
+              properties: pattern.properties,
+            ),
+        ]);
       }
-      return captures;
+      return matches;
     } finally {
       malloc.free(match);
       _queryCursorDelete(cursor);

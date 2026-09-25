@@ -36,6 +36,7 @@ tree-sitter-grammars/
 │   ├── bootstrap_language.dart     # Imports a new language's queries from nvim-treesitter
 │   └── src/                        # Libraries the tools share
 ├── test/                           # Tests of the tools
+│   └── outline/                    # Sources and the outlines their tags.scm must give
 ├── LICENSE                         # This repository's licence (MIT)
 ├── LICENSES/Apache-2.0.txt         # nvim-treesitter's licence
 ├── THIRD_PARTY_NOTICES.md          # Every licence the archive carries (generated)
@@ -75,7 +76,7 @@ The build writes into `build/out/` and moves it to `output/` only after every ch
 
 ### Checking a Build
 
-The build's last check is `tool/check_release.dart`, which loads the build through the runtime it ships, with `dart:ffi`, and fails unless every source bundle has its recorded sha256 and pinned commit, every bundle of generated sources its recorded sha256, the runtime exports every `api.h` function (apart from the three that need its wasm feature), `manifest.json` holds exactly the entries `tool/grammars.json` plans, every library is a thin arm64 binary with `minos` 13.0 and an `@rpath` install name, `build_info.json` records the language versions the runtime's `api.h` defines and `ts_parser_set_language` accepts every grammar at an ABI between them (13 to 15 at v0.27.0), every query file compiles once its `; inherits:` line is composed as the editor composes it, every language such a line names holds a file of the same type (tsx's `locals.scm` naming `jsx` apart, since jsx has no locals), every query-only file is inherited by one of those, every composition reads as the patterns `ts_query_new` counts in it, every injection pattern that captures `@injection.content` names a language, by an `@injection.language` capture or a `#set! injection.language` directive, in every grammar but those `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (each of which holds at least one that names none), and `THIRD_PARTY_NOTICES.md` is the committed text. Run it on its own, or compare a build with an earlier release's extracted archive:
+The build's last check is `tool/check_release.dart`, which loads the build through the runtime it ships, with `dart:ffi`, and fails unless every source bundle has its recorded sha256 and pinned commit, every bundle of generated sources its recorded sha256, the runtime exports every `api.h` function (apart from the three that need its wasm feature), `manifest.json` holds exactly the entries `tool/grammars.json` plans, every library is a thin arm64 binary with `minos` 13.0 and an `@rpath` install name, `build_info.json` records the language versions the runtime's `api.h` defines and `ts_parser_set_language` accepts every grammar at an ABI between them (13 to 15 at v0.27.0), every query file compiles once its `; inherits:` line is composed as the editor composes it, every language such a line names holds a file of the same type (tsx's `locals.scm` naming `jsx` apart, since jsx has no locals), every query-only file is inherited by one of those, every composition reads as the patterns `ts_query_new` counts in it, every injection pattern that captures `@injection.content` names a language, by an `@injection.language` capture or a `#set! injection.language` directive, in every grammar but those `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (each of which holds at least one that names none), every outline test under `test/outline/` passes (see [Tests](#tests)), and `THIRD_PARTY_NOTICES.md` is the committed text. Run it on its own, or compare a build with an earlier release's extracted archive:
 
 ```bash
 dart run tool/check_release.dart                      # checks output/
@@ -123,6 +124,14 @@ The build refuses a submodule checked out at any commit but the one `tool/toolch
 
 ```bash
 dart test
+```
+
+`dart test` tests the tools. The query files are tested through a build: `tool/check_release.dart` runs every outline test under `test/outline/<grammar>/`, a source file beside a `<source>.outline` file. The source must parse with no error or missing node, and the grammar's composed `tags.scm` must find in it the definitions the `.outline` file lists, one per line in the order they start (the wider of two that start together first): the kind after `definition.`, a space, and the name after the names of the definitions whose range holds it, joined by `.`, which is how the editor nests its outline. A C# test's line spells its declaring scope:
+
+```
+module Inventory
+class Inventory.StockTests
+method Inventory.StockTests.CountsWhatWasReceived
 ```
 
 ## Using Pre-built Binaries

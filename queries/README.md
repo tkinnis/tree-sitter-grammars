@@ -87,6 +87,8 @@ The `tags.scm` file defines symbols for code navigation. Uses the tree-sitter st
   name: (identifier) @name) @definition.class
 ```
 
+The editor nests each definition under the definitions whose node's range holds it, so a method's outline entry spells its declaring scope. `tool/check_release.dart` runs a grammar's `tags.scm` over the sources under `test/outline/<grammar>/` and requires the outline beside each; the repository's README describes them.
+
 ## Language Configuration (config.json)
 
 Each language directory may contain a `config.json` file with language-specific settings.

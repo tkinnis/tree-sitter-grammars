@@ -1,0 +1,6 @@
+module Inventory
+class Inventory.StockTests
+method Inventory.StockTests.Reset
+method Inventory.StockTests.CountsWhatWasReceived
+class Inventory.Stock
+method Inventory.Stock.Receive

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
@@ -6,6 +7,7 @@ import 'package:test/test.dart';
 
 import '../tool/src/grammar_pins.dart';
 import '../tool/src/release_check.dart';
+import '../tool/src/tree_sitter_ffi.dart' show Capture;
 
 void main() {
   group('apiFunctions', () {
@@ -350,6 +352,68 @@ _ @any
         ..contains('(function_static_declaration)')
         ..contains('(compound_statement)')
         ..not((folds) => folds.contains('(if_statement)'));
+    });
+  });
+
+  group('tagDefinitions', () {
+    test('names each definition by its match, skipping references', () {
+      const text = 'namespace Café { class A {} }';
+      Capture capture(String name, int start, int end) =>
+          (name: name, start: start, end: end, properties: '');
+
+      final definitions = tagDefinitions([
+        [capture('name', 10, 15), capture('definition.module', 0, 30)],
+        [capture('name', 24, 25), capture('reference.class', 18, 27)],
+        [capture('definition.class', 18, 27)],
+      ], utf8.encode(text));
+
+      check(definitions).deepEquals([
+        (kind: 'module', name: 'Café', start: 0, end: 30),
+        (kind: 'class', name: '<anonymous>', start: 18, end: 27),
+      ]);
+    });
+  });
+
+  group('outline', () {
+    TagDefinition definition(String kind, String name, int start, int end) =>
+        (kind: kind, name: name, start: start, end: end);
+
+    test('spells each definition under the ones whose range holds it', () {
+      check(
+        outline([
+          definition('method', 'Run', 20, 30),
+          definition('class', 'Tests', 10, 40),
+          definition('module', 'Company.Product', 0, 100),
+          definition('class', 'Other', 50, 60),
+          definition('module', 'Next', 100, 120),
+          definition('class', 'Last', 105, 110),
+        ]),
+      ).deepEquals([
+        'module Company.Product',
+        'class Company.Product.Tests',
+        'method Company.Product.Tests.Run',
+        'class Company.Product.Other',
+        'module Next',
+        'class Next.Last',
+      ]);
+    });
+
+    test('puts the wider of two that start together first', () {
+      check(
+        outline([
+          definition('method', 'Inner', 0, 10),
+          definition('module', 'Outer', 0, 50),
+        ]),
+      ).deepEquals(['module Outer', 'method Outer.Inner']);
+    });
+
+    test('nests neither of two over the same range', () {
+      check(
+        outline([
+          definition('class', 'A', 0, 10),
+          definition('interface', 'B', 0, 10),
+        ]),
+      ).deepEquals(['class A', 'interface B']);
     });
   });
 

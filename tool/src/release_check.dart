@@ -1,11 +1,15 @@
 /// The parts of `tool/check_release.dart` that read files and text: query
-/// composition, the patterns of a query's text, `api.h`'s function list,
-/// and the inputs of each grammar's test corpus.
+/// composition, the patterns of a query's text, the outline a tags query's
+/// matches make, `api.h`'s function list, and the inputs of each grammar's
+/// test corpus.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+
+import 'tree_sitter_ffi.dart' show Capture;
 
 /// The `api.h` functions the runtime defines only when compiled with its
 /// wasm feature, which the build does not enable.
@@ -300,6 +304,73 @@ List<int> injectionPatternsNamingNoLanguage(String source) => [
     if (_injectionContent.hasMatch(text) && !_injectionLanguage.hasMatch(text))
       line,
 ];
+
+/// One symbol a tags query defines: its kind, the capture name after
+/// `definition.`; its name, the text of the match's `@name` capture; and
+/// the byte range of the node its `@definition.<kind>` capture names.
+typedef TagDefinition = ({String kind, String name, int start, int end});
+
+/// The definitions among [matches], a tags query's captures one list per
+/// match over the UTF-8 [text]: every match with a `@definition.<kind>`
+/// capture, named by its `@name` capture or `<anonymous>` without one.
+/// Matches with no definition capture, `@reference.<kind>` among them,
+/// define nothing.
+List<TagDefinition> tagDefinitions(
+  List<List<Capture>> matches,
+  List<int> text,
+) => [
+  for (final captures in matches)
+    for (final definition in captures)
+      if (definition.name.startsWith('definition.'))
+        (
+          kind: definition.name.substring('definition.'.length),
+          name: switch (captures.where((c) => c.name == 'name').firstOrNull) {
+            final name? => utf8.decode(
+              text.sublist(name.start, name.end),
+              allowMalformed: true,
+            ),
+            null => '<anonymous>',
+          },
+          start: definition.start,
+          end: definition.end,
+        ),
+];
+
+/// The outline of [definitions], one line per definition: its kind, a
+/// space, and its name after the names of the definitions containing it,
+/// joined by `.`, so `Namespace.Class.Method` spells a method's declaring
+/// scope.
+///
+/// The lines follow the definitions ordered by start, the wider of two
+/// that start together first. A definition contains another when its
+/// range holds the other's and is not the same range, the rule the
+/// editor nests its outline by. Two definitions over one range are both
+/// listed, neither under the other; the editor keeps one of them.
+List<String> outline(List<TagDefinition> definitions) {
+  final sorted = [...definitions]
+    ..sort(
+      (a, b) => a.start != b.start ? a.start.compareTo(b.start) : b.end - a.end,
+    );
+  final open = <({TagDefinition definition, String path})>[];
+  final lines = <String>[];
+  for (final definition in sorted) {
+    while (open.isNotEmpty && !_contains(open.last.definition, definition)) {
+      open.removeLast();
+    }
+    final path = open.isEmpty
+        ? definition.name
+        : '${open.last.path}.${definition.name}';
+    open.add((definition: definition, path: path));
+    lines.add('${definition.kind} $path');
+  }
+  return lines;
+}
+
+/// Whether [outer]'s range holds [inner]'s and is not the same range.
+bool _contains(TagDefinition outer, TagDefinition inner) =>
+    outer.start <= inner.start &&
+    inner.end <= outer.end &&
+    (outer.start, outer.end) != (inner.start, inner.end);
 
 /// One example of a tree-sitter test corpus.
 typedef CorpusExample = ({String name, String input, List<String> languages});
