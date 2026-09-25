@@ -70,7 +70,7 @@ The build writes into `build/out/` and moves it to `output/` only after every ch
 
 ### Checking a Build
 
-The build's last check is `tool/check_release.dart`, which loads the build through the runtime it ships, with `dart:ffi`, and fails unless every source bundle has its recorded sha256 and pinned commit, the runtime exports every `api.h` function (apart from the three that need its wasm feature), `manifest.json` holds exactly the entries `tool/grammars.json` plans, every library is a thin arm64 binary with `minos` 13.0 and an `@rpath` install name, `ts_parser_set_language` accepts every grammar at ABI 13 to 15, every query file compiles once its `; inherits:` line is composed as the editor composes it, every query-only file is inherited by one of those, and `THIRD_PARTY_NOTICES.md` is the committed text. Run it on its own, or compare a build with an earlier release's extracted archive:
+The build's last check is `tool/check_release.dart`, which loads the build through the runtime it ships, with `dart:ffi`, and fails unless every source bundle has its recorded sha256 and pinned commit, every bundle of generated sources its recorded sha256, the runtime exports every `api.h` function (apart from the three that need its wasm feature), `manifest.json` holds exactly the entries `tool/grammars.json` plans, every library is a thin arm64 binary with `minos` 13.0 and an `@rpath` install name, `ts_parser_set_language` accepts every grammar at ABI 13 to 15, every query file compiles once its `; inherits:` line is composed as the editor composes it, every query-only file is inherited by one of those, and `THIRD_PARTY_NOTICES.md` is the committed text. Run it on its own, or compare a build with an earlier release's extracted archive:
 
 ```bash
 dart run tool/check_release.dart                      # checks output/
@@ -230,7 +230,7 @@ dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 
 It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of `HEAD`'s commit, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
 
-It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, and every repository's pinned commit with its source bundle and that bundle's sha256.
+It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, every repository's pinned commit with its source bundle and that bundle's sha256, and each bundle of generated sources with its sha256.
 
 3. Push the tag, then build again with `--publish`:
 
