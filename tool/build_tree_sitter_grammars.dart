@@ -315,6 +315,9 @@ Future<void> _build(String root, _Options options) async {
     toolchain: toolchain,
     compiler: compiler,
     flags: flags,
+    grammarFlags: {
+      for (final build in builds) build.name: _grammarFlagRecord(root, build),
+    },
     repositoryCommit:
         commit ?? (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
     repositoryDirty: (await runGit(root, [
@@ -634,6 +637,24 @@ Future<Map<String, Map<String, Object?>>> _takeGenerated(
   return records;
 }
 
+/// Each source [build] compiles, with the directory its headers come
+/// from: its `parser.c` and, where it has one, its `scanner.c`.
+List<(String, String)> _grammarSources(String root, GrammarBuild build) => [
+  (build.parserSource, build.parserIncludeDirectory),
+  if (scannerSource(root, build) case final scanner?)
+    (scanner, scannerIncludeDirectory(root, build)),
+];
+
+/// The flags each of [build]'s invocations passes beyond the shared lists,
+/// as `build_info.json` records them: each source's, by file name, and the
+/// link's under `link`.
+Map<String, List<String>> _grammarFlagRecord(String root, GrammarBuild build) =>
+    {
+      for (final (source, include) in _grammarSources(root, build))
+        p.basename(source): grammarSourceFlags(include),
+      'link': grammarLinkFlags(build.name),
+    };
+
 /// The compile of each of [build]'s sources, then its link, in order.
 List<CompileCommand> _grammarCommands(
   String root,
@@ -642,11 +663,7 @@ List<CompileCommand> _grammarCommands(
   BuildFlags flags,
   Map<String, String> environment,
 ) {
-  final sources = [
-    (build.parserSource, build.parserIncludeDirectory),
-    if (scannerSource(root, build) case final scanner?)
-      (scanner, scannerIncludeDirectory(root, build)),
-  ];
+  final sources = _grammarSources(root, build);
   final compiles = [
     for (final (source, include) in sources)
       grammarCompileCommand(

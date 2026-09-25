@@ -62,8 +62,20 @@ List<CompileCommand> _commands(BuildFlags flags) {
   ];
 }
 
+/// What build_info.json records of json's own flags: its parser's include
+/// directory and its install name.
+Map<String, Map<String, List<String>>> _grammarFlags() => {
+  'json': {
+    'parser.c': grammarSourceFlags('build/src/tree-sitter-json/src'),
+    'link': grammarLinkFlags('json'),
+  },
+};
+
 /// build_info.json as the build writes it and a reader decodes it.
-Map<String, Object?> _info(BuildFlags flags) =>
+Map<String, Object?> _info(
+  BuildFlags flags, {
+  Map<String, Map<String, List<String>>>? grammarFlags,
+}) =>
     jsonDecode(
           encodeBuildInfo(
             buildInfo(
@@ -71,6 +83,7 @@ Map<String, Object?> _info(BuildFlags flags) =>
               toolchain: _toolchain,
               compiler: _compiler,
               flags: flags,
+              grammarFlags: grammarFlags ?? _grammarFlags(),
               repositoryCommit: '77ac13625d220bcf955cb12f697e438238c774e0',
               repositoryDirty: false,
               languageVersion: 15,
@@ -145,8 +158,128 @@ void main() {
       ),
     ).deepEquals([
       'build/obj/json/parser.o: arguments do not start with the recorded '
-          'grammarCompile flags',
+          'grammarCompile flags and its own',
     ]);
+  });
+
+  test('build_info records the include directory and install name of '
+      'each grammar', () {
+    final grammars =
+        ((_info(flags)['toolchain']! as Map)['flags']! as Map)['grammars'];
+
+    check(grammars).isA<Map<String, Object?>>().deepEquals({
+      'json': {
+        'parser.c': ['-I', 'build/src/tree-sitter-json/src'],
+        'link': ['-Wl,-install_name,@rpath/libjson.dylib'],
+      },
+    });
+  });
+
+  test('a compile against another include directory is reported', () {
+    final info = _info(
+      flags,
+      grammarFlags: {
+        'json': {
+          'parser.c': grammarSourceFlags('build/gen/json'),
+          'link': grammarLinkFlags('json'),
+        },
+      },
+    );
+
+    check(buildFlagProblems(info, _commands(flags), {'json'})).deepEquals([
+      'build/obj/json/parser.o: arguments do not start with the recorded '
+          'grammarCompile flags and its own',
+    ]);
+  });
+
+  test('a link under another install name is reported', () {
+    final info = _info(
+      flags,
+      grammarFlags: {
+        'json': {
+          'parser.c': grammarSourceFlags('build/src/tree-sitter-json/src'),
+          'link': grammarLinkFlags('yaml'),
+        },
+      },
+    );
+
+    check(buildFlagProblems(info, _commands(flags), {'json'})).deepEquals([
+      'output/dylibs/json/libjson.dylib: arguments do not start with the '
+          'recorded grammarLink flags and its own',
+      'json: never linked',
+      '0 links for 1 grammars',
+    ]);
+  });
+
+  test('a link recorded and run under another file\'s install name is '
+      'reported', () {
+    final commands = _commands(flags);
+    final link = grammarLinkCommand(
+      compiler: _compiler,
+      flags: flags,
+      directory: '/clone',
+      libraryName: 'yaml',
+      objects: [commands[1].output],
+      output: 'output/dylibs/json/libjson.dylib',
+      environment: _environment,
+    );
+    final info = _info(
+      flags,
+      grammarFlags: {
+        'json': {..._grammarFlags()['json']!, 'link': grammarLinkFlags('yaml')},
+      },
+    );
+
+    check(
+      buildFlagProblems(info, [commands[0], commands[1], link], {'json'}),
+    ).deepEquals([
+      'output/dylibs/json/libjson.dylib: its recorded flags name no install '
+          'name -Wl,-install_name,@rpath/libjson.dylib',
+    ]);
+  });
+
+  test('a recorded source no invocation compiled is reported', () {
+    final info = _info(
+      flags,
+      grammarFlags: {
+        'json': {
+          ..._grammarFlags()['json']!,
+          'scanner.c': grammarSourceFlags('build/src/tree-sitter-json/src'),
+        },
+      },
+    );
+
+    check(
+      buildFlagProblems(info, _commands(flags), {'json'}),
+    ).deepEquals(['json: no invocation passed its scanner.c flags']);
+  });
+
+  test('a grammar with no record, or a record with -O0, is reported', () {
+    check(
+      buildFlagProblems(_info(flags, grammarFlags: {}), _commands(flags), {
+        'json',
+      }),
+    ).deepEquals([
+      'json: build_info.json records no flags of its own',
+      'build/obj/json/parser.o: build_info.json records no parser.c flags '
+          'of json',
+      'output/dylibs/json/libjson.dylib: build_info.json records no link '
+          'flags of json',
+      'json: never linked',
+      '0 links for 1 grammars',
+    ]);
+    final info = _info(
+      flags,
+      grammarFlags: {
+        'json': {
+          'parser.c': ['-O0', ...grammarSourceFlags('x')],
+          'link': grammarLinkFlags('json'),
+        },
+      },
+    );
+    check(
+      buildFlagProblems(info, _commands(flags), {'json'}),
+    ).contains('json: its parser.c flags pass -O0');
   });
 
   test('a record without -O3 or with NDEBUG is reported', () {
@@ -185,7 +318,11 @@ void main() {
   test('a grammar that was never linked is reported', () {
     check(
       buildFlagProblems(_info(flags), _commands(flags), {'json', 'c'}),
-    ).deepEquals(['c: never linked', '1 links for 2 grammars']);
+    ).deepEquals([
+      'c: build_info.json records no flags of its own',
+      'c: never linked',
+      '1 links for 2 grammars',
+    ]);
   });
 
   group('repositoryRecordProblems', () {

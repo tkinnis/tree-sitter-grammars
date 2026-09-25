@@ -149,13 +149,27 @@ final class BuildFlags {
   /// The runtime's one invocation, before its source and output.
   final List<String> runtime;
 
-  /// Each grammar source file's compile, before its include directory,
-  /// source and object.
+  /// Each grammar source file's compile, before its
+  /// [grammarSourceFlags], source and object.
   final List<String> grammarCompile;
 
-  /// Each grammar's link, before its install name, objects and output.
+  /// Each grammar's link, before its [grammarLinkFlags], objects and
+  /// output.
   final List<String> grammarLink;
 }
+
+/// The flags one grammar source's compile passes after
+/// [BuildFlags.grammarCompile]: the directory its headers come from.
+List<String> grammarSourceFlags(String includeDirectory) => [
+  '-I',
+  includeDirectory,
+];
+
+/// The flags a grammar's link passes after [BuildFlags.grammarLink]: the
+/// install name of `lib<libraryName>.dylib`.
+List<String> grammarLinkFlags(String libraryName) => [
+  '-Wl,-install_name,@rpath/lib$libraryName.dylib',
+];
 
 /// [flags] with [workingDirectoryPlaceholder] replaced by the absolute
 /// [workingDirectory] an invocation runs in.
@@ -257,8 +271,7 @@ CompileCommand grammarCompileCommand({
   arguments: [
     compiler.path,
     ...expandFlags(flags.grammarCompile, directory),
-    '-I',
-    includeDirectory,
+    ...grammarSourceFlags(includeDirectory),
     source,
     '-o',
     object,
@@ -282,7 +295,7 @@ CompileCommand grammarLinkCommand({
   arguments: [
     compiler.path,
     ...expandFlags(flags.grammarLink, directory),
-    '-Wl,-install_name,@rpath/lib$libraryName.dylib',
+    ...grammarLinkFlags(libraryName),
     ...objects,
     '-o',
     output,

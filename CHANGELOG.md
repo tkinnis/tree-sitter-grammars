@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `build_info.json` in the archive: the release, the runtime's tag, commit and language versions, the compiler's path and `--version` line, the SDK, the exact flags for the runtime and for grammars, the git, gzip and tar that write the bundles and the archive, and the sha256 of every source bundle
+- `build_info.json` in the archive: the release, the runtime's tag, commit and language versions, the compiler's path and `--version` line, the SDK, the exact flags for the runtime and for grammars (with each grammar's include directories and install name), the git, gzip and tar that write the bundles and the archive, and the sha256 of every source bundle
 - A `source` object on every compiled grammar's `manifest.json` entry: its repository, pinned commit (and `sourceCommit` for a deploy-branch pin), path, whether its parser is committed or generated, its ABI and its licence
 - `tool/toolchain.json`, which pins the runtime, the tree-sitter CLI (by the sha256 of its release asset) and the macOS target
 - `tool/pin_grammars.dart`, which pins every grammar in `tool/grammars.json` to one commit on its origin, with its licence, and checks the pins

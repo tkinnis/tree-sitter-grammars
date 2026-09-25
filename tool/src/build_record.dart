@@ -19,17 +19,20 @@ const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 
 /// The contents of `output/build_info.json`.
 ///
-/// [sources] records each source bundle the build compiled from, by
-/// repository name, as `bundleRecord` writes it; [generated] each bundle of
-/// generated sources, by grammar, as `generatedRecord` writes it;
-/// [packingTools] the
-/// versions `packingToolVersions` reads of the git, gzip and tar that
-/// write the bundles and the archive.
+/// [grammarFlags] records, by grammar, the flags each of its invocations
+/// passes beyond the shared lists: [grammarSourceFlags] by source file
+/// name, and [grammarLinkFlags] under `link`. [sources] records each
+/// source bundle the build compiled from, by repository name, as
+/// `bundleRecord` writes it; [generated] each bundle of generated sources,
+/// by grammar, as `generatedRecord` writes it; [packingTools] the versions
+/// `packingToolVersions` reads of the git, gzip and tar that write the
+/// bundles and the archive.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
   required Compiler compiler,
   required BuildFlags flags,
+  required Map<String, Map<String, List<String>>> grammarFlags,
   required String repositoryCommit,
   required bool repositoryDirty,
   required int languageVersion,
@@ -70,6 +73,7 @@ Map<String, Object?> buildInfo({
       'runtime': flags.runtime,
       'grammarCompile': flags.grammarCompile,
       'grammarLink': flags.grammarLink,
+      'grammars': grammarFlags,
     },
   },
   'sources': sources,
@@ -126,10 +130,13 @@ List<CompileCommand> parseCompileCommands(String json) => [
 ///
 /// The runtime and grammar compile lists must each pass `-O3` once and no
 /// other optimisation level; the link list, which compiles nothing, passes
-/// none. No list may define `NDEBUG`. The runtime must have one invocation
-/// and each of [grammarNames] one link, every object a link names must have
-/// been compiled, and no invocation may see a variable outside
-/// [allowedCompilerVariables].
+/// none. No list may define `NDEBUG`. Each grammar compile and link must
+/// pass, after its shared list, exactly the flags `flags.grammars` records
+/// of its grammar and source, which name no optimisation level and do not
+/// define `NDEBUG` either, and every one of those records must have been
+/// passed. The runtime must have one invocation and each of [grammarNames]
+/// one link, every object a link names must have been compiled, and no
+/// invocation may see a variable outside [allowedCompilerVariables].
 List<String> buildFlagProblems(
   Map<String, Object?> info,
   List<CompileCommand> commands,
@@ -138,35 +145,63 @@ List<String> buildFlagProblems(
   final toolchain = info['toolchain']! as Map<String, Object?>;
   final recorded = (toolchain['flags']! as Map<String, Object?>);
   final clang = toolchain['clangPath']! as String;
+  final grammars = _grammarRecords(recorded['grammars']);
   final problems = <String>[
     for (final kind in const ['runtime', 'grammarCompile', 'grammarLink'])
       ..._listProblems(kind, (recorded[kind]! as List).cast<String>()),
+    if (grammars == null) 'build_info.json records no flags of each grammar',
+    for (final MapEntry(key: name, value: own) in {...?grammars}.entries)
+      for (final MapEntry(key: invocation, value: flags) in own.entries)
+        for (final flag in flags)
+          if (flag.startsWith('-O') || flag.contains('NDEBUG'))
+            '$name: its $invocation flags pass $flag',
+    for (final name in {...?grammars?.keys}.difference(grammarNames))
+      '$name: flags recorded for a grammar the build does not compile',
+    if (grammars != null)
+      for (final name in grammarNames.difference(grammars.keys.toSet()))
+        '$name: build_info.json records no flags of its own',
   ];
   final compiled = {
     for (final command in commands)
       if (_kind(command.output) == 'grammarCompile')
         p.normalize(p.join(command.directory, command.output)),
   };
+  final passed = <String>{};
   final linked = <String>{};
   var runtimes = 0;
   for (final command in commands) {
     final kind = _kind(command.output);
+    final grammar = p.basename(p.dirname(command.output));
+    final invocation = kind == 'grammarCompile'
+        ? '${p.basenameWithoutExtension(command.output)}.c'
+        : 'link';
+    final own = kind == 'runtime'
+        ? const <String>[]
+        : grammars?[grammar]?[invocation];
+    if (own == null) {
+      problems.add(
+        '${command.output}: build_info.json records no $invocation flags '
+        'of $grammar',
+      );
+      continue;
+    }
+    if (kind != 'runtime') passed.add('$grammar $invocation');
     final flags = (recorded[kind]! as List).cast<String>();
-    final prefix = [clang, ...expandFlags(flags, command.directory)];
+    final prefix = [clang, ...expandFlags(flags, command.directory), ...own];
     final arguments = command.arguments;
     final head = arguments.take(prefix.length).toList();
     if (!_listEquals(head, prefix)) {
       problems.add(
         '${command.output}: arguments do not start with the '
-        'recorded $kind flags',
+        'recorded $kind flags and its own',
       );
       continue;
     }
     final tail = arguments.skip(prefix.length).toList();
     final shape = switch (kind) {
       'runtime' => _runtimeTailProblem(tail, command.output),
-      'grammarCompile' => _compileTailProblem(tail, command.output),
-      _ => _linkTailProblem(tail, command.output),
+      'grammarCompile' => _compileTailProblem(tail, command.output, invocation),
+      _ => _linkTailProblem(own, tail, command.output),
     };
     if (shape != null) problems.add('${command.output}: $shape');
     final stray = command.environment.keys.where(
@@ -184,6 +219,13 @@ List<String> buildFlagProblems(
       }
     }
   }
+  for (final MapEntry(key: name, value: own) in {...?grammars}.entries) {
+    for (final invocation in own.keys) {
+      if (!passed.contains('$name $invocation')) {
+        problems.add('$name: no invocation passed its $invocation flags');
+      }
+    }
+  }
   if (runtimes != 1) problems.add('$runtimes runtime invocations, not 1');
   for (final name in grammarNames) {
     if (!linked.contains('lib$name.dylib')) problems.add('$name: never linked');
@@ -192,6 +234,22 @@ List<String> buildFlagProblems(
     problems.add('${linked.length} links for ${grammarNames.length} grammars');
   }
   return problems;
+}
+
+/// `flags.grammars` of `build_info.json`, or null when it is not a map of
+/// each grammar to its lists of flags.
+Map<String, Map<String, List<String>>>? _grammarRecords(Object? value) {
+  if (value is! Map<String, Object?>) return null;
+  final records = <String, Map<String, List<String>>>{};
+  for (final MapEntry(key: name, value: own) in value.entries) {
+    if (own is! Map<String, Object?>) return null;
+    records[name] = {};
+    for (final MapEntry(key: invocation, value: flags) in own.entries) {
+      if (flags is! List || flags.any((flag) => flag is! String)) return null;
+      records[name]![invocation] = flags.cast<String>();
+    }
+  }
+  return records;
 }
 
 /// [buildFlagProblems] for the `build_info.json` at [buildInfoPath] and the
@@ -232,22 +290,25 @@ String? _runtimeTailProblem(List<String> tail, String output) =>
     ? null
     : 'unexpected arguments ${tail.join(' ')}';
 
-String? _compileTailProblem(List<String> tail, String output) =>
-    tail.length == 5 &&
-        tail[0] == '-I' &&
-        tail[2].endsWith('.c') &&
-        tail[3] == '-o' &&
-        tail[4] == output
+String? _compileTailProblem(List<String> tail, String output, String source) =>
+    tail.length == 3 &&
+        p.basename(tail[0]) == source &&
+        tail[1] == '-o' &&
+        tail[2] == output
     ? null
     : 'unexpected arguments ${tail.join(' ')}';
 
-String? _linkTailProblem(List<String> tail, String output) {
+/// Whether a link passing [own] flags and then [tail] writes [output]
+/// under its own install name from objects only; the problem, or null.
+String? _linkTailProblem(List<String> own, List<String> tail, String output) {
   final installName = '-Wl,-install_name,@rpath/${p.basename(output)}';
-  final objects = tail.length < 4
+  final objects = tail.length < 3
       ? const <String>[]
-      : tail.sublist(1, tail.length - 2);
-  return tail.length >= 4 &&
-          tail.first == installName &&
+      : tail.sublist(0, tail.length - 2);
+  if (!own.contains(installName)) {
+    return 'its recorded flags name no install name $installName';
+  }
+  return tail.length >= 3 &&
           objects.every((object) => object.endsWith('.o')) &&
           tail[tail.length - 2] == '-o' &&
           tail.last == output
