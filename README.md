@@ -225,7 +225,7 @@ git tag -a v1.1.0 -m v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 ```
 
-It writes `output/grammars-macos-arm64.tar.gz`. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
+It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of `HEAD`'s commit, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
 
 3. Push the tag and upload the archive, `build_info.json` and every source bundle with the GitHub CLI:
 

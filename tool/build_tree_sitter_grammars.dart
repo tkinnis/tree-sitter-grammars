@@ -51,6 +51,7 @@ import 'src/pool.dart';
 import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/release.dart';
+import 'src/release_archive.dart';
 import 'src/source_bundles.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
@@ -316,7 +317,12 @@ Future<void> _build(String root, _Options options) async {
   );
   if (release != null) {
     _step('Packing $release${dryRun ? ' (dry run)' : ''}');
-    print('  ${await _createReleaseArchive(output.path, dryRun: dryRun)}');
+    final archive = await _createReleaseArchive(
+      root,
+      output.path,
+      dryRun: dryRun,
+    );
+    print('  ${archive.path}\n  sha256 ${archive.sha256}');
   }
 }
 
@@ -567,24 +573,30 @@ Future<void> _checkRelease(String root, String outputDirectory) async {
 }
 
 /// Packs `output/` into [releaseArchiveName], or into [dryRunArchiveName]
-/// when [dryRun].
-Future<String> _createReleaseArchive(
+/// when [dryRun], and writes its sha256 beside it; returns the archive's
+/// path and sha256.
+///
+/// Every file is given mode 0644 (0755 for a dylib and a directory) and
+/// the time of `HEAD`'s commit first, so the same build packs to the same
+/// bytes.
+Future<({String path, String sha256})> _createReleaseArchive(
+  String root,
   String outputDirectory, {
   required bool dryRun,
 }) async {
-  final archiveName = dryRun ? dryRunArchiveName : releaseArchiveName;
-  final result = await Process.run('tar', [
-    '-czf',
-    archiveName,
-    'libtree-sitter.dylib',
-    'dylibs',
-    'queries',
-    'manifest.json',
-    'build_info.json',
-    noticesFileName,
-  ], workingDirectory: outputDirectory);
-  if (result.exitCode != 0) {
-    throw BuildException('tar failed: ${result.stderr}');
-  }
-  return p.join(outputDirectory, archiveName);
+  final archive = p.join(
+    outputDirectory,
+    dryRun ? dryRunArchiveName : releaseArchiveName,
+  );
+  final epoch = int.parse(
+    (await runGit(root, ['log', '-1', '--format=%ct'])).trim(),
+  );
+  final files = archiveFiles(outputDirectory);
+  await normalizeArchiveFiles(outputDirectory, files, epoch);
+  await packArchive(outputDirectory, files, archive);
+  final sha256 = await fileSha256(archive);
+  File(
+    '$archive.sha256',
+  ).writeAsStringSync('$sha256  ${p.basename(archive)}\n');
+  return (path: archive, sha256: sha256);
 }
