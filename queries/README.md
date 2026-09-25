@@ -50,7 +50,7 @@ Captures in `highlights.scm` are mapped to TextMate scopes via `theme_scope_map.
 
 ### Injections
 
-A pattern in `injections.scm` marks a node's text as another language with `@injection.content`, and says which language either through a `(#set! injection.language "<name>")` directive on the pattern or through an `@injection.language` capture whose text names it. A pattern carrying neither matches and injects nothing, so it costs a query match per node for no result. `tool/convert_neovim_queries.dart` removes every `#set!` directive from the queries it imports, which is why a language bootstrapped from nvim-treesitter has to have its directives put back by hand — `((comment) @injection.content)` alone is the shape that looks finished and does nothing.
+A pattern in `injections.scm` marks a node's text as another language with `@injection.content`, and says which language either through a `(#set! injection.language "<name>")` directive on the pattern or through an `@injection.language` capture whose text names it. A pattern carrying neither matches and injects nothing, so it costs a query match per node for no result: `((comment) @injection.content)` alone is the shape that looks finished and does nothing.
 
 Every grammar whose comments are their own node injects `comment` into them, so a `TODO:`, `FIXME(user):` or `NOTE:` tag is read by the comment grammar wherever it is written; JavaScript, TypeScript and TSX inject `jsdoc` into a comment shaped like documentation as well, through a `#match?` on the comment's text, and the two are read side by side. The name a directive gives has to be a grammar in `tool/grammars.json` — `comment`, `regex`, `jsdoc`, `markdown_inline` and the rest — since the editor loads the injected language by that name, and a name no grammar answers to is a layer that never parses.
 
@@ -230,4 +230,10 @@ If you have multiple diagrams in a single file, only the first one will parse co
 
 ## Source Attribution
 
-Query files are initially imported from [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter), which provides community-tested queries for 300+ languages. We maintain our own `tags.scm` files using the tree-sitter standard tags format.
+Every query file comes from one of three places, and `tool/query_provenance.json` records which, with the closest upstream file and commit:
+
+- **nvim-treesitter** ([nvim-treesitter/nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter)), under the Apache License 2.0. Each such file opens with a header naming the nvim-treesitter file and commit it derives from and whether it was modified here.
+- **A grammar's own repository**, under that grammar's licence.
+- **This repository**, under its MIT licence.
+
+Some files carry lines from both of the first two; when such a file's closest upstream is the grammar's own file, its header names that file as well. `THIRD_PARTY_NOTICES.md` at the repository root lists every file by origin and reproduces each licence.
