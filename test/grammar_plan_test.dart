@@ -94,8 +94,9 @@ void main() {
     });
 
     test('is the generated directory when it commits no headers', () {
-      check(scannerIncludeDirectory(root, _build(generate: true)))
-          .equals('build/gen/x');
+      check(
+        scannerIncludeDirectory(root, _build(generate: true)),
+      ).equals('build/gen/x');
     });
 
     test('is src/ for a committed parser whatever its headers', () {
@@ -104,8 +105,9 @@ void main() {
   });
 
   test('parserAbi reads LANGUAGE_VERSION', () {
-    File(p.join(root, 'parser.c'))
-        .writeAsStringSync('#include "x.h"\n#define LANGUAGE_VERSION 14\n');
+    File(
+      p.join(root, 'parser.c'),
+    ).writeAsStringSync('#include "x.h"\n#define LANGUAGE_VERSION 14\n');
 
     check(parserAbi(p.join(root, 'parser.c'))).equals(14);
   });

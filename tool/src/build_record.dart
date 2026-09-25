@@ -27,56 +27,55 @@ Map<String, Object?> buildInfo({
   required bool repositoryDirty,
   required int languageVersion,
   required int minCompatibleLanguageVersion,
-}) =>
-    {
-      'release': release,
-      'platform': 'macos-${toolchain.arch}',
-      'deploymentTarget': toolchain.deploymentTarget,
-      'repository': {
-        'url': repositoryUrl,
-        'commit': repositoryCommit,
-        'dirty': repositoryDirty,
-      },
-      'treeSitter': {
-        'tag': toolchain.treeSitterTag,
-        'commit': toolchain.treeSitterCommit,
-        'languageVersion': languageVersion,
-        'minCompatibleLanguageVersion': minCompatibleLanguageVersion,
-      },
-      'treeSitterCli': {
-        'version': toolchain.cliVersion,
-        'sha256': toolchain.cliSha256,
-      },
-      'toolchain': {
-        'clang': compiler.version,
-        'clangPath': compiler.path,
-        'sdk': compiler.sdkVersion,
-        'sdkBuild': compiler.sdkBuildVersion,
-        'sdkPath': compiler.sdkPath,
-        'flags': {
-          'workingDirectoryPlaceholder': workingDirectoryPlaceholder,
-          'runtime': flags.runtime,
-          'grammarCompile': flags.grammarCompile,
-          'grammarLink': flags.grammarLink,
-        },
-      },
-    };
+}) => {
+  'release': release,
+  'platform': 'macos-${toolchain.arch}',
+  'deploymentTarget': toolchain.deploymentTarget,
+  'repository': {
+    'url': repositoryUrl,
+    'commit': repositoryCommit,
+    'dirty': repositoryDirty,
+  },
+  'treeSitter': {
+    'tag': toolchain.treeSitterTag,
+    'commit': toolchain.treeSitterCommit,
+    'languageVersion': languageVersion,
+    'minCompatibleLanguageVersion': minCompatibleLanguageVersion,
+  },
+  'treeSitterCli': {
+    'version': toolchain.cliVersion,
+    'sha256': toolchain.cliSha256,
+  },
+  'toolchain': {
+    'clang': compiler.version,
+    'clangPath': compiler.path,
+    'sdk': compiler.sdkVersion,
+    'sdkBuild': compiler.sdkBuildVersion,
+    'sdkPath': compiler.sdkPath,
+    'flags': {
+      'workingDirectoryPlaceholder': workingDirectoryPlaceholder,
+      'runtime': flags.runtime,
+      'grammarCompile': flags.grammarCompile,
+      'grammarLink': flags.grammarLink,
+    },
+  },
+};
 
 /// Encodes [info] as `output/build_info.json` is written.
 String encodeBuildInfo(Map<String, Object?> info) =>
     '${const JsonEncoder.withIndent('  ').convert(info)}\n';
 
 /// Encodes [commands] as `build/compile_commands.json` is written.
-String encodeCompileCommands(List<CompileCommand> commands) =>
-    '${const JsonEncoder.withIndent('  ').convert([
-          for (final command in commands) command.toJson(),
-        ])}\n';
+String encodeCompileCommands(List<CompileCommand> commands) {
+  final json = [for (final command in commands) command.toJson()];
+  return '${const JsonEncoder.withIndent('  ').convert(json)}\n';
+}
 
 /// Parses `build/compile_commands.json`.
 List<CompileCommand> parseCompileCommands(String json) => [
-      for (final entry in jsonDecode(json) as List)
-        CompileCommand.fromJson(entry as Map<String, Object?>),
-    ];
+  for (final entry in jsonDecode(json) as List)
+    CompileCommand.fromJson(entry as Map<String, Object?>),
+];
 
 /// Every way [commands] depart from the flags [info] records; empty when
 /// each invocation passed exactly the recorded flags.
@@ -113,8 +112,10 @@ List<String> buildFlagProblems(
     final arguments = command.arguments;
     final head = arguments.take(prefix.length).toList();
     if (!_listEquals(head, prefix)) {
-      problems.add('${command.output}: arguments do not start with the '
-          'recorded $kind flags');
+      problems.add(
+        '${command.output}: arguments do not start with the '
+        'recorded $kind flags',
+      );
       continue;
     }
     final tail = arguments.skip(prefix.length).toList();
@@ -124,8 +125,9 @@ List<String> buildFlagProblems(
       _ => _linkTailProblem(tail, command.output),
     };
     if (shape != null) problems.add('${command.output}: $shape');
-    final stray = command.environment.keys
-        .where((name) => !allowedCompilerVariables.contains(name));
+    final stray = command.environment.keys.where(
+      (name) => !allowedCompilerVariables.contains(name),
+    );
     if (stray.isNotEmpty) {
       problems.add('${command.output}: environment has ${stray.join(', ')}');
     }
@@ -155,18 +157,20 @@ List<String> checkRecordedFlags({
   required String compileCommandsPath,
   required Set<String> grammarNames,
 }) {
-  final info = jsonDecode(File(buildInfoPath).readAsStringSync())
-      as Map<String, Object?>;
-  final commands =
-      parseCompileCommands(File(compileCommandsPath).readAsStringSync());
+  final info =
+      jsonDecode(File(buildInfoPath).readAsStringSync())
+          as Map<String, Object?>;
+  final commands = parseCompileCommands(
+    File(compileCommandsPath).readAsStringSync(),
+  );
   return buildFlagProblems(info, commands, grammarNames);
 }
 
 String _kind(String output) => p.basename(output) == 'libtree-sitter.dylib'
     ? 'runtime'
     : output.endsWith('.o')
-        ? 'grammarCompile'
-        : 'grammarLink';
+    ? 'grammarCompile'
+    : 'grammarLink';
 
 List<String> _listProblems(String kind, List<String> flags) {
   final levels = flags.where((flag) => flag.startsWith('-O')).toList();
@@ -181,22 +185,23 @@ List<String> _listProblems(String kind, List<String> flags) {
 
 String? _runtimeTailProblem(List<String> tail, String output) =>
     _listEquals(tail, ['lib/src/lib.c', '-o', output])
-        ? null
-        : 'unexpected arguments ${tail.join(' ')}';
+    ? null
+    : 'unexpected arguments ${tail.join(' ')}';
 
 String? _compileTailProblem(List<String> tail, String output) =>
     tail.length == 5 &&
-            tail[0] == '-I' &&
-            tail[2].endsWith('.c') &&
-            tail[3] == '-o' &&
-            tail[4] == output
-        ? null
-        : 'unexpected arguments ${tail.join(' ')}';
+        tail[0] == '-I' &&
+        tail[2].endsWith('.c') &&
+        tail[3] == '-o' &&
+        tail[4] == output
+    ? null
+    : 'unexpected arguments ${tail.join(' ')}';
 
 String? _linkTailProblem(List<String> tail, String output) {
   final installName = '-Wl,-install_name,@rpath/${p.basename(output)}';
-  final objects =
-      tail.length < 4 ? const <String>[] : tail.sublist(1, tail.length - 2);
+  final objects = tail.length < 4
+      ? const <String>[]
+      : tail.sublist(1, tail.length - 2);
   return tail.length >= 4 &&
           tail.first == installName &&
           objects.every((object) => object.endsWith('.o')) &&

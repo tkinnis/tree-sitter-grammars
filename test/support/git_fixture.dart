@@ -35,8 +35,10 @@ Future<String> fixtureGit(String directory, List<String> arguments) async {
     includeParentEnvironment: false,
   );
   if (result.exitCode != 0) {
-    throw StateError('git ${arguments.join(' ')} in $directory: '
-        '${result.stderr}');
+    throw StateError(
+      'git ${arguments.join(' ')} in $directory: '
+      '${result.stderr}',
+    );
   }
   return (result.stdout as String).trim();
 }
@@ -66,8 +68,13 @@ final class FixtureRepository {
       file.writeAsBytesSync(value);
     }
     await fixtureGit(path, ['add', '--all']);
-    await fixtureGit(
-        path, ['commit', '--quiet', '--allow-empty', '-m', message]);
+    await fixtureGit(path, [
+      'commit',
+      '--quiet',
+      '--allow-empty',
+      '-m',
+      message,
+    ]);
     return fixtureGit(path, ['rev-parse', 'HEAD']);
   }
 

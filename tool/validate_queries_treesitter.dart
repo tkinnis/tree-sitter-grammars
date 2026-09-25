@@ -168,8 +168,10 @@ void main() async {
 
       // Calculate relative path from grammar directory to root
       // Count directory depth to determine how many ../ we need
-      final depth =
-          grammarDir.path.split('/').where((s) => s.isNotEmpty).length;
+      final depth = grammarDir.path
+          .split('/')
+          .where((s) => s.isNotEmpty)
+          .length;
       final upPath = List.filled(depth, '..').join('/');
 
       // Run tree-sitter query from within the grammar directory

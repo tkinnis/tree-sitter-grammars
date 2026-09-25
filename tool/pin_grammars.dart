@@ -51,9 +51,11 @@ Future<void> main(List<String> args) async {
         grammarsFile.writeAsStringSync(encodeGrammars(pinned));
         _check(pinned);
       default:
-        stderr.writeln('usage: dart run tool/pin_grammars.dart '
-            '--from-checkouts | --set <repo>=<sha> [--source-commit=<sha>] '
-            '| --check');
+        stderr.writeln(
+          'usage: dart run tool/pin_grammars.dart '
+          '--from-checkouts | --set <repo>=<sha> [--source-commit=<sha>] '
+          '| --check',
+        );
         exitCode = 64;
     }
   } on PinException catch (error) {
@@ -98,7 +100,8 @@ Future<List<Map<String, Object?>>> _fromCheckouts(
   }
   if (refusals.isNotEmpty) {
     throw PinException(
-        ['grammars.json left unchanged:', ...refusals].join('\n  '));
+      ['grammars.json left unchanged:', ...refusals].join('\n  '),
+    );
   }
   return pinned;
 }
@@ -113,9 +116,11 @@ Future<List<Map<String, Object?>>> _set(
     [final name, final commit] => (name, commit),
     _ => throw PinException('--set takes <repo>=<sha>, not $assignment'),
   };
-  final index = entries.indexWhere((entry) =>
-      entry['url'] is String &&
-      repositoryName(entry['url']! as String) == name);
+  final index = entries.indexWhere(
+    (entry) =>
+        entry['url'] is String &&
+        repositoryName(entry['url']! as String) == name,
+  );
   if (index < 0) {
     throw PinException('$name: no such repository in grammars.json');
   }
@@ -125,9 +130,11 @@ Future<List<Map<String, Object?>>> _set(
   try {
     await ensureObjectStore(runGit, directory, url);
     final shallow =
-        (await runGit(directory, ['rev-parse', '--is-shallow-repository']))
-                .trim() ==
-            'true';
+        (await runGit(directory, [
+          'rev-parse',
+          '--is-shallow-repository',
+        ])).trim() ==
+        'true';
     await runGit(directory, [
       'fetch',
       '--quiet',

@@ -87,8 +87,9 @@ ProvenanceReading readQueryProvenance(
   for (final (:path, :count) in duplicateKeys(json)) {
     problems.add(switch (path) {
       [final file] => '$file: $count entries',
-      [final file, ...final inner] => '$file: ${inner.join('.')} '
-          'appears $count times',
+      [final file, ...final inner] =>
+        '$file: ${inner.join('.')} '
+            'appears $count times',
       [] => 'an empty key path',
     });
   }
@@ -123,14 +124,24 @@ QueryProvenance? _parseEntry(
   final origin = QueryOrigin.values.asNameMap()[value['origin']];
   final changed = value['changed'];
   if (origin == null) {
-    problems.add('$file: origin must be one of '
-        '${QueryOrigin.values.map((origin) => origin.name).join(', ')}');
+    problems.add(
+      '$file: origin must be one of '
+      '${QueryOrigin.values.map((origin) => origin.name).join(', ')}',
+    );
   }
   if (changed is! bool) problems.add('$file: changed must be a boolean');
-  final upstream =
-      _parseUpstream(file, 'upstream', value['upstream'], problems);
-  final nvimUpstream =
-      _parseUpstream(file, 'nvimUpstream', value['nvimUpstream'], problems);
+  final upstream = _parseUpstream(
+    file,
+    'upstream',
+    value['upstream'],
+    problems,
+  );
+  final nvimUpstream = _parseUpstream(
+    file,
+    'nvimUpstream',
+    value['nvimUpstream'],
+    problems,
+  );
   if (origin == null || changed is! bool) return null;
   final isHere = origin == QueryOrigin.here;
   if (isHere && (upstream != null || changed)) {
@@ -207,13 +218,15 @@ List<({List<String> path, int count})> duplicateKeys(String json) {
         }
         index = end;
       case '{' || '[':
-        open.add(_Container(
-          path: [
-            ...?container?.path,
-            if (container?.segment case final segment?) segment,
-          ],
-          isObject: char == '{',
-        ));
+        open.add(
+          _Container(
+            path: [
+              ...?container?.path,
+              if (container?.segment case final segment?) segment,
+            ],
+            isObject: char == '{',
+          ),
+        );
       case '}' || ']':
         open.removeLast();
       case ',':
@@ -236,8 +249,8 @@ List<({List<String> path, int count})> duplicateKeys(String json) {
 /// One object or array that [duplicateKeys] has opened and not yet closed.
 final class _Container {
   _Container({required this.path, required this.isObject})
-      : expectsKey = isObject,
-        segment = isObject ? null : '0';
+    : expectsKey = isObject,
+      segment = isObject ? null : '0';
 
   /// The keys and indexes from the top level to this container.
   final List<String> path;

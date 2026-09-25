@@ -45,21 +45,25 @@ Future<String> ensureCli(
 }) async {
   final cache = Directory(p.join(root, '.cache'))..createSync(recursive: true);
   final asset = p.join(
-      cache.path,
-      'tree-sitter-${toolchain.cliVersion}-'
-      '${toolchain.cliAsset}');
+    cache.path,
+    'tree-sitter-${toolchain.cliVersion}-'
+    '${toolchain.cliAsset}',
+  );
   if (!File(asset).existsSync() ||
       await sha256Of(asset) != toolchain.cliSha256) {
     await download(toolchain.cliUrl, asset);
   }
   final digest = await sha256Of(asset);
   if (digest != toolchain.cliSha256) {
-    throw CliException('${toolchain.cliUrl} has sha256 $digest, '
-        'toolchain.json expects ${toolchain.cliSha256}');
+    throw CliException(
+      '${toolchain.cliUrl} has sha256 $digest, '
+      'toolchain.json expects ${toolchain.cliSha256}',
+    );
   }
   final executable = p.join(cache.path, 'tree-sitter-${toolchain.cliVersion}');
-  File(executable).writeAsBytesSync(gzip.decode(File(asset).readAsBytesSync()),
-      flush: true);
+  File(
+    executable,
+  ).writeAsBytesSync(gzip.decode(File(asset).readAsBytesSync()), flush: true);
   final chmod = await Process.run('chmod', ['755', executable]);
   if (chmod.exitCode != 0) throw CliException('chmod: ${chmod.stderr}');
   return executable;
@@ -92,8 +96,10 @@ Future<void> generateParser({
   required int abi,
 }) async {
   if (File(p.join(grammarDirectory, 'src', 'parser.c')).existsSync()) {
-    throw CliException('$grammarDirectory commits src/parser.c; '
-        'it is never generated');
+    throw CliException(
+      '$grammarDirectory commits src/parser.c; '
+      'it is never generated',
+    );
   }
   Directory(outputDirectory).createSync(recursive: true);
   final result = await Process.run(
@@ -104,11 +110,15 @@ Future<void> generateParser({
     includeParentEnvironment: false,
   );
   if (result.exitCode != 0) {
-    throw CliException('tree-sitter generate in $grammarDirectory exited '
-        '${result.exitCode}\n${result.stdout}${result.stderr}');
+    throw CliException(
+      'tree-sitter generate in $grammarDirectory exited '
+      '${result.exitCode}\n${result.stdout}${result.stderr}',
+    );
   }
   if (!File(p.join(outputDirectory, 'parser.c')).existsSync()) {
-    throw CliException('tree-sitter generate wrote no parser.c to '
-        '$outputDirectory');
+    throw CliException(
+      'tree-sitter generate wrote no parser.c to '
+      '$outputDirectory',
+    );
   }
 }

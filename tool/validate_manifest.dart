@@ -15,9 +15,7 @@ import 'src/manifest.dart';
 void main(List<String> args) {
   if (args.isEmpty) {
     print('Usage: dart tool/validate_manifest.dart <manifest_path>');
-    print(
-      'Example: dart tool/validate_manifest.dart output/manifest.json',
-    );
+    print('Example: dart tool/validate_manifest.dart output/manifest.json');
     exit(1);
   }
 
@@ -127,8 +125,9 @@ void main(List<String> args) {
             if (ext is! String) {
               print('✗ $languageId: extensions[$i] must be a string');
               errorCount++;
-            } else if (!RegExp(r'^\.[.a-zA-Z0-9_-]+$|^[A-Z][a-zA-Z0-9_-]*$')
-                .hasMatch(ext)) {
+            } else if (!RegExp(
+              r'^\.[.a-zA-Z0-9_-]+$|^[A-Z][a-zA-Z0-9_-]*$',
+            ).hasMatch(ext)) {
               print(
                 '✗ $languageId: extensions[$i] "$ext" must start with a '
                 'dot (e.g., ".js", "..bashrc") or be a filename '

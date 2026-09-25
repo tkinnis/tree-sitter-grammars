@@ -42,8 +42,10 @@ Future<void> ensureObjectStore(
   }
   final origin = (await git(directory, ['remote', 'get-url', 'origin'])).trim();
   if (normalizeRepositoryUrl(origin) != normalizeRepositoryUrl(url)) {
-    throw GrammarSourceException('$name: origin of $directory is $origin, '
-        'grammars.json says $url');
+    throw GrammarSourceException(
+      '$name: origin of $directory is $origin, '
+      'grammars.json says $url',
+    );
   }
 }
 
@@ -96,9 +98,12 @@ Future<void> extractCommit(
   if (FileSystemEntity.typeSync(destination) != FileSystemEntityType.notFound) {
     throw GrammarSourceException('$destination already exists');
   }
-  Future<String> git(List<String> arguments, {String? input}) =>
-      runIsolatedGit(directory, arguments,
-          environment: environment, input: input);
+  Future<String> git(List<String> arguments, {String? input}) => runIsolatedGit(
+    directory,
+    arguments,
+    environment: environment,
+    input: input,
+  );
   Directory(destination).createSync(recursive: true);
   final archive = '$destination.tar';
   await git([
@@ -117,14 +122,17 @@ Future<void> extractCommit(
   File(archive).deleteSync();
   if (tar.exitCode != 0) {
     throw GrammarSourceException(
-        'tar could not extract $commit into $destination: ${tar.stderr}');
+      'tar could not extract $commit into $destination: ${tar.stderr}',
+    );
   }
   final problems = await _extractionProblems(git, commit, destination);
   if (problems.isNotEmpty) {
-    throw GrammarSourceException([
-      '$destination differs from $commit in ${p.basename(directory)}:',
-      ...problems,
-    ].join('\n    '));
+    throw GrammarSourceException(
+      [
+        '$destination differs from $commit in ${p.basename(directory)}:',
+        ...problems,
+      ].join('\n    '),
+    );
   }
 }
 
@@ -149,8 +157,9 @@ Future<List<String>> _extractionProblems(
     if (type == 'blob') committed[path] = (mode: mode, object: object);
   }
   final extracted = {
-    for (final entity
-        in Directory(destination).listSync(recursive: true, followLinks: false))
+    for (final entity in Directory(
+      destination,
+    ).listSync(recursive: true, followLinks: false))
       if (entity is! Directory)
         p.posix.joinAll(p.split(p.relative(entity.path, from: destination))):
             entity,
@@ -178,8 +187,9 @@ Future<List<String>> _extractionProblems(
       files.add(path);
     }
   }
-  final hashes = await _hashObjects(
-      git, [for (final path in files) p.join(destination, path)]);
+  final hashes = await _hashObjects(git, [
+    for (final path in files) p.join(destination, path),
+  ]);
   for (final (index, path) in files.indexed) {
     if (hashes[index] != committed[path]!.object) {
       problems.add('$path: extracted bytes are not the committed blob');
@@ -194,13 +204,12 @@ Future<List<String>> _hashObjects(_Git git, List<String> paths) async {
   final hashes = (await git(
     ['hash-object', '--no-filters', '--stdin-paths'],
     input: '${paths.join('\n')}\n',
-  ))
-      .split('\n')
-      .where((line) => line.isNotEmpty)
-      .toList();
+  )).split('\n').where((line) => line.isNotEmpty).toList();
   if (hashes.length != paths.length) {
-    throw GrammarSourceException('git hash-object answered '
-        '${hashes.length} of ${paths.length} paths');
+    throw GrammarSourceException(
+      'git hash-object answered '
+      '${hashes.length} of ${paths.length} paths',
+    );
   }
   return hashes;
 }

@@ -37,8 +37,9 @@ void main() {
     ]);
 
     check(result.exitCode).equals(1);
-    check(result.stderr as String)
-        .contains('queries/c/highlights.scm: no entry');
+    check(
+      result.stderr as String,
+    ).contains('queries/c/highlights.scm: no entry');
     check(Directory(p.join(root, 'output')).existsSync()).isFalse();
   });
 }

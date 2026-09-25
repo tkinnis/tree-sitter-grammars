@@ -56,15 +56,19 @@ final class Compiler {
       final result = await Process.run('xcrun', arguments);
       if (result.exitCode != 0) {
         throw CompilerException(
-            'xcrun ${arguments.join(' ')} failed: ${result.stderr}');
+          'xcrun ${arguments.join(' ')} failed: ${result.stderr}',
+        );
       }
       return (result.stdout as String).trim();
     }
 
     final path = await xcrun(['--find', 'clang']);
-    final version = await Process.run(path, ['--version'],
-        environment: compilerEnvironment(Platform.environment),
-        includeParentEnvironment: false);
+    final version = await Process.run(
+      path,
+      ['--version'],
+      environment: compilerEnvironment(Platform.environment),
+      includeParentEnvironment: false,
+    );
     if (version.exitCode != 0) {
       throw CompilerException('$path --version failed: ${version.stderr}');
     }
@@ -73,8 +77,11 @@ final class Compiler {
       version: (version.stdout as String).split('\n').first.trim(),
       sdkPath: await xcrun(['--sdk', 'macosx', '--show-sdk-path']),
       sdkVersion: await xcrun(['--sdk', 'macosx', '--show-sdk-version']),
-      sdkBuildVersion:
-          await xcrun(['--sdk', 'macosx', '--show-sdk-build-version']),
+      sdkBuildVersion: await xcrun([
+        '--sdk',
+        'macosx',
+        '--show-sdk-build-version',
+      ]),
     );
   }
 }
@@ -85,10 +92,10 @@ final class Compiler {
 /// clang finds the SDK through the explicit `-isysroot`, and its own
 /// linker beside itself, so it needs no search path of the user's.
 Map<String, String> compilerEnvironment(Map<String, String> parent) => {
-      'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
-      for (final name in const ['TMPDIR', 'DEVELOPER_DIR'])
-        if (parent[name] case final value?) name: value,
-    };
+  'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+  for (final name in const ['TMPDIR', 'DEVELOPER_DIR'])
+    if (parent[name] case final value?) name: value,
+};
 
 /// The flags every build passes, by kind of invocation.
 final class BuildFlags {
@@ -153,9 +160,9 @@ final class BuildFlags {
 /// [flags] with [workingDirectoryPlaceholder] replaced by the absolute
 /// [workingDirectory] an invocation runs in.
 List<String> expandFlags(List<String> flags, String workingDirectory) => [
-      for (final flag in flags)
-        flag.replaceAll(workingDirectoryPlaceholder, workingDirectory),
-    ];
+  for (final flag in flags)
+    flag.replaceAll(workingDirectoryPlaceholder, workingDirectory),
+];
 
 /// One compiler invocation exactly as it ran: the entries of
 /// `build/compile_commands.json`.
@@ -169,11 +176,11 @@ final class CompileCommand {
 
   /// Reads one entry of `build/compile_commands.json`.
   factory CompileCommand.fromJson(Map<String, Object?> json) => CompileCommand(
-        directory: json['directory']! as String,
-        arguments: (json['arguments']! as List).cast<String>(),
-        output: json['output']! as String,
-        environment: (json['environment']! as Map).cast<String, String>(),
-      );
+    directory: json['directory']! as String,
+    arguments: (json['arguments']! as List).cast<String>(),
+    output: json['output']! as String,
+    environment: (json['environment']! as Map).cast<String, String>(),
+  );
 
   /// The absolute working directory.
   final String directory;
@@ -188,11 +195,11 @@ final class CompileCommand {
   final Map<String, String> environment;
 
   Map<String, Object?> toJson() => {
-        'directory': directory,
-        'arguments': arguments,
-        'output': output,
-        'environment': environment,
-      };
+    'directory': directory,
+    'arguments': arguments,
+    'output': output,
+    'environment': environment,
+  };
 }
 
 /// Runs [command], throwing a [CompilerException] with the compiler's
@@ -207,8 +214,10 @@ Future<void> runCompileCommand(CompileCommand command) async {
     includeParentEnvironment: false,
   );
   if (result.exitCode != 0) {
-    throw CompilerException('${command.output}: clang exited '
-        '${result.exitCode}\n${result.stdout}${result.stderr}');
+    throw CompilerException(
+      '${command.output}: clang exited '
+      '${result.exitCode}\n${result.stdout}${result.stderr}',
+    );
   }
 }
 
@@ -220,19 +229,18 @@ CompileCommand runtimeCommand({
   required String directory,
   required String output,
   required Map<String, String> environment,
-}) =>
-    CompileCommand(
-      directory: directory,
-      arguments: [
-        compiler.path,
-        ...expandFlags(flags.runtime, directory),
-        'lib/src/lib.c',
-        '-o',
-        output,
-      ],
-      output: output,
-      environment: environment,
-    );
+}) => CompileCommand(
+  directory: directory,
+  arguments: [
+    compiler.path,
+    ...expandFlags(flags.runtime, directory),
+    'lib/src/lib.c',
+    '-o',
+    output,
+  ],
+  output: output,
+  environment: environment,
+);
 
 /// Compiles one grammar [source] against the headers in [includeDirectory]
 /// into [object]; paths are relative to [directory].
@@ -244,21 +252,20 @@ CompileCommand grammarCompileCommand({
   required String source,
   required String object,
   required Map<String, String> environment,
-}) =>
-    CompileCommand(
-      directory: directory,
-      arguments: [
-        compiler.path,
-        ...expandFlags(flags.grammarCompile, directory),
-        '-I',
-        includeDirectory,
-        source,
-        '-o',
-        object,
-      ],
-      output: object,
-      environment: environment,
-    );
+}) => CompileCommand(
+  directory: directory,
+  arguments: [
+    compiler.path,
+    ...expandFlags(flags.grammarCompile, directory),
+    '-I',
+    includeDirectory,
+    source,
+    '-o',
+    object,
+  ],
+  output: object,
+  environment: environment,
+);
 
 /// Links one grammar's [objects] into [output], whose install name is
 /// `@rpath/lib<libraryName>.dylib`; paths are relative to [directory].
@@ -270,17 +277,16 @@ CompileCommand grammarLinkCommand({
   required List<String> objects,
   required String output,
   required Map<String, String> environment,
-}) =>
-    CompileCommand(
-      directory: directory,
-      arguments: [
-        compiler.path,
-        ...expandFlags(flags.grammarLink, directory),
-        '-Wl,-install_name,@rpath/lib$libraryName.dylib',
-        ...objects,
-        '-o',
-        output,
-      ],
-      output: output,
-      environment: environment,
-    );
+}) => CompileCommand(
+  directory: directory,
+  arguments: [
+    compiler.path,
+    ...expandFlags(flags.grammarLink, directory),
+    '-Wl,-install_name,@rpath/lib$libraryName.dylib',
+    ...objects,
+    '-o',
+    output,
+  ],
+  output: output,
+  environment: environment,
+);

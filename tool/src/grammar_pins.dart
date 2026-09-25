@@ -47,9 +47,9 @@ String normalizeRepositoryUrl(String url) {
 
 /// Parses `tool/grammars.json`.
 List<Map<String, Object?>> parseGrammars(String json) => [
-      for (final entry in jsonDecode(json) as List<Object?>)
-        entry! as Map<String, Object?>,
-    ];
+  for (final entry in jsonDecode(json) as List<Object?>)
+    entry! as Map<String, Object?>,
+];
 
 /// Encodes [entries] as `tool/grammars.json` is written: two-space indent,
 /// a trailing newline, and the pin fields directly after `url`.
@@ -133,8 +133,10 @@ Future<String> pinFromCheckout(
 ) async {
   final origin = (await git(directory, ['remote', 'get-url', 'origin'])).trim();
   if (normalizeRepositoryUrl(origin) != normalizeRepositoryUrl(url)) {
-    throw PinException('${repositoryName(url)}: origin is $origin, '
-        'grammars.json says $url');
+    throw PinException(
+      '${repositoryName(url)}: origin is $origin, '
+      'grammars.json says $url',
+    );
   }
   final head = (await git(directory, ['rev-parse', 'HEAD'])).trim();
   await requireOnOrigin(git, directory, head, repositoryName(url));
@@ -150,8 +152,14 @@ Future<void> requireOnOrigin(
   String commit,
   String name,
 ) async {
-  final branches = await git(
-      directory, ['branch', '-r', '--contains', commit, '--list', 'origin/*']);
+  final branches = await git(directory, [
+    'branch',
+    '-r',
+    '--contains',
+    commit,
+    '--list',
+    'origin/*',
+  ]);
   if (branches.trim().isEmpty) {
     throw PinException('$name: no branch on origin contains $commit');
   }

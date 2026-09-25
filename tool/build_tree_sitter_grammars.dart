@@ -46,7 +46,8 @@ import 'src/release.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
 
-const _usage = 'usage: dart run tool/build_tree_sitter_grammars.dart '
+const _usage =
+    'usage: dart run tool/build_tree_sitter_grammars.dart '
     '[--release=vX.Y.Z [--dry-run]]';
 
 /// Thrown to stop the build with a message.
@@ -97,26 +98,39 @@ Future<void> _build(
   _delete(p.join(root, 'output'));
   final toolchain = Toolchain.load(root);
   final entries = parseGrammars(
-      File(p.join(root, 'tool', 'grammars.json')).readAsStringSync());
+    File(p.join(root, 'tool', 'grammars.json')).readAsStringSync(),
+  );
   _step('Checking pins, query provenance and the runtime submodule');
   _requireNone('grammars.json', pinProblems(entries));
   _requireNone('query_provenance.json', _provenanceProblems(root));
   await _requireRuntimeSubmodule(root, toolchain);
   if (release != null) {
-    await checkReleasePreflight(runGit, root, release,
-        runtimeCommit: toolchain.treeSitterCommit, dryRun: dryRun);
+    await checkReleasePreflight(
+      runGit,
+      root,
+      release,
+      runtimeCommit: toolchain.treeSitterCommit,
+      dryRun: dryRun,
+    );
     if (dryRun) print('  --dry-run: not requiring HEAD to be the tag $release');
   }
 
   _delete(p.join(root, 'build'));
 
-  _step('Extracting the runtime and ${_urlEntries(entries).length} grammar '
-      'repositories at their pins');
+  _step(
+    'Extracting the runtime and ${_urlEntries(entries).length} grammar '
+    'repositories at their pins',
+  );
   final runtimeDirectory = p.join(root, 'build', 'src', 'tree-sitter');
-  await extractCommit(p.join(root, 'tree-sitter'), toolchain.treeSitterCommit,
-      runtimeDirectory);
-  final languageVersions =
-      _runtimeLanguageVersions(runtimeDirectory, toolchain);
+  await extractCommit(
+    p.join(root, 'tree-sitter'),
+    toolchain.treeSitterCommit,
+    runtimeDirectory,
+  );
+  final languageVersions = _runtimeLanguageVersions(
+    runtimeDirectory,
+    toolchain,
+  );
   await _extractGrammars(root, entries);
 
   final builds = planGrammars(root, entries);
@@ -125,8 +139,10 @@ Future<void> _build(
   }
   final generated = builds.where((build) => build.generate).toList();
   if (generated.isNotEmpty) {
-    _step('Generating ${generated.map((b) => b.name).join(', ')} with '
-        'tree-sitter ${toolchain.cliVersion}');
+    _step(
+      'Generating ${generated.map((b) => b.name).join(', ')} with '
+      'tree-sitter ${toolchain.cliVersion}',
+    );
     final cli = await ensureCli(root, toolchain);
     for (final build in generated) {
       await generateParser(
@@ -142,15 +158,19 @@ Future<void> _build(
   final compiler = await Compiler.resolve();
   final flags = BuildFlags(toolchain, compiler);
   final environment = compilerEnvironment(Platform.environment);
-  print('  ${compiler.version}\n  ${compiler.path}\n'
-      '  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
+  print(
+    '  ${compiler.version}\n  ${compiler.path}\n'
+    '  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})',
+  );
   final outputDirectory = p.join(root, 'build', 'out');
   final runtime = runtimeCommand(
     compiler: compiler,
     flags: flags,
     directory: runtimeDirectory,
-    output: p.relative(p.join(outputDirectory, 'libtree-sitter.dylib'),
-        from: runtimeDirectory),
+    output: p.relative(
+      p.join(outputDirectory, 'libtree-sitter.dylib'),
+      from: runtimeDirectory,
+    ),
     environment: environment,
   );
   final grammarCommands = [
@@ -158,20 +178,23 @@ Future<void> _build(
       _grammarCommands(root, build, compiler, flags, environment),
   ];
   final commands = [runtime, for (final group in grammarCommands) ...group];
-  File(p.join(root, 'build', 'compile_commands.json'))
-      .writeAsStringSync(encodeCompileCommands(commands));
+  File(
+    p.join(root, 'build', 'compile_commands.json'),
+  ).writeAsStringSync(encodeCompileCommands(commands));
   Directory(p.join(outputDirectory, 'dylibs')).createSync(recursive: true);
   for (final build in builds) {
     Directory(p.join(root, build.objectDirectory)).createSync(recursive: true);
-    Directory(p.join(outputDirectory, build.dylibDirectory))
-        .createSync(recursive: true);
+    Directory(
+      p.join(outputDirectory, build.dylibDirectory),
+    ).createSync(recursive: true);
   }
   _requireNone(
-      'compile',
-      [
-        ...await _pooled([runtime], _run),
-        ...await _pooled(grammarCommands, _runInOrder),
-      ].nonNulls.toList());
+    'compile',
+    [
+      ...await _pooled([runtime], _run),
+      ...await _pooled(grammarCommands, _runInOrder),
+    ].nonNulls.toList(),
+  );
 
   _step('Checking every library');
   final expectations = [
@@ -182,43 +205,54 @@ Future<void> _build(
     ),
     for (final build in builds)
       LibraryExpectation(
-        path:
-            p.join(outputDirectory, build.dylibDirectory, build.dylibFileName),
+        path: p.join(
+          outputDirectory,
+          build.dylibDirectory,
+          build.dylibFileName,
+        ),
         installName: '@rpath/${build.dylibFileName}',
         exportedSymbols: ['_tree_sitter_${build.symbol}'],
       ),
   ];
   _requireNone('libraries', [
-    for (final problems
-        in await _pooled(expectations, (e) => libraryProblems(e, toolchain)))
+    for (final problems in await _pooled(
+      expectations,
+      (e) => libraryProblems(e, toolchain),
+    ))
       ...problems,
   ]);
 
   _step('Writing query bundles, manifest.json and build_info.json');
   final manifest = _writeBundles(root, outputDirectory, entries, builds);
-  File(p.join(outputDirectory, 'manifest.json'))
-      .writeAsStringSync(encodeManifest(manifest));
+  File(
+    p.join(outputDirectory, 'manifest.json'),
+  ).writeAsStringSync(encodeManifest(manifest));
   final info = buildInfo(
     release: release,
     toolchain: toolchain,
     compiler: compiler,
     flags: flags,
     repositoryCommit: (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
-    repositoryDirty:
-        (await runGit(root, ['status', '--porcelain'])).trim().isNotEmpty,
+    repositoryDirty: (await runGit(root, [
+      'status',
+      '--porcelain',
+    ])).trim().isNotEmpty,
     languageVersion: languageVersions.current,
     minCompatibleLanguageVersion: languageVersions.minCompatible,
   );
-  File(p.join(outputDirectory, 'build_info.json'))
-      .writeAsStringSync(encodeBuildInfo(info));
+  File(
+    p.join(outputDirectory, 'build_info.json'),
+  ).writeAsStringSync(encodeBuildInfo(info));
 
   _step('Checking the recorded flags and the manifest');
   await _checkRecords(root, outputDirectory, builds);
   final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
 
-  print('\n✓ Built libtree-sitter.dylib, ${builds.length} grammar dylibs and '
-      '${manifest.values.where((e) => e['queryOnly'] == true).length} '
-      'query-only bundles into output/');
+  print(
+    '\n✓ Built libtree-sitter.dylib, ${builds.length} grammar dylibs and '
+    '${manifest.values.where((e) => e['queryOnly'] == true).length} '
+    'query-only bundles into output/',
+  );
   if (release != null) {
     _step('Packing $release${dryRun ? ' (dry run)' : ''}');
     print('  ${await _createReleaseArchive(output.path, dryRun: dryRun)}');
@@ -237,30 +271,36 @@ void _requireNone(String what, List<String> problems) {
 }
 
 Iterable<Map<String, Object?>> _urlEntries(
-        List<Map<String, Object?>> entries) =>
-    entries.where((entry) => entry['url'] is String);
+  List<Map<String, Object?>> entries,
+) => entries.where((entry) => entry['url'] is String);
 
 List<String> _provenanceProblems(String root) {
   final queryFiles = [
-    for (final entity
-        in Directory(p.join(root, 'queries')).listSync(recursive: true))
+    for (final entity in Directory(
+      p.join(root, 'queries'),
+    ).listSync(recursive: true))
       if (entity is File && entity.path.endsWith('.scm'))
         p.posix.joinAll(p.split(p.relative(entity.path, from: root))),
   ];
-  final json =
-      File(p.join(root, 'tool', 'query_provenance.json')).readAsStringSync();
+  final json = File(
+    p.join(root, 'tool', 'query_provenance.json'),
+  ).readAsStringSync();
   return readQueryProvenance(json, queryFiles).problems;
 }
 
 /// Requires the `tree-sitter` submodule's checkout to be the toolchain's
 /// commit.
 Future<void> _requireRuntimeSubmodule(String root, Toolchain toolchain) async {
-  final head =
-      (await runGit(p.join(root, 'tree-sitter'), ['rev-parse', 'HEAD'])).trim();
+  final head = (await runGit(p.join(root, 'tree-sitter'), [
+    'rev-parse',
+    'HEAD',
+  ])).trim();
   if (head != toolchain.treeSitterCommit) {
-    throw BuildException('tree-sitter is checked out at $head; '
-        'toolchain.json pins ${toolchain.treeSitterTag} '
-        '(${toolchain.treeSitterCommit})');
+    throw BuildException(
+      'tree-sitter is checked out at $head; '
+      'toolchain.json pins ${toolchain.treeSitterTag} '
+      '(${toolchain.treeSitterCommit})',
+    );
   }
 }
 
@@ -271,21 +311,27 @@ Future<void> _requireRuntimeSubmodule(String root, Toolchain toolchain) async {
   String runtimeDirectory,
   Toolchain toolchain,
 ) {
-  final makefile =
-      File(p.join(runtimeDirectory, 'Makefile')).readAsStringSync();
-  final version = RegExp(r'^VERSION := (\S+)$', multiLine: true)
-      .firstMatch(makefile)
-      ?.group(1);
+  final makefile = File(
+    p.join(runtimeDirectory, 'Makefile'),
+  ).readAsStringSync();
+  final version = RegExp(
+    r'^VERSION := (\S+)$',
+    multiLine: true,
+  ).firstMatch(makefile)?.group(1);
   if (version != toolchain.runtimeVersion) {
-    throw BuildException('the runtime Makefile declares VERSION $version, '
-        'toolchain.json says ${toolchain.runtimeVersion}');
+    throw BuildException(
+      'the runtime Makefile declares VERSION $version, '
+      'toolchain.json says ${toolchain.runtimeVersion}',
+    );
   }
-  final api =
-      File(p.join(runtimeDirectory, 'lib', 'include', 'tree_sitter', 'api.h'))
-          .readAsStringSync();
+  final api = File(
+    p.join(runtimeDirectory, 'lib', 'include', 'tree_sitter', 'api.h'),
+  ).readAsStringSync();
   int define(String name) {
-    final match =
-        RegExp('^#define $name (\\d+)\$', multiLine: true).firstMatch(api);
+    final match = RegExp(
+      '^#define $name (\\d+)\$',
+      multiLine: true,
+    ).firstMatch(api);
     if (match == null) throw BuildException('api.h does not define $name');
     return int.parse(match.group(1)!);
   }
@@ -339,7 +385,9 @@ List<CompileCommand> _grammarCommands(
         includeDirectory: include,
         source: source,
         object: p.join(
-            build.objectDirectory, '${p.basenameWithoutExtension(source)}.o'),
+          build.objectDirectory,
+          '${p.basenameWithoutExtension(source)}.o',
+        ),
         environment: environment,
       ),
   ];
@@ -410,20 +458,25 @@ Map<String, Map<String, Object?>> _writeBundles(
       final name = entry['name']! as String;
       final manifestEntry = queryOnlyEntry(entry);
       bundleQueries(
-          root,
-          name,
-          manifestEntry['queries']! as Map<String, Object?>,
-          p.join(outputDirectory, 'queries', name));
+        root,
+        name,
+        manifestEntry['queries']! as Map<String, Object?>,
+        p.join(outputDirectory, 'queries', name),
+      );
       manifest[name] = manifestEntry;
     } else {
       for (final build in builds.where((build) => build.entry == entry)) {
         final manifestEntry = grammarEntry(
-            root, build, parserAbi(p.join(root, build.parserSource)));
+          root,
+          build,
+          parserAbi(p.join(root, build.parserSource)),
+        );
         bundleQueries(
-            root,
-            build.name,
-            manifestEntry['queries']! as Map<String, Object?>,
-            p.join(outputDirectory, build.dylibDirectory));
+          root,
+          build.name,
+          manifestEntry['queries']! as Map<String, Object?>,
+          p.join(outputDirectory, build.dylibDirectory),
+        );
         manifest[build.name] = manifestEntry;
       }
     }
@@ -447,18 +500,16 @@ Future<void> _checkRecords(
   );
   _requireNone('recorded flags', problems);
   print('  every compiler invocation passed exactly the recorded flags');
-  final validation = await Process.run(
-    Platform.resolvedExecutable,
-    [
-      'run',
-      p.join('tool', 'validate_manifest.dart'),
-      p.join(outputDirectory, 'manifest.json'),
-    ],
-    workingDirectory: root,
-  );
+  final validation = await Process.run(Platform.resolvedExecutable, [
+    'run',
+    p.join('tool', 'validate_manifest.dart'),
+    p.join(outputDirectory, 'manifest.json'),
+  ], workingDirectory: root);
   if (validation.exitCode != 0) {
-    throw BuildException('validate_manifest.dart exited '
-        '${validation.exitCode}\n${validation.stdout}${validation.stderr}');
+    throw BuildException(
+      'validate_manifest.dart exited '
+      '${validation.exitCode}\n${validation.stdout}${validation.stderr}',
+    );
   }
   print('  validate_manifest.dart passed');
 }
@@ -470,19 +521,15 @@ Future<String> _createReleaseArchive(
   required bool dryRun,
 }) async {
   final archiveName = dryRun ? dryRunArchiveName : releaseArchiveName;
-  final result = await Process.run(
-    'tar',
-    [
-      '-czf',
-      archiveName,
-      'libtree-sitter.dylib',
-      'dylibs',
-      'queries',
-      'manifest.json',
-      'build_info.json',
-    ],
-    workingDirectory: outputDirectory,
-  );
+  final result = await Process.run('tar', [
+    '-czf',
+    archiveName,
+    'libtree-sitter.dylib',
+    'dylibs',
+    'queries',
+    'manifest.json',
+    'build_info.json',
+  ], workingDirectory: outputDirectory);
   if (result.exitCode != 0) {
     throw BuildException('tar failed: ${result.stderr}');
   }

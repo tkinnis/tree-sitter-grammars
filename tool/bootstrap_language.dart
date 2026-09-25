@@ -17,9 +17,7 @@
 import 'dart:io';
 
 /// Map our language names to nvim-treesitter directory names when they differ
-const languageNameMap = <String, String>{
-  'c-sharp': 'c_sharp',
-};
+const languageNameMap = <String, String>{'c-sharp': 'c_sharp'};
 
 /// Query types to import from nvim-treesitter
 const queryTypesToImport = [
@@ -90,16 +88,13 @@ Examples:
   final nvimTsDir = Directory('/tmp/nvim-treesitter');
   if (!nvimTsDir.existsSync()) {
     print('Cloning nvim-treesitter repository...');
-    final result = await Process.run(
-      'git',
-      [
-        'clone',
-        '--depth',
-        '1',
-        'https://github.com/nvim-treesitter/nvim-treesitter.git',
-        nvimTsDir.path,
-      ],
-    );
+    final result = await Process.run('git', [
+      'clone',
+      '--depth',
+      '1',
+      'https://github.com/nvim-treesitter/nvim-treesitter.git',
+      nvimTsDir.path,
+    ]);
     if (result.exitCode != 0) {
       print('Error cloning repository: ${result.stderr}');
       exit(1);
@@ -107,11 +102,9 @@ Examples:
     print('Cloned nvim-treesitter\n');
   } else {
     print('Updating nvim-treesitter repository...');
-    final result = await Process.run(
-      'git',
-      ['pull'],
-      workingDirectory: nvimTsDir.path,
-    );
+    final result = await Process.run('git', [
+      'pull',
+    ], workingDirectory: nvimTsDir.path);
     if (result.exitCode != 0) {
       print('Warning: Could not update repository: ${result.stderr}');
     }
@@ -121,8 +114,9 @@ Examples:
   // Find source queries
   // Note: nvim-treesitter moved queries from queries/ to runtime/queries/
   final nvimName = languageNameMap[languageName] ?? languageName;
-  final nvimQueryDir =
-      Directory('/tmp/nvim-treesitter/runtime/queries/$nvimName');
+  final nvimQueryDir = Directory(
+    '/tmp/nvim-treesitter/runtime/queries/$nvimName',
+  );
 
   if (!nvimQueryDir.existsSync()) {
     print('Error: Language "$languageName" not found in nvim-treesitter');
@@ -195,7 +189,8 @@ Examples:
     final displayName =
         languageName[0].toUpperCase() + languageName.substring(1);
 
-    final configContent = '''{
+    final configContent =
+        '''{
   "displayName": "$displayName",
   "symbol": "$languageName",
   "scope": "source.$languageName",
@@ -240,8 +235,10 @@ Examples:
     print('  1. Edit config.json: extensions, comments, brackets');
     print('  2. Review and customize the imported queries as needed');
     print('  3. Add symbol patterns to tags.scm for code navigation');
-    print('  4. Pin the grammar: dart run tool/pin_grammars.dart '
-        '--set <repo>=<sha>');
+    print(
+      '  4. Pin the grammar: dart run tool/pin_grammars.dart '
+      '--set <repo>=<sha>',
+    );
     print('  5. Record each query file in tool/query_provenance.json');
     print('  6. Run: dart run tool/build_tree_sitter_grammars.dart');
     print('  7. Test syntax highlighting with example files');

@@ -61,18 +61,22 @@ List<CompileCommand> _commands(BuildFlags flags) {
 }
 
 /// build_info.json as the build writes it and a reader decodes it.
-Map<String, Object?> _info(BuildFlags flags) => jsonDecode(
-      encodeBuildInfo(buildInfo(
-        release: null,
-        toolchain: _toolchain,
-        compiler: _compiler,
-        flags: flags,
-        repositoryCommit: '77ac13625d220bcf955cb12f697e438238c774e0',
-        repositoryDirty: false,
-        languageVersion: 15,
-        minCompatibleLanguageVersion: 13,
-      )),
-    ) as Map<String, Object?>;
+Map<String, Object?> _info(BuildFlags flags) =>
+    jsonDecode(
+          encodeBuildInfo(
+            buildInfo(
+              release: null,
+              toolchain: _toolchain,
+              compiler: _compiler,
+              flags: flags,
+              repositoryCommit: '77ac13625d220bcf955cb12f697e438238c774e0',
+              repositoryDirty: false,
+              languageVersion: 15,
+              minCompatibleLanguageVersion: 13,
+            ),
+          ),
+        )
+        as Map<String, Object?>;
 
 /// [commands] after a JSON round trip, as the check reads them from disk.
 List<CompileCommand> _roundTrip(List<CompileCommand> commands) =>
@@ -100,8 +104,9 @@ void main() {
     final commands = _roundTrip(_commands(flags));
 
     check(buildFlagProblems(_info(flags), commands, {'json'})).isEmpty();
-    check(commands[1].arguments.take(3))
-        .deepEquals(['/xcode/clang', '-c', '-O3']);
+    check(
+      commands[1].arguments.take(3),
+    ).deepEquals(['/xcode/clang', '-c', '-O3']);
     check(commands[1].arguments).contains('-ffile-prefix-map=/clone=.');
   });
 
@@ -115,11 +120,13 @@ void main() {
       environment: compile.environment,
     );
 
-    check(buildFlagProblems(
-      _info(flags),
-      [commands[0], mutated, commands[2]],
-      {'json'},
-    )).deepEquals([
+    check(
+      buildFlagProblems(
+        _info(flags),
+        [commands[0], mutated, commands[2]],
+        {'json'},
+      ),
+    ).deepEquals([
       'build/obj/json/parser.o: arguments do not start with the recorded '
           'grammarCompile flags',
     ]);
@@ -133,10 +140,12 @@ void main() {
     ];
     recorded['grammarCompile'] = [...flags.grammarCompile, '-DNDEBUG'];
 
-    check(buildFlagProblems(info, _commands(flags), {'json'}))
-        .contains('runtime flags pass optimisation levels [-O2], not [-O3]');
-    check(buildFlagProblems(info, _commands(flags), {'json'}))
-        .contains('grammarCompile flags pass -DNDEBUG');
+    check(
+      buildFlagProblems(info, _commands(flags), {'json'}),
+    ).contains('runtime flags pass optimisation levels [-O2], not [-O3]');
+    check(
+      buildFlagProblems(info, _commands(flags), {'json'}),
+    ).contains('grammarCompile flags pass -DNDEBUG');
   });
 
   test('an environment carrying CFLAGS is reported', () {
@@ -149,32 +158,36 @@ void main() {
       environment: {...runtime.environment, 'CFLAGS': '-O0'},
     );
 
-    check(buildFlagProblems(
-        _info(flags), [leaky, ...commands.skip(1)], {'json'})).deepEquals([
+    check(
+      buildFlagProblems(_info(flags), [leaky, ...commands.skip(1)], {'json'}),
+    ).deepEquals([
       '../../../output/libtree-sitter.dylib: environment has CFLAGS',
     ]);
   });
 
   test('a grammar that was never linked is reported', () {
-    check(buildFlagProblems(_info(flags), _commands(flags), {'json', 'c'}))
-        .deepEquals(['c: never linked', '1 links for 2 grammars']);
+    check(
+      buildFlagProblems(_info(flags), _commands(flags), {'json', 'c'}),
+    ).deepEquals(['c: never linked', '1 links for 2 grammars']);
   });
 
-  test('the compiler environment keeps only PATH, TMPDIR and DEVELOPER_DIR',
-      () {
-    final environment = compilerEnvironment({
-      'PATH': '/opt/homebrew/bin:/usr/bin',
-      'TMPDIR': '/tmp/x/',
-      'CFLAGS': '-O0',
-      'CPPFLAGS': '-DNDEBUG',
-      'LDFLAGS': '-Wl,-x',
-      'CCC_OVERRIDE_OPTIONS': '+-O0',
-      'SDKROOT': '/elsewhere',
-    });
+  test(
+    'the compiler environment keeps only PATH, TMPDIR and DEVELOPER_DIR',
+    () {
+      final environment = compilerEnvironment({
+        'PATH': '/opt/homebrew/bin:/usr/bin',
+        'TMPDIR': '/tmp/x/',
+        'CFLAGS': '-O0',
+        'CPPFLAGS': '-DNDEBUG',
+        'LDFLAGS': '-Wl,-x',
+        'CCC_OVERRIDE_OPTIONS': '+-O0',
+        'SDKROOT': '/elsewhere',
+      });
 
-    check(environment).deepEquals({
-      'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
-      'TMPDIR': '/tmp/x/',
-    });
-  });
+      check(environment).deepEquals({
+        'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+        'TMPDIR': '/tmp/x/',
+      });
+    },
+  );
 }

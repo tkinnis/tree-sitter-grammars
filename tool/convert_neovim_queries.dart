@@ -42,8 +42,10 @@ void main(List<String> args) async {
   print('  Files processed: $filesProcessed');
   print('  Files modified: $filesModified');
   print('\nNext steps:');
-  print('  1. Manually merge inherited queries '
-      '(cpp, javascript, typescript, tsx, objc, php)');
+  print(
+    '  1. Manually merge inherited queries '
+    '(cpp, javascript, typescript, tsx, objc, php)',
+  );
   print('  2. Run: dart run tool/build_tree_sitter_grammars.dart');
   print('  3. Test the changes');
 }
@@ -105,8 +107,10 @@ Future<bool> convertQueryFile(File file) async {
   }
 
   // Step 7: Remove #set-lang-from-info-string! directives
-  final setLangPattern =
-      RegExp(r'\s*\(#set-lang-from-info-string!\s+[^)]+\)\s*', multiLine: true);
+  final setLangPattern = RegExp(
+    r'\s*\(#set-lang-from-info-string!\s+[^)]+\)\s*',
+    multiLine: true,
+  );
   if (content.contains(setLangPattern)) {
     content = content.replaceAll(setLangPattern, '\n');
     modified = true;
@@ -232,11 +236,7 @@ Map<String, dynamic>? extractQueryPattern(List<String> lines, int startIndex) {
 
     // Pattern is complete when depth returns to 0
     if (depth == 0) {
-      return {
-        'lines': patternLines,
-        'startIndex': startIndex,
-        'endIndex': i,
-      };
+      return {'lines': patternLines, 'startIndex': startIndex, 'endIndex': i};
     }
   }
 

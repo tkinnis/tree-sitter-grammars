@@ -38,36 +38,48 @@ Future<void> checkReleasePreflight(
 }) async {
   final status = (await git(root, ['status', '--porcelain'])).trim();
   if (status.isNotEmpty) {
-    throw ReleaseException('a release builds from a clean working tree:\n'
-        '$status');
+    throw ReleaseException(
+      'a release builds from a clean working tree:\n'
+      '$status',
+    );
   }
-  final gitlink = (await git(root, ['ls-tree', 'HEAD', 'tree-sitter']))
-      .trim()
-      .split(RegExp(r'\s+'));
+  final gitlink = (await git(root, [
+    'ls-tree',
+    'HEAD',
+    'tree-sitter',
+  ])).trim().split(RegExp(r'\s+'));
   final recorded = gitlink.length < 3 ? 'nothing' : gitlink[2];
   if (recorded != runtimeCommit) {
-    throw ReleaseException('HEAD records the tree-sitter submodule at '
-        '$recorded, not $runtimeCommit');
+    throw ReleaseException(
+      'HEAD records the tree-sitter submodule at '
+      '$recorded, not $runtimeCommit',
+    );
   }
   if (dryRun) return;
   final String tagObject;
   try {
-    tagObject =
-        (await git(root, ['show-ref', '--verify', 'refs/tags/$release']))
-            .trim()
-            .split(' ')
-            .first;
+    tagObject = (await git(root, [
+      'show-ref',
+      '--verify',
+      'refs/tags/$release',
+    ])).trim().split(' ').first;
   } on GitException {
-    throw ReleaseException('no tag $release; tag the release commit with '
-        'git tag -a $release');
+    throw ReleaseException(
+      'no tag $release; tag the release commit with '
+      'git tag -a $release',
+    );
   }
   if ((await git(root, ['cat-file', '-t', tagObject])).trim() != 'tag') {
-    throw ReleaseException('$release is a lightweight tag; a release tag '
-        'is annotated: git tag -a $release');
+    throw ReleaseException(
+      '$release is a lightweight tag; a release tag '
+      'is annotated: git tag -a $release',
+    );
   }
-  final tagged =
-      (await git(root, ['rev-parse', '--verify', '$tagObject^{commit}']))
-          .trim();
+  final tagged = (await git(root, [
+    'rev-parse',
+    '--verify',
+    '$tagObject^{commit}',
+  ])).trim();
   final head = (await git(root, ['rev-parse', 'HEAD'])).trim();
   if (tagged != head) {
     throw ReleaseException('HEAD is $head, but $release is $tagged');

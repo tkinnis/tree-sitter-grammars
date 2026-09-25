@@ -8,14 +8,14 @@ import '../tool/src/query_provenance.dart';
 const _commit = '0123456789abcdef0123456789abcdef01234567';
 
 Map<String, Object?> _nvimEntry({bool changed = true}) => {
-      'origin': 'nvim',
-      'changed': changed,
-      'upstream': {
-        'repo': 'https://github.com/nvim-treesitter/nvim-treesitter',
-        'commit': _commit,
-        'path': 'queries/c/highlights.scm',
-      },
-    };
+  'origin': 'nvim',
+  'changed': changed,
+  'upstream': {
+    'repo': 'https://github.com/nvim-treesitter/nvim-treesitter',
+    'commit': _commit,
+    'path': 'queries/c/highlights.scm',
+  },
+};
 
 const _hereEntry = {'origin': 'here', 'changed': false, 'upstream': null};
 
@@ -26,10 +26,10 @@ void main() {
       'queries/c/tags.scm': _hereEntry,
     });
 
-    final reading = readQueryProvenance(
-      json,
-      ['queries/c/highlights.scm', 'queries/c/tags.scm'],
-    );
+    final reading = readQueryProvenance(json, [
+      'queries/c/highlights.scm',
+      'queries/c/tags.scm',
+    ]);
 
     check(reading.problems).isEmpty();
     check(reading.entries['queries/c/highlights.scm'])
@@ -41,10 +41,10 @@ void main() {
   test('a query file with no entry is reported', () {
     final json = jsonEncode({'queries/c/highlights.scm': _nvimEntry()});
 
-    final reading = readQueryProvenance(
-      json,
-      ['queries/c/highlights.scm', 'queries/c/tags.scm'],
-    );
+    final reading = readQueryProvenance(json, [
+      'queries/c/highlights.scm',
+      'queries/c/tags.scm',
+    ]);
 
     check(reading.problems).deepEquals(['queries/c/tags.scm: no entry']);
   });
@@ -57,8 +57,9 @@ void main() {
 
     final reading = readQueryProvenance(json, ['queries/c/highlights.scm']);
 
-    check(reading.problems)
-        .deepEquals(['queries/c/gone.scm: entry names no query file']);
+    check(
+      reading.problems,
+    ).deepEquals(['queries/c/gone.scm: entry names no query file']);
   });
 
   test('a duplicated key is reported although the decoder keeps one', () {
@@ -71,7 +72,8 @@ void main() {
   });
 
   test('a key duplicated inside an entry is reported', () {
-    const json = '{"queries/c/highlights.scm": {"origin": "nvim", '
+    const json =
+        '{"queries/c/highlights.scm": {"origin": "nvim", '
         '"changed": false, "changed": true, "upstream": {'
         '"repo": "https://github.com/nvim-treesitter/nvim-treesitter", '
         '"commit": "$_commit", "commit": "$_commit", '
@@ -86,17 +88,20 @@ void main() {
   });
 
   test('a key escaped two ways is one key', () {
-    const json = r'{"queries/c/tags.scm": {"origin": "here", '
+    const json =
+        r'{"queries/c/tags.scm": {"origin": "here", '
         r'"changed": false, "upstream": null, "\u006frigin": "here"}}';
 
     final reading = readQueryProvenance(json, ['queries/c/tags.scm']);
 
-    check(reading.problems)
-        .deepEquals(['queries/c/tags.scm: origin appears 2 times']);
+    check(
+      reading.problems,
+    ).deepEquals(['queries/c/tags.scm: origin appears 2 times']);
   });
 
   test('duplicateKeys names array indexes and skips braces in strings', () {
-    const json = r'{"s": "a \"{\" b", "list": [1, {"x": 1, "x": 2}], '
+    const json =
+        r'{"s": "a \"{\" b", "list": [1, {"x": 1, "x": 2}], '
         r'"s": ""}';
 
     check([
@@ -111,10 +116,10 @@ void main() {
       'queries/c/locals.scm': _nvimEntry(),
     });
 
-    final reading = readQueryProvenance(
-      json,
-      ['queries/c/highlights.scm', 'queries/c/locals.scm'],
-    );
+    final reading = readQueryProvenance(json, [
+      'queries/c/highlights.scm',
+      'queries/c/locals.scm',
+    ]);
 
     check(reading.problems).isEmpty();
   });
@@ -138,8 +143,9 @@ void main() {
 
     final reading = readQueryProvenance(json, ['queries/c/tags.scm']);
 
-    check(reading.problems)
-        .deepEquals(['queries/c/tags.scm: origin grammar needs an upstream']);
+    check(
+      reading.problems,
+    ).deepEquals(['queries/c/tags.scm: origin grammar needs an upstream']);
   });
 
   test('an abbreviated commit, an unknown origin and a stray field fail', () {
@@ -150,10 +156,10 @@ void main() {
       'queries/c/tags.scm': {..._hereEntry, 'origin': 'elsewhere', 'note': 'x'},
     });
 
-    final reading = readQueryProvenance(
-      json,
-      ['queries/c/highlights.scm', 'queries/c/tags.scm'],
-    );
+    final reading = readQueryProvenance(json, [
+      'queries/c/highlights.scm',
+      'queries/c/tags.scm',
+    ]);
 
     check(reading.problems).unorderedEquals([
       'queries/c/highlights.scm: upstream.commit must be 40 lowercase hex '
@@ -174,10 +180,10 @@ void main() {
       },
     });
 
-    final reading = readQueryProvenance(
-      json,
-      ['queries/c/highlights.scm', 'queries/c/tags.scm'],
-    );
+    final reading = readQueryProvenance(json, [
+      'queries/c/highlights.scm',
+      'queries/c/tags.scm',
+    ]);
 
     check(reading.problems).deepEquals([
       'queries/c/highlights.scm: nvimUpstream belongs only to origin both',

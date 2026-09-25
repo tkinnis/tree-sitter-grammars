@@ -7,18 +7,18 @@ import 'package:test/test.dart';
 import '../tool/src/toolchain.dart';
 
 Map<String, Object?> _valid() => {
-      'treeSitter': {
-        'tag': 'v0.27.0',
-        'commit': '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
-      },
-      'treeSitterCli': {
-        'version': '0.27.0',
-        'asset': 'tree-sitter-macos-arm64.gz',
-        'sha256':
-            '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e',
-      },
-      'macos': {'arch': 'arm64', 'deploymentTarget': '13.0'},
-    };
+  'treeSitter': {
+    'tag': 'v0.27.0',
+    'commit': '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+  },
+  'treeSitterCli': {
+    'version': '0.27.0',
+    'asset': 'tree-sitter-macos-arm64.gz',
+    'sha256':
+        '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e',
+  },
+  'macos': {'arch': 'arm64', 'deploymentTarget': '13.0'},
+};
 
 void main() {
   test('the committed toolchain.json parses', () {
@@ -31,8 +31,9 @@ void main() {
       ..has((t) => t.runtimeVersion, 'runtimeVersion').equals('0.27.0')
       ..has((t) => t.deploymentTarget, 'deploymentTarget').equals('13.0')
       ..has((t) => t.cliUrl.toString(), 'cliUrl').equals(
-          'https://github.com/tree-sitter/tree-sitter/releases/download/'
-          'v0.27.0/tree-sitter-macos-arm64.gz');
+        'https://github.com/tree-sitter/tree-sitter/releases/download/'
+        'v0.27.0/tree-sitter-macos-arm64.gz',
+      );
   });
 
   test('an abbreviated runtime commit is refused', () {

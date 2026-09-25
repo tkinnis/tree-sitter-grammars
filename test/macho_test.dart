@@ -25,8 +25,9 @@ void main() {
 
   setUpAll(() {
     scratch = Directory.systemTemp.createTempSync('macho_test').path;
-    File(p.join(scratch, 'x.c'))
-        .writeAsStringSync('const void *tree_sitter_x(void) { return 0; }\n');
+    File(
+      p.join(scratch, 'x.c'),
+    ).writeAsStringSync('const void *tree_sitter_x(void) { return 0; }\n');
   });
 
   tearDownAll(() => Directory(scratch).deleteSync(recursive: true));
@@ -58,13 +59,13 @@ void main() {
   }
 
   Future<List<String>> problems(String path) => libraryProblems(
-        LibraryExpectation(
-          path: path,
-          installName: '@rpath/libx.dylib',
-          exportedSymbols: const ['_tree_sitter_x'],
-        ),
-        _toolchain,
-      );
+    LibraryExpectation(
+      path: path,
+      installName: '@rpath/libx.dylib',
+      exportedSymbols: const ['_tree_sitter_x'],
+    ),
+    _toolchain,
+  );
 
   test('a library built as the toolchain says has no problems', () async {
     check(await problems(await library('good'))).isEmpty();
@@ -85,13 +86,16 @@ void main() {
   test('another install name is reported', () async {
     final path = await library('named', installName: '/usr/local/libx.dylib');
 
-    check(await problems(path))
-        .deepEquals(['$path: install name /usr/local/libx.dylib']);
+    check(
+      await problems(path),
+    ).deepEquals(['$path: install name /usr/local/libx.dylib']);
   });
 
   test('a dependency beyond libSystem is reported', () async {
-    final path =
-        await library('linked', flags: ['-framework', 'CoreFoundation']);
+    final path = await library(
+      'linked',
+      flags: ['-framework', 'CoreFoundation'],
+    );
 
     check(await problems(path)).single.startsWith('$path: depends on [');
   });

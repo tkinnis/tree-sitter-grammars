@@ -31,13 +31,14 @@ void main() async {
   int failedQueries = 0;
 
   // Get all language directories
-  final languages = queriesDir
-      .listSync()
-      .whereType<Directory>()
-      .map((d) => d.path.split('/').last)
-      .where((name) => name.isNotEmpty && !name.startsWith('.'))
-      .toList()
-    ..sort();
+  final languages =
+      queriesDir
+          .listSync()
+          .whereType<Directory>()
+          .map((d) => d.path.split('/').last)
+          .where((name) => name.isNotEmpty && !name.startsWith('.'))
+          .toList()
+        ..sort();
 
   print('Found ${languages.length} languages');
   print('');
@@ -97,8 +98,9 @@ void main() async {
     print('Failed queries by language:');
     for (final lang in results.keys) {
       final queriesMap = results[lang]!['queries'] as Map<String, String>;
-      final failed =
-          queriesMap.entries.where((e) => e.value.startsWith('FAIL')).toList();
+      final failed = queriesMap.entries
+          .where((e) => e.value.startsWith('FAIL'))
+          .toList();
       if (failed.isNotEmpty) {
         print('  $lang:');
         for (final entry in failed) {

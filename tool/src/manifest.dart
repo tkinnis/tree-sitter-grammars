@@ -36,9 +36,9 @@ String _capitalize(String text) =>
 
 /// Which of [queryKinds] `queries/<name>/` under [root] holds.
 Map<String, bool> queryAvailability(String root, String name) => {
-      for (final kind in queryKinds)
-        kind: File(p.join(root, 'queries', name, '$kind.scm')).existsSync(),
-    };
+  for (final kind in queryKinds)
+    kind: File(p.join(root, 'queries', name, '$kind.scm')).existsSync(),
+};
 
 /// The manifest entry of a compiled grammar.
 ///
@@ -51,7 +51,8 @@ Map<String, Object?> grammarEntry(String root, GrammarBuild build, int abi) {
       (entry['file-types'] ?? metadata['file-types'] ?? [build.name]) as List;
   final filenames = entry['filenames'] as List?;
   return {
-    'displayName': entry['displayName'] ??
+    'displayName':
+        entry['displayName'] ??
         metadata['camelcase'] ??
         metadata['camel-case-name'] ??
         _capitalize(build.name),
@@ -95,7 +96,8 @@ Map<String, Object?> queryOnlyEntry(Map<String, Object?> entry) {
     'extensions': entry['extensions'] ?? const <String>[],
     'queryOnly': true,
     'queries_dir': 'queries/$name',
-    'queries': entry['queries'] ??
+    'queries':
+        entry['queries'] ??
         {for (final kind in queryKinds) kind: kind == 'highlights'},
   };
 }
@@ -117,18 +119,20 @@ void bundleQueries(
     throw ManifestException('$name: no queries/$name/config.json');
   }
   Directory(destination).createSync(recursive: true);
-  final queryFiles = source
-      .listSync()
-      .whereType<File>()
-      .where((file) => file.path.endsWith('.scm'))
-      .toList()
-    ..sort((a, b) => a.path.compareTo(b.path));
+  final queryFiles =
+      source
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.endsWith('.scm'))
+          .toList()
+        ..sort((a, b) => a.path.compareTo(b.path));
   for (final file in queryFiles) {
     file.copySync(p.join(destination, p.basename(file.path)));
   }
   final json = jsonDecode(config.readAsStringSync()) as Map<String, Object?>;
-  File(p.join(destination, 'config.json'))
-      .writeAsStringSync(_encoder.convert({...json, 'queries': queries}));
+  File(
+    p.join(destination, 'config.json'),
+  ).writeAsStringSync(_encoder.convert({...json, 'queries': queries}));
 }
 
 /// Encodes [manifest] as `output/manifest.json` is written.

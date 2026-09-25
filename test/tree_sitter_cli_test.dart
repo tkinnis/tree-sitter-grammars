@@ -13,20 +13,24 @@ const _executable = '#!/bin/sh\necho tree-sitter 0.27.0\n';
 /// under test.
 String _sha256(List<int> bytes, String scratch) {
   final file = File(p.join(scratch, 'digest-input'))..writeAsBytesSync(bytes);
-  final result =
-      Process.runSync('openssl', ['dgst', '-sha256', '-r', file.path]);
+  final result = Process.runSync('openssl', [
+    'dgst',
+    '-sha256',
+    '-r',
+    file.path,
+  ]);
   return (result.stdout as String).split(' ').first;
 }
 
 Toolchain _toolchain(String sha256) => Toolchain(
-      treeSitterTag: 'v0.27.0',
-      treeSitterCommit: '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
-      cliVersion: '0.27.0',
-      cliAsset: 'tree-sitter-macos-arm64.gz',
-      cliSha256: sha256,
-      arch: 'arm64',
-      deploymentTarget: '13.0',
-    );
+  treeSitterTag: 'v0.27.0',
+  treeSitterCommit: '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+  cliVersion: '0.27.0',
+  cliAsset: 'tree-sitter-macos-arm64.gz',
+  cliSha256: sha256,
+  arch: 'arm64',
+  deploymentTarget: '13.0',
+);
 
 void main() {
   late String root;
@@ -44,9 +48,9 @@ void main() {
   tearDown(() => Directory(root).deleteSync(recursive: true));
 
   Downloader serving(List<int> bytes) => (url, destination) async {
-        downloads.add(url);
-        File(destination).writeAsBytesSync(bytes);
-      };
+    downloads.add(url);
+    File(destination).writeAsBytesSync(bytes);
+  };
 
   String cached(String name) => p.join(root, '.cache', name);
 
@@ -61,10 +65,13 @@ void main() {
   test('refuses an asset whose sha256 is not the pinned one', () async {
     final tampered = gzip.encode('#!/bin/sh\necho evil\n'.codeUnits);
 
-    await check(ensureCli(root, toolchain, download: serving(tampered)))
-        .throws<CliException>((it) => it
-            .has((e) => e.message, 'message')
-            .contains('toolchain.json expects ${toolchain.cliSha256}'));
+    await check(
+      ensureCli(root, toolchain, download: serving(tampered)),
+    ).throws<CliException>(
+      (it) => it
+          .has((e) => e.message, 'message')
+          .contains('toolchain.json expects ${toolchain.cliSha256}'),
+    );
     check(File(cached('tree-sitter-0.27.0')).existsSync()).isFalse();
   });
 
@@ -93,14 +100,18 @@ void main() {
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('');
 
-    await check(generateParser(
-      cli: '/nonexistent/tree-sitter',
-      grammarDirectory: p.join(root, 'grammar'),
-      outputDirectory: p.join(root, 'gen'),
-      abi: 15,
-    )).throws<CliException>((it) => it
-        .has((e) => e.message, 'message')
-        .contains('commits src/parser.c; it is never generated'));
+    await check(
+      generateParser(
+        cli: '/nonexistent/tree-sitter',
+        grammarDirectory: p.join(root, 'grammar'),
+        outputDirectory: p.join(root, 'gen'),
+        abi: 15,
+      ),
+    ).throws<CliException>(
+      (it) => it
+          .has((e) => e.message, 'message')
+          .contains('commits src/parser.c; it is never generated'),
+    );
     check(Directory(p.join(root, 'gen')).existsSync()).isFalse();
   });
 }

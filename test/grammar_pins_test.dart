@@ -21,8 +21,9 @@ Future<String> Function(String, List<String>) _fakeGit(
 
 void main() {
   test('the committed grammars.json is fully pinned', () {
-    final entries =
-        parseGrammars(File('tool/grammars.json').readAsStringSync());
+    final entries = parseGrammars(
+      File('tool/grammars.json').readAsStringSync(),
+    );
 
     check(pinProblems(entries)).isEmpty();
     check(entries.where((entry) => entry['url'] != null)).length.equals(46);
@@ -54,12 +55,12 @@ void main() {
       {
         'url': 'https://github.com/a/tree-sitter-a',
         'commit': _sha,
-        'license': 'MIT'
+        'license': 'MIT',
       },
       {
         'url': 'https://github.com/a/tree-sitter-a.git/',
         'commit': _sha,
-        'license': 'MIT'
+        'license': 'MIT',
       },
     ]);
 
@@ -76,14 +77,16 @@ void main() {
       },
     ]);
 
-    check(json).equals('[\n'
-        '  {\n'
-        '    "url": "https://github.com/a/tree-sitter-a",\n'
-        '    "commit": "$_sha",\n'
-        '    "license": "MIT",\n'
-        '    "highlights": "queries/highlights.scm"\n'
-        '  }\n'
-        ']\n');
+    check(json).equals(
+      '[\n'
+      '  {\n'
+      '    "url": "https://github.com/a/tree-sitter-a",\n'
+      '    "commit": "$_sha",\n'
+      '    "license": "MIT",\n'
+      '    "highlights": "queries/highlights.scm"\n'
+      '  }\n'
+      ']\n',
+    );
   });
 
   test('a new pin drops the sourceCommit of the one it replaces', () {
@@ -95,25 +98,30 @@ void main() {
 
     check(withPin(entry, _sha))
       ..has((pinned) => pinned['commit'], 'commit').equals(_sha)
-      ..has((pinned) => pinned.containsKey('sourceCommit'), 'has sourceCommit')
-          .isFalse();
-    check(withPin(entry, _sha, sourceCommit: _sha)['sourceCommit'])
-        .equals(_sha);
+      ..has(
+        (pinned) => pinned.containsKey('sourceCommit'),
+        'has sourceCommit',
+      ).isFalse();
+    check(
+      withPin(entry, _sha, sourceCommit: _sha)['sourceCommit'],
+    ).equals(_sha);
   });
 
   group('pinFromCheckout', () {
     const url = 'https://github.com/tree-sitter/tree-sitter-ocaml';
 
-    test('pins HEAD when origin matches and a remote branch contains it',
-        () async {
-      final git = _fakeGit({
-        'remote get-url origin': '$url.git\n',
-        'rev-parse HEAD': '$_sha\n',
-        'branch -r --contains $_sha --list origin/*': '  origin/master\n',
-      });
+    test(
+      'pins HEAD when origin matches and a remote branch contains it',
+      () async {
+        final git = _fakeGit({
+          'remote get-url origin': '$url.git\n',
+          'rev-parse HEAD': '$_sha\n',
+          'branch -r --contains $_sha --list origin/*': '  origin/master\n',
+        });
 
-      check(await pinFromCheckout(git, 'grammars/x', url)).equals(_sha);
-    });
+        check(await pinFromCheckout(git, 'grammars/x', url)).equals(_sha);
+      },
+    );
 
     test('refuses a checkout whose origin is another repository', () async {
       final git = _fakeGit({
@@ -150,15 +158,18 @@ void main() {
 
     setUpAll(() async {
       temporary = Directory.systemTemp.createTempSync('pins_test');
-      final upstream =
-          await FixtureRepository.create(p.join(temporary.path, 'upstream'));
+      final upstream = await FixtureRepository.create(
+        p.join(temporary.path, 'upstream'),
+      );
       onOrigin = await upstream.commit({'grammar.js': bytes('a')});
-      final fork =
-          await FixtureRepository.create(p.join(temporary.path, 'fork'));
+      final fork = await FixtureRepository.create(
+        p.join(temporary.path, 'fork'),
+      );
       await fork.git(['pull', '--quiet', upstream.path, 'main']);
       onForkOnly = await fork.commit({'grammar.js': bytes('b')});
-      store = (await FixtureRepository.create(p.join(temporary.path, 'store')))
-          .path;
+      store = (await FixtureRepository.create(
+        p.join(temporary.path, 'store'),
+      )).path;
       await fixtureGit(store, ['remote', 'add', 'origin', upstream.path]);
       await fixtureGit(store, ['remote', 'add', 'fork', fork.path]);
       await fixtureGit(store, ['fetch', '--quiet', '--all']);
@@ -171,8 +182,9 @@ void main() {
     });
 
     test('refuses a commit that only another remote contains', () async {
-      await check(requireOnOrigin(runGit, store, onForkOnly, 'tree-sitter-x'))
-          .throws<PinException>(
+      await check(
+        requireOnOrigin(runGit, store, onForkOnly, 'tree-sitter-x'),
+      ).throws<PinException>(
         (it) => it
             .has((e) => e.message, 'message')
             .equals('tree-sitter-x: no branch on origin contains $onForkOnly'),

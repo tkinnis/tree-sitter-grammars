@@ -31,10 +31,12 @@ void main(List<String> args) async {
   await tempDir.create();
 
   print('Extracting release archive...');
-  final extractResult = await Process.run(
-    'tar',
-    ['-xzf', archiveFile.path, '-C', tempDir.path],
-  );
+  final extractResult = await Process.run('tar', [
+    '-xzf',
+    archiveFile.path,
+    '-C',
+    tempDir.path,
+  ]);
   if (extractResult.exitCode != 0) {
     print('Error extracting archive: ${extractResult.stderr}');
     exit(1);
@@ -73,8 +75,9 @@ void main(List<String> args) async {
     Map<String, dynamic> released;
 
     try {
-      current = jsonDecode(await currentConfig.readAsString())
-          as Map<String, dynamic>;
+      current =
+          jsonDecode(await currentConfig.readAsString())
+              as Map<String, dynamic>;
     } catch (e) {
       print('$lang: Error reading current config: $e');
       continue;
@@ -87,8 +90,9 @@ void main(List<String> args) async {
     }
 
     try {
-      released = jsonDecode(await releasedConfig.readAsString())
-          as Map<String, dynamic>;
+      released =
+          jsonDecode(await releasedConfig.readAsString())
+              as Map<String, dynamic>;
     } catch (e) {
       print('$lang: Error reading released config: $e');
       continue;

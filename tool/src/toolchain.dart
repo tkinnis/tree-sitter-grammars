@@ -43,30 +43,48 @@ final class Toolchain {
     final cli = _object(root, 'treeSitterCli');
     final macos = _object(root, 'macos');
     final toolchain = Toolchain(
-      treeSitterTag:
-          _string(treeSitter, 'treeSitter.tag', RegExp(r'^v\d+\.\d+\.\d+$')),
-      treeSitterCommit:
-          _string(treeSitter, 'treeSitter.commit', RegExp(r'^[0-9a-f]{40}$')),
-      cliVersion:
-          _string(cli, 'treeSitterCli.version', RegExp(r'^\d+\.\d+\.\d+$')),
+      treeSitterTag: _string(
+        treeSitter,
+        'treeSitter.tag',
+        RegExp(r'^v\d+\.\d+\.\d+$'),
+      ),
+      treeSitterCommit: _string(
+        treeSitter,
+        'treeSitter.commit',
+        RegExp(r'^[0-9a-f]{40}$'),
+      ),
+      cliVersion: _string(
+        cli,
+        'treeSitterCli.version',
+        RegExp(r'^\d+\.\d+\.\d+$'),
+      ),
       cliAsset: _string(cli, 'treeSitterCli.asset', RegExp(r'^[\w.-]+\.gz$')),
-      cliSha256:
-          _string(cli, 'treeSitterCli.sha256', RegExp(r'^[0-9a-f]{64}$')),
+      cliSha256: _string(
+        cli,
+        'treeSitterCli.sha256',
+        RegExp(r'^[0-9a-f]{64}$'),
+      ),
       arch: _string(macos, 'macos.arch', RegExp(r'^arm64$')),
-      deploymentTarget:
-          _string(macos, 'macos.deploymentTarget', RegExp(r'^\d+\.\d+$')),
+      deploymentTarget: _string(
+        macos,
+        'macos.deploymentTarget',
+        RegExp(r'^\d+\.\d+$'),
+      ),
     );
     if (toolchain.runtimeVersion != toolchain.cliVersion) {
-      throw ToolchainException('treeSitterCli.version '
-          '${toolchain.cliVersion} differs from treeSitter.tag '
-          '${toolchain.treeSitterTag}');
+      throw ToolchainException(
+        'treeSitterCli.version '
+        '${toolchain.cliVersion} differs from treeSitter.tag '
+        '${toolchain.treeSitterTag}',
+      );
     }
     return toolchain;
   }
 
   /// Reads `tool/toolchain.json` under [repositoryRoot].
   factory Toolchain.load(String repositoryRoot) => Toolchain.parse(
-      File('$repositoryRoot/tool/toolchain.json').readAsStringSync());
+    File('$repositoryRoot/tool/toolchain.json').readAsStringSync(),
+  );
 
   /// The runtime's release tag, for example `v0.27.0`.
   final String treeSitterTag;
@@ -94,8 +112,10 @@ final class Toolchain {
   String get runtimeVersion => treeSitterTag.substring(1);
 
   /// Where the CLI release asset is downloaded from.
-  Uri get cliUrl => Uri.parse('https://github.com/tree-sitter/tree-sitter/'
-      'releases/download/v$cliVersion/$cliAsset');
+  Uri get cliUrl => Uri.parse(
+    'https://github.com/tree-sitter/tree-sitter/'
+    'releases/download/v$cliVersion/$cliAsset',
+  );
 }
 
 Map<String, Object?> _object(Object? root, String key) {

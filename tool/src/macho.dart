@@ -47,14 +47,17 @@ Future<List<String>> libraryProblems(
   final problems = <String>[];
   final archs = (await _tool(['lipo', '-archs', path])).trim();
   if (archs != toolchain.arch) problems.add('$path: architectures $archs');
-  final id =
-      (await _tool(['otool', '-D', path])).trim().split('\n').skip(1).join();
+  final id = (await _tool([
+    'otool',
+    '-D',
+    path,
+  ])).trim().split('\n').skip(1).join();
   if (id != expectation.installName) problems.add('$path: install name $id');
   final loadCommands = await _tool(['otool', '-l', path]);
-  final minos = RegExp(r'^\s*minos (\S+)$', multiLine: true)
-      .allMatches(loadCommands)
-      .map((match) => match.group(1))
-      .toList();
+  final minos = RegExp(
+    r'^\s*minos (\S+)$',
+    multiLine: true,
+  ).allMatches(loadCommands).map((match) => match.group(1)).toList();
   if (minos.length != 1 || minos.single != toolchain.deploymentTarget) {
     problems.add('$path: minos $minos');
   }
@@ -71,10 +74,11 @@ Future<List<String>> libraryProblems(
       dependencies.single != '/usr/lib/libSystem.B.dylib') {
     problems.add('$path: depends on $dependencies');
   }
-  final exported = (await _tool(['nm', '-gU', path]))
-      .split('\n')
-      .map((line) => line.trim().split(' ').last)
-      .toSet();
+  final exported = (await _tool([
+    'nm',
+    '-gU',
+    path,
+  ])).split('\n').map((line) => line.trim().split(' ').last).toSet();
   for (final symbol in expectation.exportedSymbols) {
     if (!exported.contains(symbol)) problems.add('$path: no $symbol');
   }

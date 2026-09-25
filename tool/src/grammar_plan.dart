@@ -89,12 +89,14 @@ List<GrammarBuild> planGrammars(
   for (final entry in entries) {
     if (entry['url'] is! String) continue;
     if (entry['name'] case final String name) {
-      builds.add(GrammarBuild(
-        name: name,
-        entry: entry,
-        metadata: entry,
-        path: entry['path'] as String? ?? '.',
-      ));
+      builds.add(
+        GrammarBuild(
+          name: name,
+          entry: entry,
+          metadata: entry,
+          path: entry['path'] as String? ?? '.',
+        ),
+      );
       continue;
     }
     final repository = repositoryName(entry['url']! as String);
@@ -104,16 +106,20 @@ List<GrammarBuild> planGrammars(
         ? declared
         : declared.where((grammar) => selected.contains(grammar['name']));
     if (selected != null && chosen.length != selected.length) {
-      throw GrammarPlanException('$repository: tree-sitter.json lacks one of '
-          '${selected.join(', ')}');
+      throw GrammarPlanException(
+        '$repository: tree-sitter.json lacks one of '
+        '${selected.join(', ')}',
+      );
     }
     for (final grammar in chosen) {
-      builds.add(GrammarBuild(
-        name: grammar['name']! as String,
-        entry: entry,
-        metadata: grammar,
-        path: grammar['path'] as String? ?? '.',
-      ));
+      builds.add(
+        GrammarBuild(
+          name: grammar['name']! as String,
+          entry: entry,
+          metadata: grammar,
+          path: grammar['path'] as String? ?? '.',
+        ),
+      );
     }
   }
   final names = <String>{};
@@ -129,17 +135,22 @@ List<Map<String, Object?>> _treeSitterJsonGrammars(
   String root,
   String repository,
 ) {
-  final file =
-      File(p.join(root, 'build', 'src', repository, 'tree-sitter.json'));
+  final file = File(
+    p.join(root, 'build', 'src', repository, 'tree-sitter.json'),
+  );
   if (!file.existsSync()) {
-    throw GrammarPlanException('$repository: no tree-sitter.json at its pin; '
-        'give its grammars.json entry a "name"');
+    throw GrammarPlanException(
+      '$repository: no tree-sitter.json at its pin; '
+      'give its grammars.json entry a "name"',
+    );
   }
   final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
   final grammars = json['grammars'];
   if (grammars is! List || grammars.isEmpty) {
-    throw GrammarPlanException('$repository: tree-sitter.json lists no '
-        'grammars');
+    throw GrammarPlanException(
+      '$repository: tree-sitter.json lists no '
+      'grammars',
+    );
   }
   return grammars.cast<Map<String, Object?>>();
 }
@@ -150,10 +161,13 @@ List<Map<String, Object?>> _treeSitterJsonGrammars(
 /// not compile.
 String? scannerSource(String root, GrammarBuild build) {
   for (final extension in const ['cc', 'cpp']) {
-    if (File(p.join(root, build.sourceDirectory, 'scanner.$extension'))
-        .existsSync()) {
-      throw GrammarPlanException('${build.name}: a C++ scanner '
-          '(scanner.$extension) is not supported');
+    if (File(
+      p.join(root, build.sourceDirectory, 'scanner.$extension'),
+    ).existsSync()) {
+      throw GrammarPlanException(
+        '${build.name}: a C++ scanner '
+        '(scanner.$extension) is not supported',
+      );
     }
   }
   final scanner = p.join(build.sourceDirectory, 'scanner.c');
@@ -164,8 +178,8 @@ String? scannerSource(String root, GrammarBuild build) {
 /// it has one, otherwise the generated ones.
 String scannerIncludeDirectory(String root, GrammarBuild build) =>
     Directory(p.join(root, build.sourceDirectory, 'tree_sitter')).existsSync()
-        ? build.sourceDirectory
-        : build.parserIncludeDirectory;
+    ? build.sourceDirectory
+    : build.parserIncludeDirectory;
 
 /// Checks that the extracted sources hold what [build]'s entry promises: a
 /// committed `parser.c`, or, for a generated grammar, a `grammar.json` and
@@ -175,23 +189,31 @@ void checkSources(String root, GrammarBuild build) {
   final committedParser = File(p.join(source, 'parser.c')).existsSync();
   if (build.generate) {
     if (committedParser) {
-      throw GrammarPlanException('${build.name}: commits src/parser.c, so it '
-          'must not be generated; remove "generate" from its entry');
+      throw GrammarPlanException(
+        '${build.name}: commits src/parser.c, so it '
+        'must not be generated; remove "generate" from its entry',
+      );
     }
     if (!File(p.join(source, 'grammar.json')).existsSync()) {
-      throw GrammarPlanException('${build.name}: no src/grammar.json to '
-          'generate from');
+      throw GrammarPlanException(
+        '${build.name}: no src/grammar.json to '
+        'generate from',
+      );
     }
   } else if (!committedParser) {
-    throw GrammarPlanException('${build.name}: no src/parser.c at '
-        '${build.commit}');
+    throw GrammarPlanException(
+      '${build.name}: no src/parser.c at '
+      '${build.commit}',
+    );
   }
 }
 
 /// The `LANGUAGE_VERSION` a generated `parser.c` declares: its ABI.
 int parserAbi(String parserSource) {
-  final match = RegExp(r'^#define LANGUAGE_VERSION (\d+)$', multiLine: true)
-      .firstMatch(File(parserSource).readAsStringSync());
+  final match = RegExp(
+    r'^#define LANGUAGE_VERSION (\d+)$',
+    multiLine: true,
+  ).firstMatch(File(parserSource).readAsStringSync());
   if (match == null) {
     throw GrammarPlanException('$parserSource declares no LANGUAGE_VERSION');
   }

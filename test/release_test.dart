@@ -17,8 +17,9 @@ void main() {
 
   setUp(() async {
     temporary = Directory.systemTemp.createTempSync('release_test');
-    repository =
-        await FixtureRepository.create(p.join(temporary.path, 'grammars'));
+    repository = await FixtureRepository.create(
+      p.join(temporary.path, 'grammars'),
+    );
     await repository.commit({'README.md': bytes('grammars\n')});
     // An uninitialised submodule: an empty directory at the gitlink.
     Directory(p.join(repository.path, 'tree-sitter')).createSync();
@@ -34,16 +35,17 @@ void main() {
   tearDown(() => temporary.deleteSync(recursive: true));
 
   Future<void> preflight({bool dryRun = false}) => checkReleasePreflight(
-        runGit,
-        repository.path,
-        'v1.1.0',
-        runtimeCommit: _runtime,
-        dryRun: dryRun,
-      );
+    runGit,
+    repository.path,
+    'v1.1.0',
+    runtimeCommit: _runtime,
+    dryRun: dryRun,
+  );
 
   Future<void> refuses(Future<void> Function() run, String message) =>
       check(run()).throws<ReleaseException>(
-          (it) => it.has((e) => e.message, 'message').contains(message));
+        (it) => it.has((e) => e.message, 'message').contains(message),
+      );
 
   test('accepts an annotated tag at HEAD', () async {
     await repository.git(['tag', '-a', 'v1.1.0', '-m', 'v1.1.0']);
@@ -83,8 +85,10 @@ void main() {
     ]);
     await repository.commit({});
 
-    await refuses(() => preflight(dryRun: true),
-        'records the tree-sitter submodule at ${'1' * 40}');
+    await refuses(
+      () => preflight(dryRun: true),
+      'records the tree-sitter submodule at ${'1' * 40}',
+    );
   });
 
   test('a dry run needs no tag', () async {

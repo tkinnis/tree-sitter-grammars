@@ -23,7 +23,7 @@ GrammarBuild _build(Map<String, Object?> pins) {
     entry: entry,
     metadata: const {
       'scope': 'source.x',
-      'file-types': ['x']
+      'file-types': ['x'],
     },
     path: 'grammars/x',
   );
@@ -36,8 +36,11 @@ void main() {
   tearDown(() => Directory(root).deleteSync(recursive: true));
 
   test('a committed parser names its pin, deploy source and licence', () {
-    final entry =
-        grammarEntry(root, _build({'sourceCommit': _sourceCommit}), 14);
+    final entry = grammarEntry(
+      root,
+      _build({'sourceCommit': _sourceCommit}),
+      14,
+    );
 
     check(entry['source']).isA<Map<String, Object?>>().deepEquals({
       'url': 'https://github.com/example/tree-sitter-x',
@@ -52,8 +55,9 @@ void main() {
   });
 
   test('a generated parser says so and names no deploy source', () {
-    final source = grammarEntry(root, _build({'generate': true}), 15)['source']
-        as Map<String, Object?>;
+    final source =
+        grammarEntry(root, _build({'generate': true}), 15)['source']
+            as Map<String, Object?>;
 
     check(source['parser']).equals('generated');
     check(source.containsKey('sourceCommit')).isFalse();
@@ -61,15 +65,17 @@ void main() {
   });
 
   test('a malformed source is reported field by field', () {
-    check(sourceProblems({
-      'url': 'git@github.com:example/tree-sitter-x',
-      'commit': _commit.substring(0, 12),
-      'path': '',
-      'parser': 'regenerated',
-      'abi': 16,
-      'license': '',
-      'note': 'x',
-    })).deepEquals([
+    check(
+      sourceProblems({
+        'url': 'git@github.com:example/tree-sitter-x',
+        'commit': _commit.substring(0, 12),
+        'path': '',
+        'parser': 'regenerated',
+        'abi': 16,
+        'license': '',
+        'note': 'x',
+      }),
+    ).deepEquals([
       'source.url must be an https URL',
       'source.commit must be 40 lowercase hex digits',
       'source.path must be a path',
@@ -103,8 +109,9 @@ void main() {
       });
 
       check(result.exitCode).equals(1);
-      check(result.stdout as String)
-          .contains('x: Missing required field "source"');
+      check(
+        result.stdout as String,
+      ).contains('x: Missing required field "source"');
     });
   });
 }
