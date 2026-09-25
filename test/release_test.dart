@@ -34,23 +34,18 @@ void main() {
 
   tearDown(() => temporary.deleteSync(recursive: true));
 
-  Future<void> preflight({bool dryRun = false}) => checkReleasePreflight(
-    runGit,
-    repository.path,
-    'v1.1.0',
-    runtimeCommit: _runtime,
-    dryRun: dryRun,
-  );
+  Future<String> preflight({bool dryRun = false}) =>
+      checkReleasePreflight(runGit, repository.path, 'v1.1.0', dryRun: dryRun);
 
   Future<void> refuses(Future<void> Function() run, String message) =>
       check(run()).throws<ReleaseException>(
         (it) => it.has((e) => e.message, 'message').contains(message),
       );
 
-  test('accepts an annotated tag at HEAD', () async {
+  test('accepts an annotated tag at HEAD, and returns HEAD', () async {
     await repository.git(['tag', '-a', 'v1.1.0', '-m', 'v1.1.0']);
 
-    await preflight();
+    check(await preflight()).equals(head);
   });
 
   test('refuses a branch named like the tag', () async {
@@ -77,23 +72,67 @@ void main() {
     await refuses(() => preflight(dryRun: true), 'clean working tree');
   });
 
-  test('refuses a runtime submodule at another commit', () async {
-    await repository.git([
-      'update-index',
-      '--cacheinfo',
-      '160000,${'1' * 40},tree-sitter',
-    ]);
-    await repository.commit({});
-
-    await refuses(
-      () => preflight(dryRun: true),
-      'records the tree-sitter submodule at ${'1' * 40}',
-    );
-  });
-
-  test('a dry run needs no tag', () async {
+  test('a dry run needs no tag, and returns HEAD', () async {
     await repository.git(['branch', 'v1.1.0']);
 
-    await preflight(dryRun: true);
+    check(await preflight(dryRun: true)).equals(head);
+  });
+
+  group('checkRecordedRuntime', () {
+    test('accepts the commit recording the pinned runtime', () async {
+      await checkRecordedRuntime(runGit, repository.path, head, _runtime);
+    });
+
+    test('refuses a commit recording another runtime', () async {
+      await repository.git([
+        'update-index',
+        '--cacheinfo',
+        '160000,${'1' * 40},tree-sitter',
+      ]);
+      final moved = await repository.commit({});
+
+      await refuses(
+        () => checkRecordedRuntime(runGit, repository.path, moved, _runtime),
+        'records the tree-sitter submodule at ${'1' * 40}',
+      );
+    });
+
+    test('reads the given commit, not HEAD', () async {
+      await repository.git([
+        'update-index',
+        '--cacheinfo',
+        '160000,${'1' * 40},tree-sitter',
+      ]);
+      await repository.commit({});
+
+      await checkRecordedRuntime(runGit, repository.path, head, _runtime);
+    });
+  });
+
+  group('checkUnchangedSince', () {
+    Future<void> unchanged() =>
+        checkUnchangedSince(runGit, repository.path, head);
+
+    test('accepts the same commit with a clean working tree', () async {
+      await unchanged();
+    });
+
+    test('refuses an edit to a committed file', () async {
+      File(p.join(repository.path, 'README.md')).writeAsStringSync('edited\n');
+
+      await refuses(unchanged, 'the working tree changed during the build');
+    });
+
+    test('refuses a file added to the working tree', () async {
+      File(p.join(repository.path, 'stray.txt')).writeAsStringSync('stray\n');
+
+      await refuses(unchanged, 'stray.txt');
+    });
+
+    test('refuses a commit made during the build', () async {
+      final next = await repository.commit({'README.md': bytes('next\n')});
+
+      await refuses(unchanged, 'HEAD moved from $head to $next');
+    });
   });
 }

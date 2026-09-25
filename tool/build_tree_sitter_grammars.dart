@@ -27,9 +27,13 @@
 /// every bundle's sha256.
 ///
 /// `--release=vX.Y.Z` first requires a clean working tree whose `HEAD` is
-/// the annotated tag `vX.Y.Z`, and then packs `output/` into
-/// `output/grammars-macos-arm64.tar.gz`. `--dry-run` skips only the tag
-/// requirement and packs the same bytes into
+/// the annotated tag `vX.Y.Z`, and reads this repository's own files (its
+/// pins, query files, provenance and licences) from that commit's tree,
+/// extracted into `build/repository`, never from the working tree. It packs
+/// `output/` into `output/grammars-macos-arm64.tar.gz` only if `HEAD` is
+/// still that commit and the working tree still clean once every check has
+/// passed. `--dry-run` skips only the tag requirement and packs the same
+/// bytes into
 /// `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset
 /// has. Packing also writes the archive's sha256 beside it and the release
 /// notes into `output/release-notes.md`. `--publish` then creates the
@@ -143,26 +147,29 @@ Future<void> _build(String root, _Options options) async {
   // before anything can fail, and the build fills build/out/ and moves it
   // into place last.
   _delete(p.join(root, 'output'));
-  final toolchain = Toolchain.load(root);
+  _delete(p.join(root, 'build'));
+  final commit = release == null
+      ? null
+      : await _releaseCommit(root, release, dryRun: dryRun);
+  // A release reads this repository's own files from its commit, extracted
+  // into build/repository; any other build reads the working tree.
+  final inputs = commit == null ? root : await _extractRepository(root, commit);
+  final toolchain = Toolchain.load(inputs);
   final entries = parseGrammars(
-    File(p.join(root, 'tool', 'grammars.json')).readAsStringSync(),
+    File(p.join(inputs, 'tool', 'grammars.json')).readAsStringSync(),
   );
   _step('Checking pins, query provenance and the runtime');
   _requireNone('grammars.json', pinProblems(entries));
-  _requireNone('query_provenance.json', _provenanceProblems(root, entries));
+  _requireNone('query_provenance.json', _provenanceProblems(inputs, entries));
   if (bundles == null) await _requireRuntimeSubmodule(root, toolchain);
-  if (release != null) {
-    await checkReleasePreflight(
+  if (commit != null) {
+    await checkRecordedRuntime(
       runGit,
       root,
-      release,
-      runtimeCommit: toolchain.treeSitterCommit,
-      dryRun: dryRun,
+      commit,
+      toolchain.treeSitterCommit,
     );
-    if (dryRun) print('  --dry-run: not requiring HEAD to be the tag $release');
   }
-
-  _delete(p.join(root, 'build'));
 
   final outputDirectory = p.join(root, 'build', 'out');
   final origin = bundles == null
@@ -193,7 +200,7 @@ Future<void> _build(String root, _Options options) async {
 
   _step('Writing $noticesFileName');
   _writeNotices(
-    root,
+    inputs,
     outputDirectory,
     NoticesInput(
       toolchain: toolchain,
@@ -201,11 +208,11 @@ Future<void> _build(String root, _Options options) async {
       entries: entries,
       builds: builds,
       sourceRoot: p.join(root, 'build', 'src'),
-      provenance: readRepositoryProvenance(root),
+      provenance: readRepositoryProvenance(inputs),
       apacheLicense: File(
-        p.join(root, 'LICENSES', 'Apache-2.0.txt'),
+        p.join(inputs, 'LICENSES', 'Apache-2.0.txt'),
       ).readAsStringSync(),
-      ownLicense: File(p.join(root, 'LICENSE')).readAsStringSync(),
+      ownLicense: File(p.join(inputs, 'LICENSE')).readAsStringSync(),
     ),
   );
   final generated = builds.where((build) => build.generate).toList();
@@ -293,7 +300,13 @@ Future<void> _build(String root, _Options options) async {
   ]);
 
   _step('Writing query bundles, manifest.json and build_info.json');
-  final manifest = _writeBundles(root, outputDirectory, entries, builds);
+  final manifest = _writeBundles(
+    root,
+    inputs,
+    outputDirectory,
+    entries,
+    builds,
+  );
   File(
     p.join(outputDirectory, 'manifest.json'),
   ).writeAsStringSync(encodeManifest(manifest));
@@ -302,7 +315,8 @@ Future<void> _build(String root, _Options options) async {
     toolchain: toolchain,
     compiler: compiler,
     flags: flags,
-    repositoryCommit: (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
+    repositoryCommit:
+        commit ?? (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
     repositoryDirty: (await runGit(root, [
       'status',
       '--porcelain',
@@ -322,6 +336,10 @@ Future<void> _build(String root, _Options options) async {
 
   _step('Checking the build through the runtime it ships');
   await _checkRelease(root, outputDirectory);
+  if (commit != null) {
+    await checkUnchangedSince(runGit, root, commit);
+    print('  the working tree is still clean at $commit');
+  }
   final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
 
   print(
@@ -329,11 +347,12 @@ Future<void> _build(String root, _Options options) async {
     '${manifest.values.where((e) => e['queryOnly'] == true).length} '
     'query-only bundles into output/',
   );
-  if (release != null) {
+  if (release != null && commit != null) {
     _step('Packing $release${dryRun ? ' (dry run)' : ''}');
     final archive = await _createReleaseArchive(
       root,
       output.path,
+      commit,
       dryRun: dryRun,
     );
     print('  ${archive.path}\n  sha256 ${archive.sha256}');
@@ -350,7 +369,7 @@ Future<void> _build(String root, _Options options) async {
           '--verify',
           'refs/tags/$release',
         ])).trim(),
-        commit: (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
+        commit: commit,
         assets: assets,
         notesFile: notes,
       );
@@ -391,6 +410,37 @@ String _sourcesDirectory(String root, String sources) {
     }
   }
   return resolved;
+}
+
+/// Runs the release preflight and returns the commit the release builds.
+Future<String> _releaseCommit(
+  String root,
+  String release, {
+  required bool dryRun,
+}) async {
+  _step('Checking that $release builds from a clean commit');
+  final commit = await checkReleasePreflight(
+    runGit,
+    root,
+    release,
+    dryRun: dryRun,
+  );
+  if (dryRun) print('  --dry-run: not requiring HEAD to be the tag $release');
+  return commit;
+}
+
+/// Extracts the tree of this repository's [commit] into `build/repository`
+/// and returns that directory, from which a release reads the repository's
+/// own files: its pins, query files, provenance and licences.
+///
+/// [extractCommit] checks every extracted file against its committed blob,
+/// so an edit to the working tree while the build runs never reaches what
+/// the build reads.
+Future<String> _extractRepository(String root, String commit) async {
+  final directory = p.join(root, 'build', 'repository');
+  await extractCommit(root, commit, directory);
+  print("  reading this repository's files at $commit, not the working tree");
+  return directory;
 }
 
 void _step(String title) => print('\n── $title');
@@ -642,10 +692,12 @@ Future<String?> _runInOrder(List<CompileCommand> commands) async {
   return null;
 }
 
-/// Bundles every language's queries into [outputDirectory] and returns the
-/// manifest, in `grammars.json` order.
+/// Bundles every language's queries, read from `queries/` under [inputs],
+/// into [outputDirectory] and returns the manifest, in `grammars.json`
+/// order; each grammar's parser is read from its build under [root].
 Map<String, Map<String, Object?>> _writeBundles(
   String root,
+  String inputs,
   String outputDirectory,
   List<Map<String, Object?>> entries,
   List<GrammarBuild> builds,
@@ -658,7 +710,7 @@ Map<String, Map<String, Object?>> _writeBundles(
       final name = entry['name']! as String;
       final manifestEntry = queryOnlyEntry(entry);
       bundleQueries(
-        root,
+        inputs,
         name,
         manifestEntry['queries']! as Map<String, Object?>,
         p.join(outputDirectory, 'queries', name),
@@ -667,12 +719,12 @@ Map<String, Map<String, Object?>> _writeBundles(
     } else {
       for (final build in builds.where((build) => build.entry == entry)) {
         final manifestEntry = grammarEntry(
-          root,
+          inputs,
           build,
           parserAbi(p.join(root, build.parserSource)),
         );
         bundleQueries(
-          root,
+          inputs,
           build.name,
           manifestEntry['queries']! as Map<String, Object?>,
           p.join(outputDirectory, build.dylibDirectory),
@@ -758,11 +810,12 @@ Future<Map<String, String>> _releaseAssets(
 /// path and sha256.
 ///
 /// Every file is given mode 0644 (0755 for a dylib and a directory) and
-/// the time of `HEAD`'s commit first, so the same build packs to the same
-/// bytes.
+/// the time of [commit], the commit built, first, so the same build packs
+/// to the same bytes.
 Future<({String path, String sha256})> _createReleaseArchive(
   String root,
-  String outputDirectory, {
+  String outputDirectory,
+  String commit, {
   required bool dryRun,
 }) async {
   final archive = p.join(
@@ -770,7 +823,7 @@ Future<({String path, String sha256})> _createReleaseArchive(
     dryRun ? dryRunArchiveName : releaseArchiveName,
   );
   final epoch = int.parse(
-    (await runGit(root, ['log', '-1', '--format=%ct'])).trim(),
+    (await runGit(root, ['log', '-1', '--format=%ct', commit])).trim(),
   );
   final files = archiveFiles(outputDirectory);
   await normalizeArchiveFiles(outputDirectory, files, epoch);

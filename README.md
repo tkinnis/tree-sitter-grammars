@@ -261,6 +261,8 @@ git tag -a v1.1.0 -m v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 ```
 
+A release reads this repository's own files (`tool/grammars.json`, `tool/toolchain.json`, `tool/query_provenance.json`, `queries/`, the licences and `THIRD_PARTY_NOTICES.md`) from the tree of the commit it builds, extracted into `build/repository` and checked against the committed blobs, never from the working tree, so an edit made while it runs cannot reach the archive. It packs nothing unless, once every check has passed, `HEAD` is still that commit and the working tree still clean, and `tool/check_release.dart` refuses a `build_info.json` that records a release built from a dirty working tree.
+
 It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of `HEAD`'s commit, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
 
 It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, every repository's pinned commit with its source bundle and that bundle's sha256, and each bundle of generated sources with its sha256.

@@ -188,6 +188,57 @@ void main() {
     ).deepEquals(['c: never linked', '1 links for 2 grammars']);
   });
 
+  group('repositoryRecordProblems', () {
+    Map<String, Object?> record({String? release, Object? dirty = false}) => {
+      ..._info(flags),
+      'release': release,
+      'repository': {
+        'url': repositoryUrl,
+        'commit': '77ac13625d220bcf955cb12f697e438238c774e0',
+        'dirty': dirty,
+      },
+    };
+
+    test('accepts a clean release and a dirty build that is none', () {
+      check(repositoryRecordProblems(record(release: 'v1.1.0'))).isEmpty();
+      check(repositoryRecordProblems(record(dirty: true))).isEmpty();
+    });
+
+    test('refuses a release built from a dirty working tree', () {
+      check(
+        repositoryRecordProblems(record(release: 'v1.1.0', dirty: true)),
+      ).deepEquals([
+        'build_info.json records the release v1.1.0 as built from a dirty '
+            'working tree',
+      ]);
+    });
+
+    test('refuses a release that does not record the tree at all', () {
+      check(
+        repositoryRecordProblems(record(release: 'v1.1.0', dirty: null)),
+      ).deepEquals([
+        'build_info.json does not record whether the working tree was dirty',
+        'build_info.json records the release v1.1.0 as built from a dirty '
+            'working tree',
+      ]);
+    });
+
+    test('refuses a record naming no commit or another repository', () {
+      final info = record()
+        ..['repository'] = {
+          'url': 'https://example.com/fork',
+          'commit': 'HEAD',
+          'dirty': false,
+        };
+
+      check(repositoryRecordProblems(info)).deepEquals([
+        'build_info.json names the repository https://example.com/fork, not '
+            '$repositoryUrl',
+        'build_info.json records no 40-hex repository commit',
+      ]);
+    });
+  });
+
   test(
     'the compiler environment keeps only PATH, TMPDIR and DEVELOPER_DIR',
     () {

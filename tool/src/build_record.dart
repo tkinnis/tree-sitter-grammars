@@ -76,6 +76,35 @@ Map<String, Object?> buildInfo({
   'generated': generated,
 };
 
+/// Every problem with the `repository` [info] records; empty when it names
+/// this repository at a 40-hex commit and, for a release, a working tree
+/// that was clean.
+///
+/// A release reads this repository's files from its commit, so a working
+/// tree that changed while it ran never reaches the archive; a release
+/// recorded as built from a dirty tree is refused all the same, since the
+/// tools that checked it ran from that tree.
+List<String> repositoryRecordProblems(Map<String, Object?> info) {
+  final repository = info['repository'];
+  if (repository is! Map<String, Object?>) {
+    return ['build_info.json records no repository'];
+  }
+  final commit = repository['commit'];
+  final dirty = repository['dirty'];
+  return [
+    if (repository['url'] != repositoryUrl)
+      'build_info.json names the repository ${repository['url']}, not '
+          '$repositoryUrl',
+    if (commit is! String || !RegExp(r'^[0-9a-f]{40}$').hasMatch(commit))
+      'build_info.json records no 40-hex repository commit',
+    if (dirty is! bool)
+      'build_info.json does not record whether the working tree was dirty',
+    if (info['release'] is String && dirty != false)
+      'build_info.json records the release ${info['release']} as built from '
+          'a dirty working tree',
+  ];
+}
+
 /// Encodes [info] as `output/build_info.json` is written.
 String encodeBuildInfo(Map<String, Object?> info) =>
     '${const JsonEncoder.withIndent('  ').convert(info)}\n';

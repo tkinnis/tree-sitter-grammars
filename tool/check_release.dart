@@ -10,6 +10,8 @@
 /// `<output>` defaults to `output/`. Every one of these must hold, or the
 /// check exits 1 after listing each failure:
 ///
+/// - `build_info.json` names this repository at a 40-hex commit and, when
+///   it records a release, a clean working tree.
 /// - Every source bundle in `<output>/sources/` has the sha256
 ///   `build_info.json` records and names its pinned commit, every bundle
 ///   of generated sources has its recorded sha256, and `sources/` holds
@@ -60,6 +62,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/build_record.dart';
 import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
@@ -160,6 +163,7 @@ _check(
   );
   final info = _json(p.join(output, 'build_info.json'));
   final manifest = _json(p.join(output, 'manifest.json'));
+  problems.addAll(repositoryRecordProblems(info));
   final treeSitter = info['treeSitter']! as Map<String, Object?>;
   if (treeSitter['tag'] != toolchain.treeSitterTag ||
       treeSitter['commit'] != toolchain.treeSitterCommit) {
