@@ -47,10 +47,9 @@ Future<List<String>> libraryProblems(
   final problems = <String>[];
   final archs = (await _tool(['lipo', '-archs', path])).trim();
   if (archs != toolchain.arch) problems.add('$path: architectures $archs');
-  final id = (await _tool(['otool', '-D', path])).trim().split('\n').skip(1);
-  if (id.join() != expectation.installName) {
-    problems.add('$path: install name ${id.join()}');
-  }
+  final id =
+      (await _tool(['otool', '-D', path])).trim().split('\n').skip(1).join();
+  if (id != expectation.installName) problems.add('$path: install name $id');
   final loadCommands = await _tool(['otool', '-l', path]);
   final minos = RegExp(r'^\s*minos (\S+)$', multiLine: true)
       .allMatches(loadCommands)
@@ -66,7 +65,7 @@ Future<List<String>> libraryProblems(
       .split('\n')
       .skip(1)
       .map((line) => line.trim().split(' ').first)
-      .where((name) => name.isNotEmpty && name != expectation.installName)
+      .where((name) => name.isNotEmpty && name != id)
       .toList();
   if (dependencies.length != 1 ||
       dependencies.single != '/usr/lib/libSystem.B.dylib') {

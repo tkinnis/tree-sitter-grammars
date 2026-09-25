@@ -134,3 +134,45 @@ void bundleQueries(
 /// Encodes [manifest] as `output/manifest.json` is written.
 String encodeManifest(Map<String, Map<String, Object?>> manifest) =>
     _encoder.convert(manifest);
+
+final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
+
+/// Every problem with a compiled grammar's `source` object, as
+/// [grammarEntry] writes it; empty when it is well formed.
+List<String> sourceProblems(Object? source) {
+  if (source is! Map<String, Object?>) return ['source must be an object'];
+  final url = source['url'];
+  final commit = source['commit'];
+  final sourceCommit = source['sourceCommit'];
+  final path = source['path'];
+  final abi = source['abi'];
+  final license = source['license'];
+  const known = {
+    'url',
+    'commit',
+    'sourceCommit',
+    'path',
+    'parser',
+    'abi',
+    'license',
+  };
+  return [
+    if (url is! String || !url.startsWith('https://'))
+      'source.url must be an https URL',
+    if (commit is! String || !_commitPattern.hasMatch(commit))
+      'source.commit must be 40 lowercase hex digits',
+    if (sourceCommit != null &&
+        (sourceCommit is! String || !_commitPattern.hasMatch(sourceCommit)))
+      'source.sourceCommit must be 40 lowercase hex digits',
+    if (path is! String || path.isEmpty) 'source.path must be a path',
+    if (!const {'committed', 'generated'}.contains(source['parser']))
+      'source.parser must be "committed" or "generated"',
+    // The language ABIs the pinned runtime, tree-sitter v0.27.0, loads.
+    if (abi is! int || abi < 13 || abi > 15)
+      'source.abi must be a language ABI from 13 to 15',
+    if (license is! String || license.isEmpty)
+      'source.license must name a licence',
+    for (final field in source.keys)
+      if (!known.contains(field)) 'source has unknown field "$field"',
+  ];
+}

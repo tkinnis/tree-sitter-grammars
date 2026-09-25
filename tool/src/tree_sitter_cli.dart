@@ -28,13 +28,21 @@ Future<String> sha256Of(String path) async {
   return (result.stdout as String).split(' ').first;
 }
 
-/// Returns the path of the pinned CLI under [root]`/.cache/`, downloading
-/// its release asset when it is absent or its digest is wrong.
+/// Fetches [url] into the file [destination].
+typedef Downloader = Future<void> Function(Uri url, String destination);
+
+/// Returns the path of the pinned CLI under [root]`/.cache/`, fetching its
+/// release asset with [download] when it is absent or its digest is wrong.
 ///
 /// The asset's sha256 is checked against `toolchain.json` every time, and
 /// the executable is decompressed afresh from the checked asset, so a
-/// modified executable in the cache never runs.
-Future<String> ensureCli(String root, Toolchain toolchain) async {
+/// modified executable in the cache never runs. Throws a [CliException]
+/// when the fetched asset's digest is not the pinned one.
+Future<String> ensureCli(
+  String root,
+  Toolchain toolchain, {
+  Downloader download = _download,
+}) async {
   final cache = Directory(p.join(root, '.cache'))..createSync(recursive: true);
   final asset = p.join(
       cache.path,
@@ -42,7 +50,7 @@ Future<String> ensureCli(String root, Toolchain toolchain) async {
       '${toolchain.cliAsset}');
   if (!File(asset).existsSync() ||
       await sha256Of(asset) != toolchain.cliSha256) {
-    await _download(toolchain.cliUrl, asset);
+    await download(toolchain.cliUrl, asset);
   }
   final digest = await sha256Of(asset);
   if (digest != toolchain.cliSha256) {
