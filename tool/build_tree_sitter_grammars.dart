@@ -304,6 +304,9 @@ Future<void> _build(String root, _Options options) async {
 
   _step('Checking the recorded flags and the manifest');
   await _checkRecords(root, outputDirectory, builds);
+
+  _step('Checking the build through the runtime it ships');
+  await _checkRelease(root, outputDirectory);
   final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
 
   print(
@@ -543,6 +546,24 @@ Future<void> _checkRecords(
     );
   }
   print('  validate_manifest.dart passed');
+}
+
+/// Requires `tool/check_release.dart` to pass on [outputDirectory], in a
+/// process of its own because it loads every library it checks.
+Future<void> _checkRelease(String root, String outputDirectory) async {
+  final result = await Process.run(Platform.resolvedExecutable, [
+    'run',
+    p.join('tool', 'check_release.dart'),
+    outputDirectory,
+  ], workingDirectory: root);
+  for (final line in '${result.stdout}'.trim().split('\n')) {
+    print('  $line');
+  }
+  if (result.exitCode != 0) {
+    throw BuildException(
+      'check_release.dart exited ${result.exitCode}\n${result.stderr}',
+    );
+  }
 }
 
 /// Packs `output/` into [releaseArchiveName], or into [dryRunArchiveName]

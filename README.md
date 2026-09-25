@@ -32,6 +32,7 @@ tree-sitter-grammars/
 │   ├── check_query_provenance.dart # Checks query_provenance.json and each query file's header
 │   ├── write_notices.dart          # Generates THIRD_PARTY_NOTICES.md
 │   ├── validate_manifest.dart      # Checks a built manifest.json
+│   ├── check_release.dart          # Checks a built output/ through the runtime it ships
 │   ├── bootstrap_language.dart     # Imports queries from nvim-treesitter
 │   └── src/                        # Libraries the tools share
 ├── test/                           # Tests of the tools
@@ -66,6 +67,17 @@ dart run tool/build_tree_sitter_grammars.dart
 The build starts from empty `build/` and `output/` directories. For the runtime and every grammar repository it packs a source bundle: the tree `git archive` writes at the pin, with git's user and system configuration shut out, compressed by `gzip -n -9` into `output/sources/<repository>-<commit>.tar.gz`. It uses `tree-sitter/` and `grammars/<repo>` only as git object stores (a grammar's store is created and fetched as needed; its working tree is never read), unpacks each bundle into `build/src/`, and checks every unpacked file against its committed blob. It compiles each library with `-O3` and tree-sitter's assertions on. `output/build_info.json` records the runtime, the compiler, the exact flags and the sha256 of every source bundle; `build/compile_commands.json` records every compiler invocation, and the build fails unless each one passed exactly the recorded flags.
 
 The build writes into `build/out/` and moves it to `output/` only after every check passes, so `output/` exists only after a successful build.
+
+### Checking a Build
+
+The build's last check is `tool/check_release.dart`, which loads the build through the runtime it ships, with `dart:ffi`, and fails unless every source bundle has its recorded sha256 and pinned commit, the runtime exports every `api.h` function (apart from the three that need its wasm feature), every library is a thin arm64 binary with `minos` 13.0 and an `@rpath` install name, `ts_parser_set_language` accepts every grammar at ABI 13 to 15, every query file compiles once its `; inherits:` line is composed as the editor composes it, and `THIRD_PARTY_NOTICES.md` is the committed text. Run it on its own, or compare a build with an earlier release's extracted archive:
+
+```bash
+dart run tool/check_release.dart                      # checks output/
+dart run tool/check_release.dart --against=<archive>  # also compares grammars
+```
+
+`--against` parses every example of each grammar's test corpus and every highlight test input from the pinned sources with both archives' grammars under this runtime, and prints each difference in the tree (anonymous nodes included) and in the captures of every query file both archives carry.
 
 ### Pinning Grammars
 
