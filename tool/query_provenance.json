@@ -1277,7 +1277,7 @@
   },
   "queries/objc/injections.scm": {
     "origin": "nvim",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",

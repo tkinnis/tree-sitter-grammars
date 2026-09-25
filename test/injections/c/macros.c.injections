@@ -1,0 +1,5 @@
+comment "// Every register's offset."
+c "(0x0004u)"
+c "(*(volatile unsigned *)((base) + REG_OFFSET))"
+c "do { *(base) = 0; } while (0)"
+comment "/* A value, not a directive. */"

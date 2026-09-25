@@ -1,0 +1,3 @@
+comment "// A log line with the app's prefix."
+objc "NSLog(@\"[app] \" format, ##__VA_ARGS__)"
+objc "[object description]"

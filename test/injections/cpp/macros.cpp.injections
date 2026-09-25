@@ -1,0 +1,4 @@
+comment "// A checked cast."
+cpp "static_cast<T>(value)"
+cpp "std::vector<std::string>{}"
+sql "select name from accounts"

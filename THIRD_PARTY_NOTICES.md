@@ -2148,7 +2148,7 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `objc/folds.scm` | `runtime/queries/objc/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `objc/highlights.scm` | `queries/objc/highlights.scm` | `dad1b7cd6606ffaa5c283ba73d707b4741a5f445` | by way of the grammar's file below |
 | `objc/indents.scm` | `runtime/queries/objc/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
-| `objc/injections.scm` | `runtime/queries/objc/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
+| `objc/injections.scm` | `runtime/queries/objc/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `objc/locals.scm` | `runtime/queries/objc/locals.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `ocaml/folds.scm` | `runtime/queries/ocaml/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `ocaml/highlights.scm` | `queries/ocaml/highlights.scm` | `a6063b22c9e6d8660b82255d251c19d150725d9f` | by way of the grammar's file below |

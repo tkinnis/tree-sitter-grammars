@@ -4,6 +4,16 @@
 ; Only patterns that name a language: a pattern naming none costs a
 ; match per node and injects nothing.
 
+; A macro's body is read as C++, each body a document of its own; a
+; directive's argument, #pragma's and #error's among them, is left as it is.
+(preproc_def
+  value: (preproc_arg) @injection.content
+  (#set! injection.language "cpp"))
+
+(preproc_function_def
+  value: (preproc_arg) @injection.content
+  (#set! injection.language "cpp"))
+
 ; Every comment carries the tags the comment grammar reads.
 ((comment) @injection.content
   (#set! injection.language "comment"))

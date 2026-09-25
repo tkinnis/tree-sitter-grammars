@@ -316,7 +316,6 @@ _ @any
         'objc/folds.scm',
         'objc/highlights.scm',
         'objc/indents.scm',
-        'objc/injections.scm',
         'objc/locals.scm',
         'cpp/indents.scm',
         'cpp/locals.scm',
