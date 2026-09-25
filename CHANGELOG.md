@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - C#: `tags.scm` defines every namespace as `@definition.module`: a block namespace under any name, qualified ones included, and a file-scoped namespace over the compilation unit that holds the declarations after it, so every class and method nests under its namespace in the editor's outline and a test's declaring scope reads `Namespace.Class`
 - Outline tests: `tool/check_release.dart` parses every source under `test/outline/<grammar>/` and requires the outline of the definitions the grammar's composed `tags.scm` finds in it, nested by range as the editor nests its outline, to be the `.outline` file beside it; the first are three C# test files, for xUnit, NUnit and MSTest
-- `tool/check_release.dart` refuses an injection pattern that captures `@injection.content` and names no language, in every grammar but the twelve `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (bash, go, html, java, kotlin, make, pascal, python, ruby, sql, xml and yaml, which hold 74), and requires every composed query to read as the patterns `ts_query_new` counts in it
+- `tool/check_release.dart` refuses an injection pattern that captures no `@injection.content`, and one that captures it and names no language in every grammar but the twelve `injectionsNamingNoLanguage` in `tool/src/release_check.dart` lists (bash, go, html, java, kotlin, make, pascal, python, ruby, sql, xml and yaml, which hold 74), and requires every composed query to read as the patterns `ts_query_new` counts in it
 
 ### Fixed
 
@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - C: a macro's body and a directive's argument are injected as C, in Objective-C too, which inherits C's injections; the re2c, doxygen and 70 printf patterns, which named no language and so injected nothing, are removed, since no grammar here compiles those languages
 - Markdown inline: an HTML tag is injected as `html`, combined, and a LaTeX block as `latex`, as nvim-treesitter's file has them
 - Javadoc: a description is injected as `html` and a Markdown description as `markdown_inline`; the two printf patterns of `@value` format strings, which named no language, are removed
+- TypeScript, TSX and JavaScript: the `hbs` template pattern, which captured `@glimmer` in place of `@injection.content` and so injected nothing, is removed
 
 ## [1.1.0] - 2026-09-25
 

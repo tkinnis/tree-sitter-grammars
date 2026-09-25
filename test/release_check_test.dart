@@ -268,6 +268,30 @@ _ @any
     });
   });
 
+  group('injectionPatternsCapturingNoContent', () {
+    test('lists the lines of the patterns with no content capture', () {
+      const query = '''
+((comment) @injection.content
+  (#set! injection.language "comment"))
+
+(call_expression
+  function: ((identifier) @_name
+             (#eq? @_name "hbs"))
+  arguments: ((template_string) @glimmer
+              (#offset! @glimmer 0 1 0 -1)))
+
+((regex_pattern) @injection.content.inner
+  (#set! injection.language "regex"))
+
+(raw_string_literal
+  delimiter: (raw_string_delimiter) @injection.language
+  (raw_string_content) @injection.content)
+''';
+
+      check(injectionPatternsCapturingNoContent(query)).deepEquals([4, 10]);
+    });
+  });
+
   group("this repository's queries", () {
     test('every file composes, each name it inherits holding the file', () {
       for (final directory in Directory(
@@ -340,6 +364,19 @@ _ @any
         ).deepEquals(injectionsNamingNoLanguage.toList()..sort());
       },
     );
+
+    test('every injection pattern captures @injection.content', () {
+      for (final directory in Directory(
+        'queries',
+      ).listSync().whereType<Directory>()) {
+        if (composeQuery(directory.path, 'injections.scm') case final source?) {
+          check(
+            because: directory.path,
+            injectionPatternsCapturingNoContent(source),
+          ).isEmpty();
+        }
+      }
+    });
 
     test("php's folds and indents compose with php_only's", () {
       String compose(String file) =>

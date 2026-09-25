@@ -11,13 +11,4 @@
   (#set! injection.combined)
   (#set! injection.include-children))
 
-
-
-; Parse Ember/Glimmer/Handlebars/HTMLBars/etc. template literals
-; e.g.: await render(hbs`<SomeComponent />`)
-(call_expression
-  function: ((identifier) @_name
-             (#eq? @_name "hbs"))
-  arguments: ((template_string) @glimmer
-              (#offset! @glimmer 0 1 0 -1)))
 ; inherits: ecma

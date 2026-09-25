@@ -37,11 +37,11 @@
 ///   same type, tsx's `locals.scm` naming `jsx` apart; and every
 ///   query-only file is read by one of those compositions.
 /// - Every composition reads as the patterns `ts_query_new` counts in it,
-///   and every pattern of a composed `injections.scm` that captures
-///   `@injection.content` names a language, by an `@injection.language`
-///   capture or a `#set! injection.language` directive, in every grammar
-///   but those `injectionsNamingNoLanguage` lists, each of which holds at
-///   least one pattern naming none.
+///   and every pattern of a composed `injections.scm` captures
+///   `@injection.content` and names a language, by an
+///   `@injection.language` capture or a `#set! injection.language`
+///   directive, in every grammar but those `injectionsNamingNoLanguage`
+///   lists, each of which holds at least one pattern naming none.
 /// - Every source under `test/outline/<grammar>/` parses with no error or
 ///   missing node, and the outline of the definitions the grammar's
 ///   composed `tags.scm` finds in it, nested by range as the editor nests
@@ -584,9 +584,11 @@ Map<String, Pointer<Void>> _checkGrammars(
 /// grammar's language.
 ///
 /// Each composition must read as the patterns `ts_query_new` counts in
-/// it, so [injectionPatternsNamingNoLanguage] reads every one of them,
-/// and [_checkInjectionLanguages] then holds each grammar's injection
-/// patterns to naming a language.
+/// it, so [injectionPatternsCapturingNoContent] and
+/// [injectionPatternsNamingNoLanguage] read every one of them. Every
+/// injection pattern must capture `@injection.content`, and
+/// [_checkInjectionLanguages] then holds each grammar's injection patterns
+/// to naming a language.
 void _checkQueries(
   TreeSitterRuntime runtime,
   String output,
@@ -604,6 +606,14 @@ void _checkQueries(
   for (final (:directory, :fileName, :source) in queries.composed) {
     final name = grammarAt[directory]!.name;
     if (fileName == 'injections.scm') {
+      final capturingNoContent = injectionPatternsCapturingNoContent(source);
+      if (capturingNoContent.isNotEmpty) {
+        problems.add(
+          '$name/injections.scm: ${capturingNoContent.length} patterns '
+          'capture no @injection.content (composed lines '
+          '${capturingNoContent.join(', ')})',
+        );
+      }
       final lines = injectionPatternsNamingNoLanguage(source);
       if (lines.isNotEmpty) namingNoLanguage[name] = lines;
     }

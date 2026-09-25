@@ -305,6 +305,14 @@ List<int> injectionPatternsNamingNoLanguage(String source) => [
       line,
 ];
 
+/// The line of every pattern of the injection query [source] that
+/// captures no `@injection.content`, so the editor injects nothing where
+/// it matches, whatever else it captures.
+List<int> injectionPatternsCapturingNoContent(String source) => [
+  for (final (:line, :text) in queryPatterns(source))
+    if (!_injectionContent.hasMatch(text)) line,
+];
+
 /// One symbol a tags query defines: its kind, the capture name after
 /// `definition.`; its name, the text of the match's `@name` capture; and
 /// the byte range of the node its `@definition.<kind>` capture names.
