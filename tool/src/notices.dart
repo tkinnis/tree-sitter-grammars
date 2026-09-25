@@ -3,10 +3,10 @@
 /// goes.
 ///
 /// It reproduces the tree-sitter runtime's licences, each pinned grammar's
-/// licence file, every copyright comment a grammar's compiled sources carry
-/// beyond that licence, the Apache License 2.0 of the query files derived
-/// from nvim-treesitter, and this repository's own licence, and it lists
-/// where every query file came from.
+/// licence and NOTICE files, every licence comment the runtime's or a
+/// grammar's compiled sources carry beyond those, the Apache License 2.0 of
+/// the query files derived from nvim-treesitter, and this repository's own
+/// licence, and it lists where every query file came from.
 library;
 
 import 'dart:convert';
@@ -36,7 +36,30 @@ final licenseFilePattern = RegExp(
   caseSensitive: false,
 );
 
-final _copyright = RegExp('copyright', caseSensitive: false);
+/// Matches a NOTICE file's name at a repository's root, which is
+/// reproduced beside its licence.
+final noticeFilePattern = RegExp(
+  r'^notice(\.(md|txt))?$',
+  caseSensitive: false,
+);
+
+/// What marks a comment as a licence statement: a copyright, a licence, an
+/// SPDX identifier, a public-domain dedication, a permission grant, a
+/// reservation of rights, a copyright sign or `(c)`.
+final _licenseMark = RegExp(
+  r'copyright|licen[cs]e|spdx-license-identifier|public\s+domain|'
+  r'permission\s+is\s+hereby\s+granted|all\s+rights\s+reserved|\u00a9|'
+  r'\(c\)',
+  caseSensitive: false,
+);
+
+/// [_licenseMark] without `(c)`, which C code writes wherever it passes a
+/// variable named `c`, so it can be counted outside comments too.
+final _licenseWord = RegExp(
+  r'copyright|licen[cs]e|spdx-license-identifier|public\s+domain|'
+  r'permission\s+is\s+hereby\s+granted|all\s+rights\s+reserved|\u00a9',
+  caseSensitive: false,
+);
 
 /// Thrown when the notices cannot be generated, listing every reason.
 final class NoticesException implements Exception {
@@ -90,21 +113,35 @@ final class NoticesInput {
 /// The contents of `THIRD_PARTY_NOTICES.md`.
 ///
 /// Throws a [NoticesException] listing every problem: a grammar with no
-/// `license` field or no licence file at its root, a query file the
-/// provenance does not list, or a compiled source outside `src/tree_sitter/`
-/// that mentions a copyright anywhere without an `extraNotices` entry
-/// naming it (and any `extraNotices` entry naming a file with no copyright
-/// comment). A mention outside every comment is a problem too, since
-/// only a comment can be reproduced; the check errs toward stopping.
+/// `license` field or no licence file at its root, a licence or NOTICE
+/// file that is not UTF-8 text, a query file the provenance does not list,
+/// and every compiled source problem [_sourceNotices] finds, for the runtime
+/// against `toolchain.json`'s `treeSitter.extraNotices` and for a grammar
+/// against its entry's `extraNotices`.
 String thirdPartyNotices(NoticesInput input) {
   final problems = [...input.provenance.problems];
   final runtimeLicenses = _readLicenses(
     input.runtimeDirectory,
-    runtimeLicenseFiles,
+    [
+      ...runtimeLicenseFiles,
+      ..._rootFiles(input.runtimeDirectory, noticeFilePattern),
+    ],
     'tree-sitter',
     problems,
   );
-  problems.addAll(_runtimeCopyrightProblems(input.runtimeDirectory));
+  final runtimeNotices = _sourceNotices(
+    directory: input.runtimeDirectory,
+    sources: [
+      for (final source in includedFiles(input.runtimeDirectory, [
+        'lib/src/lib.c',
+      ], runtimeIncludeDirectories))
+        if (!source.startsWith('lib/src/unicode/')) source,
+    ],
+    extraNotices: input.toolchain.runtimeExtraNotices,
+    name: 'tree-sitter',
+    listedIn: "toolchain.json's treeSitter.extraNotices",
+    problems: problems,
+  );
   final grammars = [
     for (final entry in input.entries)
       if (entry['url'] is String) _grammarNotice(input, entry, problems),
@@ -119,7 +156,18 @@ String thirdPartyNotices(NoticesInput input) {
   if (problems.isNotEmpty) throw NoticesException(problems);
   final buffer = StringBuffer()
     ..write(_introduction(input))
-    ..write(_runtimeSection(input.toolchain, runtimeLicenses))
+    ..write(
+      _runtimeSection(
+        input.toolchain,
+        runtimeLicenses,
+        _extraNoticeBlocks(
+          runtimeNotices,
+          input.toolchain.runtimeExtraNotices,
+          'the runtime',
+          level: 3,
+        ),
+      ),
+    )
     ..write('## Grammars\n\n')
     ..write(
       'Each grammar library is compiled from its repository at the commit '
@@ -160,7 +208,11 @@ String _introduction(NoticesInput input) {
       'repository\'s `queries/<language>/*.scm`.\n\n';
 }
 
-String _runtimeSection(Toolchain toolchain, List<(String, String)> licenses) {
+String _runtimeSection(
+  Toolchain toolchain,
+  List<(String, String)> licenses,
+  String extraNotices,
+) {
   final buffer = StringBuffer()
     ..write('## tree-sitter\n\n')
     ..write(
@@ -173,8 +225,19 @@ String _runtimeSection(Toolchain toolchain, List<(String, String)> licenses) {
   for (final (path, text) in licenses) {
     buffer.write(_fenced(path, text));
   }
-  return buffer.toString();
+  return (buffer..write(extraNotices)).toString();
 }
+
+/// The files at [directory]'s root whose names [pattern] matches, sorted;
+/// none when [directory] does not exist.
+List<String> _rootFiles(String directory, RegExp pattern) =>
+    Directory(directory).existsSync()
+    ? ([
+        for (final entity in Directory(directory).listSync())
+          if (entity is File && pattern.hasMatch(p.basename(entity.path)))
+            p.basename(entity.path),
+      ]..sort())
+    : const [];
 
 /// Reads [paths] under [directory], recording a problem for each that is
 /// missing or not UTF-8.
@@ -225,53 +288,32 @@ String _grammarNotice(
   if (license is! String || license.isEmpty) {
     problems.add('$repository: grammars.json names no license');
   }
-  final licenseFiles = Directory(directory).existsSync()
-      ? ([
-          for (final entity in Directory(directory).listSync())
-            if (entity is File &&
-                licenseFilePattern.hasMatch(p.basename(entity.path)))
-              p.basename(entity.path),
-        ]..sort())
-      : const <String>[];
+  final licenseFiles = _rootFiles(directory, licenseFilePattern);
   if (licenseFiles.isEmpty) {
     problems.add('$repository: no licence file at its root');
   }
-  final licenses = _readLicenses(directory, licenseFiles, repository, problems);
+  final licenses = _readLicenses(
+    directory,
+    [...licenseFiles, ..._rootFiles(directory, noticeFilePattern)],
+    repository,
+    problems,
+  );
   final builds = input.builds.where((build) => build.entry == entry).toList();
   final extraNotices = [...?(entry['extraNotices'] as List?)?.cast<String>()];
-  final copyrighted = <String, List<String>>{};
-  for (final build in builds) {
-    final sourceDirectory = p.posix.normalize(p.posix.join(build.path, 'src'));
-    for (final source in compiledSources(directory, sourceDirectory)) {
-      final text = File(p.join(directory, source)).readAsStringSync();
-      if (!_copyright.hasMatch(text)) continue;
-      final comments = copyrightComments(text);
-      if (comments.isEmpty) {
-        problems.add(
-          '$repository: $source mentions a copyright outside any comment, '
-          'which the notices cannot reproduce; read it by hand',
-        );
-      } else {
-        copyrighted[source] = comments;
-      }
-    }
-  }
-  for (final source in copyrighted.keys) {
-    if (!extraNotices.contains(source)) {
-      problems.add(
-        '$repository: $source carries a copyright comment; name it in '
-        'the entry\'s extraNotices',
-      );
-    }
-  }
-  for (final source in extraNotices) {
-    if (!copyrighted.containsKey(source)) {
-      problems.add(
-        '$repository: extraNotices names $source, which no library '
-        'compiles or which carries no copyright comment',
-      );
-    }
-  }
+  final noticed = _sourceNotices(
+    directory: directory,
+    sources: {
+      for (final build in builds)
+        ...compiledSources(
+          directory,
+          p.posix.normalize(p.posix.join(build.path, 'src')),
+        ),
+    }.toList(),
+    extraNotices: extraNotices,
+    name: repository,
+    listedIn: "the entry's extraNotices",
+    problems: problems,
+  );
   final deployedFrom = switch (entry['sourceCommit']) {
     final String source => ', deployed from $source',
     _ => '',
@@ -285,14 +327,82 @@ String _grammarNotice(
   for (final (file, text) in licenses) {
     buffer.write(_fenced(file, text, level: 4));
   }
+  return (buffer..write(
+        _extraNoticeBlocks(noticed, extraNotices, 'the library', level: 4),
+      ))
+      .toString();
+}
+
+/// The licence comments of every one of [sources], relative to
+/// [directory], that carries any, by source.
+///
+/// Records in [problems], under [name]: a source that names a licence
+/// outside its comments, which only a reader can reproduce, found as more
+/// licence words in its raw text than in its comments; a source with a
+/// licence comment that [extraNotices] does not name; and an entry of
+/// [extraNotices] naming no such source. [listedIn] says where
+/// [extraNotices] is written. The check errs toward stopping.
+Map<String, List<String>> _sourceNotices({
+  required String directory,
+  required List<String> sources,
+  required List<String> extraNotices,
+  required String name,
+  required String listedIn,
+  required List<String> problems,
+}) {
+  final noticed = <String, List<String>>{};
+  for (final source in sources) {
+    final text = File(p.join(directory, source)).readAsStringSync();
+    if (!_licenseMark.hasMatch(text)) continue;
+    final comments = licenseComments(text);
+    final commented = comments.fold(
+      0,
+      (count, comment) => count + _licenseWord.allMatches(comment).length,
+    );
+    if (_licenseWord.allMatches(text).length > commented) {
+      problems.add(
+        '$name: $source mentions a licence outside any comment, which the '
+        'notices cannot reproduce; read it by hand',
+      );
+    }
+    if (comments.isNotEmpty) noticed[source] = comments;
+  }
+  for (final source in noticed.keys) {
+    if (!extraNotices.contains(source)) {
+      problems.add(
+        '$name: $source carries a licence comment; name it in $listedIn',
+      );
+    }
+  }
   for (final source in extraNotices) {
-    final comments = copyrighted[source];
+    if (!noticed.containsKey(source)) {
+      problems.add(
+        '$name: $listedIn names $source, which is not compiled or carries '
+        'no licence comment',
+      );
+    }
+  }
+  return noticed;
+}
+
+/// The licence comments [noticed] holds of each of [extraNotices], each
+/// under a heading of [level] naming its file, which [compiledBy]
+/// compiles in.
+String _extraNoticeBlocks(
+  Map<String, List<String>> noticed,
+  List<String> extraNotices,
+  String compiledBy, {
+  required int level,
+}) {
+  final buffer = StringBuffer();
+  for (final source in extraNotices) {
+    final comments = noticed[source];
     if (comments == null) continue;
     buffer
       ..write(
-        '#### $source\n\n'
-        'The copyright comment${comments.length == 1 ? '' : 's'} of '
-        '`$source`, which the library compiles in:\n\n',
+        '${'#' * level} $source\n\n'
+        'The licence comment${comments.length == 1 ? '' : 's'} of '
+        '`$source`, which $compiledBy compiles in:\n\n',
       )
       ..write([for (final comment in comments) _fenced(null, comment)].join());
   }
@@ -308,21 +418,6 @@ String _libraryList(List<GrammarBuild> builds) {
   };
   return '$list ${names.length == 1 ? 'is' : 'are'} compiled';
 }
-
-/// Every problem with the runtime's compiled sources: a file outside
-/// `lib/src/unicode/`, whose licence the notices carry, that mentions a
-/// copyright.
-List<String> _runtimeCopyrightProblems(String runtimeDirectory) => [
-  for (final source in includedFiles(runtimeDirectory, [
-    'lib/src/lib.c',
-  ], runtimeIncludeDirectories))
-    if (!source.startsWith('lib/src/unicode/') &&
-        _copyright.hasMatch(
-          File(p.join(runtimeDirectory, source)).readAsStringSync(),
-        ))
-      'tree-sitter: $source mentions a copyright the notices do not '
-          'reproduce',
-];
 
 /// The files a grammar's library compiles, relative to its repository
 /// root [repositoryDirectory]: its `parser.c` and `scanner.c` in
@@ -393,9 +488,10 @@ List<String> includedFiles(
   return found.toList()..sort();
 }
 
-/// Every comment in the C source [text] that mentions a copyright, in
-/// full, in order. String and character literals are skipped.
-List<String> copyrightComments(String text) {
+/// Every comment in the C source [text] that makes a licence statement, in
+/// full, in order. String and character literals are skipped, and a run of
+/// line comments on consecutive lines is one comment.
+List<String> licenseComments(String text) {
   final comments = <String>[];
   var index = 0;
   while (index < text.length) {
@@ -412,8 +508,16 @@ List<String> copyrightComments(String text) {
       comments.add(text.substring(index, stop));
       index = stop;
     } else if (text.startsWith('//', index)) {
-      final end = text.indexOf('\n', index);
-      final stop = end < 0 ? text.length : end;
+      var stop = _lineEnd(text, index);
+      while (stop < text.length) {
+        var next = stop + 1;
+        while (next < text.length &&
+            (text[next] == ' ' || text[next] == '\t')) {
+          next++;
+        }
+        if (!text.startsWith('//', next)) break;
+        stop = _lineEnd(text, next);
+      }
       comments.add(text.substring(index, stop));
       index = stop;
     } else {
@@ -422,8 +526,15 @@ List<String> copyrightComments(String text) {
   }
   return [
     for (final comment in comments)
-      if (_copyright.hasMatch(comment)) comment,
+      if (_licenseMark.hasMatch(comment)) comment,
   ];
+}
+
+/// The index of the newline ending the line [start] is on, or the end of
+/// [text].
+int _lineEnd(String text, int start) {
+  final end = text.indexOf('\n', start);
+  return end < 0 ? text.length : end;
 }
 
 String _querySection(

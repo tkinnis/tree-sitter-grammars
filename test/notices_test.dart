@@ -12,11 +12,13 @@ import '../tool/src/toolchain.dart';
 
 const _pin = '0123456789abcdef0123456789abcdef01234567';
 
-final _toolchain = Toolchain.parse(
+/// The toolchain, with [extraNotices] as the runtime's.
+Toolchain _toolchain({List<String>? extraNotices}) => Toolchain.parse(
   jsonEncode({
     'treeSitter': {
       'tag': 'v0.27.0',
       'commit': '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+      'extraNotices': ?extraNotices,
     },
     'treeSitterCli': {
       'version': '0.27.0',
@@ -44,17 +46,27 @@ void main() {
     ..writeAsStringSync(text);
 
   /// A runtime and one grammar, `tree-sitter-x`, whose scanner includes a
-  /// header carrying [helperComment].
+  /// header carrying [helperComment]; the runtime's `lib.c` includes a
+  /// `parser.c` holding [runtimeParser].
   (NoticesInput, Map<String, Object?>) fixture({
     String helperComment = '// helpers',
     String parser = 'int parse(void);\n',
     List<String>? extraNotices,
     bool license = true,
+    String runtimeParser = '#include <stdio.h>\n',
+    List<String>? runtimeExtraNotices,
   }) {
     write('src/tree-sitter/LICENSE', 'runtime licence\n');
     write('src/tree-sitter/lib/src/unicode/LICENSE', 'Unicode, Inc\n');
-    write('src/tree-sitter/lib/src/lib.c', '#include "./parser.c"\n');
-    write('src/tree-sitter/lib/src/parser.c', '#include <stdio.h>\n');
+    write(
+      'src/tree-sitter/lib/src/unicode/utf8.h',
+      '// Copyright (c) Unicode, Inc. All rights reserved.\n',
+    );
+    write(
+      'src/tree-sitter/lib/src/lib.c',
+      '#include "./parser.c"\n#include "unicode/utf8.h"\n',
+    );
+    write('src/tree-sitter/lib/src/parser.c', runtimeParser);
     if (license) write('src/tree-sitter-x/LICENSE', 'grammar licence\n');
     write('src/tree-sitter-x/src/parser.c', parser);
     write('src/tree-sitter-x/src/scanner.c', '#include "helper.h"\n');
@@ -71,7 +83,7 @@ void main() {
       'name': 'x',
     };
     final input = NoticesInput(
-      toolchain: _toolchain,
+      toolchain: _toolchain(extraNotices: runtimeExtraNotices),
       runtimeDirectory: path('src/tree-sitter'),
       entries: [entry],
       builds: [
@@ -139,7 +151,7 @@ void main() {
     check(() => thirdPartyNotices(input))
         .throws<NoticesException>()
         .has((e) => e.problems.single, 'problem')
-        .contains('src/helper.h carries a copyright comment');
+        .contains('src/helper.h carries a licence comment');
   });
 
   test('reproduces a copyright comment extraNotices names', () {
@@ -157,7 +169,108 @@ void main() {
     check(() => thirdPartyNotices(input))
         .throws<NoticesException>()
         .has((e) => e.problems.single, 'problem')
-        .contains('src/parser.c mentions a copyright outside any comment');
+        .contains('src/parser.c mentions a licence outside any comment');
+  });
+
+  test('refuses a copyright outside the comments of a file named in '
+      'extraNotices', () {
+    final (input, _) = fixture(
+      parser:
+          '/* Copyright (c) A */\n'
+          'const char *s = "Copyright (c) B, all rights reserved";\n',
+      extraNotices: ['src/parser.c'],
+    );
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems.single, 'problem')
+        .contains('src/parser.c mentions a licence outside any comment');
+  });
+
+  for (final (label, comment) in [
+    ('an SPDX identifier', '// SPDX-License-Identifier: GPL-3.0-only'),
+    ('a public-domain dedication', '// "License": Public Domain'),
+    ('a permission grant', '/* Permission is hereby granted, free */'),
+    ('all rights reserved', '/* All rights reserved. */'),
+    ('a copyright sign', '// \u00a9 2020 Someone'),
+    ('a (c) notice', '/* (c) 2020 Someone */'),
+  ]) {
+    test('refuses $label in a compiled comment extraNotices does not name', () {
+      final (input, _) = fixture(helperComment: comment);
+
+      check(() => thirdPartyNotices(input))
+          .throws<NoticesException>()
+          .has((e) => e.problems.single, 'problem')
+          .contains('src/helper.h carries a licence comment');
+    });
+  }
+
+  test('reads (c) outside a comment as code, not a notice', () {
+    final (input, _) = fixture(
+      parser: 'int f(int c) { return iswspace(c) || (c) == 0; }\n',
+    );
+
+    check(thirdPartyNotices(input)).contains('grammar licence');
+  });
+
+  test('reproduces a run of line comments as one notice', () {
+    const header =
+        '// "License": Public Domain\n'
+        '// I place this file into the public domain.\n'
+        '  // Consider it an example.';
+    final (input, _) = fixture(
+      helperComment: '$header\n\n// unrelated',
+      extraNotices: ['src/helper.h'],
+    );
+
+    final notices = thirdPartyNotices(input);
+
+    check(notices).contains('```text\n$header\n```');
+    check(notices).not((it) => it.contains('unrelated'));
+  });
+
+  test('reproduces a NOTICE file at a grammar\'s root', () {
+    final (input, _) = fixture();
+    write('src/tree-sitter-x/NOTICE', 'x includes software by Someone\n');
+
+    check(
+      thirdPartyNotices(input),
+    ).contains('#### NOTICE\n\n```text\nx includes software by Someone\n```');
+  });
+
+  test('refuses a NOTICE file that is not UTF-8 text', () {
+    final (input, _) = fixture();
+    File(
+      path('src/tree-sitter-x/NOTICE.txt'),
+    ).writeAsBytesSync(latin1.encode('F\xf6rster\n'));
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems, 'problems')
+        .contains('tree-sitter-x: NOTICE.txt is not UTF-8 text');
+  });
+
+  test('refuses a runtime licence comment the toolchain does not name', () {
+    final (input, _) = fixture(runtimeParser: '// "License": Public Domain\n');
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems.single, 'problem')
+        .contains(
+          'tree-sitter: lib/src/parser.c carries a licence comment; name it '
+          'in toolchain.json',
+        );
+  });
+
+  test('reproduces a runtime licence comment the toolchain names', () {
+    final (input, _) = fixture(
+      runtimeParser: '// "License": Public Domain\n',
+      runtimeExtraNotices: ['lib/src/parser.c'],
+    );
+
+    check(thirdPartyNotices(input))
+      ..contains('### lib/src/parser.c')
+      ..contains('```text\n// "License": Public Domain\n```');
   });
 
   test('refuses an extraNotices entry naming no copyrighted source', () {
@@ -188,10 +301,10 @@ void main() {
     ).throws<NoticesException>();
   });
 
-  group('copyrightComments', () {
+  group('licenseComments', () {
     test('finds block and line comments, never string literals', () {
       check(
-        copyrightComments(
+        licenseComments(
           'char *a = "/* Copyright */";\n'
           '/* Copyright A */\n'
           "char b = '\"';\n"

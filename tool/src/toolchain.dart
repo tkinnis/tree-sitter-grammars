@@ -26,6 +26,7 @@ final class Toolchain {
     required this.cliSha256,
     required this.arch,
     required this.deploymentTarget,
+    this.runtimeExtraNotices = const [],
   });
 
   /// Parses and checks the contents of `tool/toolchain.json`.
@@ -70,6 +71,7 @@ final class Toolchain {
         'macos.deploymentTarget',
         RegExp(r'^\d+\.\d+$'),
       ),
+      runtimeExtraNotices: _paths(treeSitter, 'treeSitter.extraNotices'),
     );
     if (toolchain.runtimeVersion != toolchain.cliVersion) {
       throw ToolchainException(
@@ -107,6 +109,11 @@ final class Toolchain {
   /// The minimum macOS version every library declares.
   final String deploymentTarget;
 
+  /// The runtime's compiled sources, relative to its repository root, that
+  /// carry a licence statement of their own beyond its licence files:
+  /// `treeSitter.extraNotices`, empty when absent.
+  final List<String> runtimeExtraNotices;
+
   /// [treeSitterTag] without its leading `v`, as the runtime's Makefile
   /// declares it.
   String get runtimeVersion => treeSitterTag.substring(1);
@@ -124,6 +131,17 @@ Map<String, Object?> _object(Object? root, String key) {
     throw ToolchainException('$key must be an object');
   }
   return value;
+}
+
+/// The optional list of paths [field] names in [object]; empty when it is
+/// absent.
+List<String> _paths(Map<String, Object?> object, String field) {
+  final value = object[field.split('.').last];
+  if (value == null) return const [];
+  if (value is! List || value.any((path) => path is! String || path.isEmpty)) {
+    throw ToolchainException('$field must be a list of paths');
+  }
+  return value.cast<String>();
 }
 
 String _string(Map<String, Object?> object, String field, RegExp pattern) {

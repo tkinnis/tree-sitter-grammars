@@ -453,6 +453,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
+### lib/src/portable/endian.h
+
+The licence comment of `lib/src/portable/endian.h`, which the runtime compiles in:
+
+```text
+// "License": Public Domain
+// I, Mathias Panzenböck, place this file hereby into the public domain. Use it at your own risk for whatever you like.
+// In case there are jurisdictions that don't support putting things in the public domain you can also consider it to
+// be "dual licensed" under the BSD, MIT and Apache licenses, if you want to. This code is trivial anyway. Consider it
+// an example on how to get the endian conversion functions on different platforms.
+```
+
 ## Grammars
 
 Each grammar library is compiled from its repository at the commit named, and that repository's licence covers it.
@@ -1723,7 +1735,7 @@ THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR I
 
 #### src/bsearch.h
 
-The copyright comment of `src/bsearch.h`, which the library compiles in:
+The licence comment of `src/bsearch.h`, which the library compiles in:
 
 ```text
 /*

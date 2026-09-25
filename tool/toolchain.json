@@ -1,7 +1,10 @@
 {
   "treeSitter": {
     "tag": "v0.27.0",
-    "commit": "6070dbfefd326bd735e5683eb128cc1b57dad0c0"
+    "commit": "6070dbfefd326bd735e5683eb128cc1b57dad0c0",
+    "extraNotices": [
+      "lib/src/portable/endian.h"
+    ]
   },
   "treeSitterCli": {
     "version": "0.27.0",

@@ -8,8 +8,9 @@
 /// - `license`: the SPDX identifier of the grammar's licence.
 /// - `generate` (optional): true when the grammar commits no `src/parser.c`
 ///   and the build generates it from `src/grammar.json`.
-/// - `extraNotices` (optional): source files carrying a copyright notice of
-///   their own, beyond the grammar's licence file.
+/// - `extraNotices` (optional): compiled source files carrying a licence
+///   comment of their own, beyond the grammar's licence file, which the
+///   notices reproduce.
 library;
 
 import 'dart:convert';
