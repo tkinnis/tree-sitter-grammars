@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/zig/highlights.scm @ 77362027f7aa850c87419fd571151e76b0b342a6, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; Variables
 (identifier) @variable
 

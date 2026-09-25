@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/cpp/injections.scm @ b5f203031282a6e9e025080fe71b58dbb43f7509, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; Only patterns that name a language: a pattern naming none costs a
 ; match per node and injects nothing.
 

@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/commonlisp/highlights.scm @ d198a75e2c2e24885b05650515538d055d0c64e4, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 (sym_lit) @variable
 
 ; A highlighting for functions/macros in th cl namespace is available in theHamsta/nvim-treesitter-commonlisp

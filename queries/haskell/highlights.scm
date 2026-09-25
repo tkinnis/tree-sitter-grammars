@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/haskell/highlights.scm @ d6ebbd5039954ecd47463802a16b5d8d7f223eef, Apache-2.0.
+; Taken from https://github.com/tree-sitter/tree-sitter-haskell, queries/highlights.scm @ d9b04afe59cf6bcf76c43c48212ffae888eaeab4, MIT.
+; Modified in tree-sitter-grammars.
+
 ; ----------------------------------------------------------------------------
 ; Parameters and variables
 ; NOTE: These are at the top, so that they have low priority,

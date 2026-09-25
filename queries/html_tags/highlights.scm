@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/html_tags/highlights.scm @ f7c05e3e0510df7c742d455c802e27b6ee7ab384, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 (tag_name) @tag
 
 ; (erroneous_end_tag_name) @error ; we do not lint syntax errors

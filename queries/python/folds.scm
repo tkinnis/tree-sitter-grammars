@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/python/folds.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; NOTE: Python's if_statement spans the entire if-elif-else chain.
 ; Folding if_statement will hide elif/else clauses. This is a known limitation
 ; due to Python's indentation-based blocks - there's no separate block node

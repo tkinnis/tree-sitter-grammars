@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/tsx/locals.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Taken from https://github.com/tree-sitter/tree-sitter-javascript, queries/locals.scm @ 9802cc5812a19cd28168076af36e88b463dd3a18, MIT.
+; Modified in tree-sitter-grammars.
+
 ; Scopes
 ;-------
 

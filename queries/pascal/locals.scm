@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/pascal/locals.scm @ 5b90ea2abaa4303b9205b5c9002a8cdd0acd11a5, Apache-2.0.
+; Taken from https://github.com/Isopod/tree-sitter-pascal, queries/locals.scm @ 22fb8f8fe5e6822266e82794a1d19444f9f3879e, MIT.
+; Unchanged.
+
 
 (root)                                   @local.scope
 

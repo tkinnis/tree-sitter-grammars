@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/php/folds.scm @ 3cb46f0c81a5640cd3b342e8a50e77058d7923d5, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; inherits: php_only
 
 ; Removed if_statement from folds - fold compound_statement instead to keep else visible

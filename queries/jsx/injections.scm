@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/jsx/injections.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Unchanged.
+
 ; Styled Jsx <style jsx>
 (jsx_element
   (jsx_opening_element

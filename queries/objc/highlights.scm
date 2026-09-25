@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/objc/highlights.scm @ dad1b7cd6606ffaa5c283ba73d707b4741a5f445, Apache-2.0.
+; Taken from https://github.com/tree-sitter-grammars/tree-sitter-objc, queries/highlights.scm @ a360943e0f108b7d0935924a4eb772ce1a6aaec7, MIT.
+; Modified in tree-sitter-grammars.
+
 (identifier) @variable
 
 ((identifier) @constant

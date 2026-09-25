@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/haskell/injections.scm @ 77e298e4de607d69aa7f37dc6dcba6aee131ac7f, Apache-2.0.
+; Taken from https://github.com/tree-sitter/tree-sitter-haskell, queries/injections.scm @ 50a04bf6d208a8f1aa90048c500fc4eb94b2df0f, MIT.
+; Unchanged.
+
 ; -----------------------------------------------------------------------------
 ; General language injection
 (quasiquote

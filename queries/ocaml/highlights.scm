@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/ocaml/highlights.scm @ a6063b22c9e6d8660b82255d251c19d150725d9f, Apache-2.0.
+; Taken from https://github.com/tree-sitter/tree-sitter-ocaml, queries/highlights.scm @ 45ddc92d18fa11b2ca1a18cd94de4e63feea0806, MIT.
+; Unchanged.
+
 ; Punctuation
 ;------------
 

@@ -1,3 +1,7 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/kotlin/highlights.scm @ a2629ebcc0da7542f8723fb7f7b2e653ad230d3f, Apache-2.0.
+; Taken from https://github.com/fwcd/tree-sitter-kotlin, queries/highlights.scm @ e72b9d5acf709bf2f73561797a0107fb5370625a, MIT.
+; Modified in tree-sitter-grammars.
+
 ;; Based on the nvim-treesitter highlighting, which is under the Apache license.
 ;; See https://github.com/nvim-treesitter/nvim-treesitter/blob/f8ab59861eed4a1c168505e3433462ed800f2bae/queries/kotlin/highlights.scm
 ;;

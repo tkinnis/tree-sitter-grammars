@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/ada/highlights.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; highlight queries.
 ; See the syntax at https://tree-sitter.github.io/tree-sitter/using-parsers#pattern-matching-with-queries
 ; See also https://github.com/nvim-treesitter/nvim-treesitter/blob/master/CONTRIBUTING.md#parser-configurations

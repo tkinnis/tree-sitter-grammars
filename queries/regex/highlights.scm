@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/regex/highlights.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
+; Unchanged.
+
 ; Forked from tree-sitter-regex
 ; The MIT License (MIT) Copyright (c) 2014 Max Brunsfeld
 [

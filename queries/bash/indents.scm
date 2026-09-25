@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/bash/indents.scm @ 433779916223596dce3ea64f4b77300c3aa2bfdc, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 [
   (function_definition)
   (compound_statement)

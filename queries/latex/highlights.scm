@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/latex/highlights.scm @ 2c30e515ebe79037ab8d15f7e59c0e2690f50626, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; General syntax
 (command_name) @function @nospell
 

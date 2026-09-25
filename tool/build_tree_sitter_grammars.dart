@@ -41,6 +41,7 @@ import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/manifest.dart';
+import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/release.dart';
 import 'src/toolchain.dart';
@@ -102,7 +103,7 @@ Future<void> _build(
   );
   _step('Checking pins, query provenance and the runtime submodule');
   _requireNone('grammars.json', pinProblems(entries));
-  _requireNone('query_provenance.json', _provenanceProblems(root));
+  _requireNone('query_provenance.json', _provenanceProblems(root, entries));
   await _requireRuntimeSubmodule(root, toolchain);
   if (release != null) {
     await checkReleasePreflight(
@@ -274,7 +275,12 @@ Iterable<Map<String, Object?>> _urlEntries(
   List<Map<String, Object?>> entries,
 ) => entries.where((entry) => entry['url'] is String);
 
-List<String> _provenanceProblems(String root) {
+/// Every problem with `tool/query_provenance.json` and with the header each
+/// query file derived from nvim-treesitter carries.
+List<String> _provenanceProblems(
+  String root,
+  List<Map<String, Object?>> entries,
+) {
   final queryFiles = [
     for (final entity in Directory(
       p.join(root, 'queries'),
@@ -285,7 +291,9 @@ List<String> _provenanceProblems(String root) {
   final json = File(
     p.join(root, 'tool', 'query_provenance.json'),
   ).readAsStringSync();
-  return readQueryProvenance(json, queryFiles).problems;
+  final reading = readQueryProvenance(json, queryFiles);
+  if (reading.problems.isNotEmpty) return reading.problems;
+  return queryHeaderCheck(root, reading.entries, licenseLookup(entries));
 }
 
 /// Requires the `tree-sitter` submodule's checkout to be the toolchain's

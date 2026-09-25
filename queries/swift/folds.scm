@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/swift/folds.scm @ 13ddd4d7522ce3e5a1abc0ea34e10ec4e445908a, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 ; format-ignore
 ; Syntax-based folds. if_statement/guard_statement span entire chains,
 ; but indent-based folds are merged to provide granular branch folding.

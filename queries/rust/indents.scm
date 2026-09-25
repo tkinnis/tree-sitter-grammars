@@ -1,3 +1,6 @@
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/rust/indents.scm @ 1b050206e490a4146cdf25c7b38969c1711b5620, Apache-2.0.
+; Modified in tree-sitter-grammars.
+
 [
   (mod_item)
   (struct_item)
