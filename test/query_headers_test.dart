@@ -118,6 +118,75 @@ void main() {
     });
   });
 
+  group('unchangedNvimSource', () {
+    const body = '(identifier) @variable\n';
+
+    String headed(QueryProvenance provenance) => withQueryHeader(
+      body,
+      queryHeader('queries/c/highlights.scm', provenance, _license),
+    );
+
+    test('reads back the file an unchanged import header names', () {
+      final source = unchangedNvimSource(
+        headed(
+          const QueryProvenance(
+            origin: QueryOrigin.nvim,
+            changed: false,
+            upstream: _nvimFile,
+          ),
+        ),
+      );
+
+      check(source).isNotNull()
+        ..has((it) => it.repo, 'repo').equals(nvimTreesitterUrl)
+        ..has((it) => it.commit, 'commit').equals(_nvimCommit)
+        ..has((it) => it.path, 'path').equals(_nvimFile.path);
+    });
+
+    test('names nothing for a modified file, a grammar file or none', () {
+      check(
+        unchangedNvimSource(
+          headed(
+            const QueryProvenance(
+              origin: QueryOrigin.nvim,
+              changed: true,
+              upstream: _nvimFile,
+            ),
+          ),
+        ),
+      ).isNull();
+      check(
+        unchangedNvimSource(
+          headed(
+            const QueryProvenance(
+              origin: QueryOrigin.both,
+              changed: false,
+              upstream: UpstreamFile(
+                repo: _grammarUrl,
+                commit: _grammarCommit,
+                path: 'queries/highlights.scm',
+              ),
+              nvimUpstream: _nvimFile,
+            ),
+          ),
+        ),
+      ).isNull();
+      check(unchangedNvimSource(body)).isNull();
+    });
+
+    test('reads back a path with spaces, and no path but a .scm file', () {
+      String header(String path) =>
+          '; Derived from nvim-treesitter $nvimTreesitterUrl, '
+          '$path @ $_nvimCommit, Apache-2.0.\n; Unchanged.\n\n$body';
+
+      check(unchangedNvimSource(header('runtime/queries/my lang/folds.scm')))
+          .isNotNull()
+          .has((it) => it.path, 'path')
+          .equals('runtime/queries/my lang/folds.scm');
+      check(unchangedNvimSource(header('runtime/queries/c'))).isNull();
+    });
+  });
+
   group('queryHeaderProblems', () {
     const header = ['; Derived from nvim-treesitter x', '; Unchanged.'];
     const body = '(identifier) @variable\n';

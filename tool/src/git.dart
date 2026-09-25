@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 /// Thrown when a git command exits non-zero.
 final class GitException implements Exception {
@@ -61,8 +62,8 @@ Map<String, String> isolatedGitEnvironment(Map<String, String> parent) => {
   'GIT_NO_REPLACE_OBJECTS': '1',
 };
 
-/// The result of one git invocation.
-typedef _GitResult = ({int exitCode, String stdout, String stderr});
+/// The result of one git invocation, its stdout undecoded.
+typedef _GitResult = ({int exitCode, Uint8List stdout, String stderr});
 
 const _decoder = Utf8Decoder(allowMalformed: true);
 
@@ -80,18 +81,21 @@ Future<_GitResult> _git(
     environment: environment,
     includeParentEnvironment: false,
   );
-  final stdout = process.stdout.transform(_decoder).join();
+  final stdout = process.stdout.fold(
+    BytesBuilder(copy: false),
+    (bytes, chunk) => bytes..add(chunk),
+  );
   final stderr = process.stderr.transform(_decoder).join();
   if (input != null) process.stdin.write(input);
   await process.stdin.close();
   return (
     exitCode: await process.exitCode,
-    stdout: await stdout,
+    stdout: (await stdout).takeBytes(),
     stderr: await stderr,
   );
 }
 
-String _stdout(_GitResult result, String directory, List<String> arguments) {
+Uint8List _stdout(_GitResult result, String directory, List<String> arguments) {
   if (result.exitCode != 0) {
     throw GitException(directory, arguments, result.exitCode, result.stderr);
   }
@@ -101,10 +105,12 @@ String _stdout(_GitResult result, String directory, List<String> arguments) {
 /// Runs the real `git` with the user's configuration, throwing a
 /// [GitException] on a non-zero exit.
 Future<String> runGit(String directory, List<String> arguments) async =>
-    _stdout(
-      await _git(directory, arguments, gitEnvironment(Platform.environment)),
-      directory,
-      arguments,
+    _decoder.convert(
+      _stdout(
+        await _git(directory, arguments, gitEnvironment(Platform.environment)),
+        directory,
+        arguments,
+      ),
     );
 
 /// Runs [executable], by default the `git` on `PATH`, with
@@ -117,13 +123,31 @@ Future<String> runIsolatedGit(
   Map<String, String>? environment,
   String? input,
   String executable = 'git',
-}) async => _stdout(
+}) async => _decoder.convert(
+  _stdout(
+    await _git(
+      directory,
+      arguments,
+      isolatedGitEnvironment(environment ?? Platform.environment),
+      input: input,
+      executable: executable,
+    ),
+    directory,
+    arguments,
+  ),
+);
+
+/// Runs `git` like [runIsolatedGit] and returns its stdout undecoded, so a
+/// caller can read a blob's exact bytes; throws a [GitException] on a
+/// non-zero exit.
+Future<Uint8List> runIsolatedGitBytes(
+  String directory,
+  List<String> arguments,
+) async => _stdout(
   await _git(
     directory,
     arguments,
-    isolatedGitEnvironment(environment ?? Platform.environment),
-    input: input,
-    executable: executable,
+    isolatedGitEnvironment(Platform.environment),
   ),
   directory,
   arguments,

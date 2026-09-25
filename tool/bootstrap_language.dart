@@ -1,246 +1,94 @@
-#!/usr/bin/env dart
-// Bootstrap query files for a new language from nvim-treesitter.
-//
-// This script imports high-quality query files from the nvim-treesitter project
-// for bootstrapping new language support. It should only be used for languages
-// that don't already have query files.
-//
-// Usage:
-//   dart run tool/bootstrap_language.dart --language=<name> [options]
-//
-// Options:
-//   --language=NAME  Language to bootstrap (required)
-//   --force          Overwrite existing queries (use with caution)
-//   --dry-run        Show what would be imported without copying
-//   --help           Show this help
+/// Imports a new language's query files from nvim-treesitter, recording the
+/// nvim-treesitter commit they come from.
+///
+/// Usage:
+///
+/// ```sh
+/// dart run tool/bootstrap_language.dart --language=<name>
+///     [--commit=<sha>] [--force] [--dry-run]
+/// ```
+///
+/// It fetches nvim-treesitter's `HEAD` and branches into the object store
+/// `.cache/nvim-treesitter`, with git's user and system configuration shut
+/// out, and reads the language's highlights, folds, injections, locals and
+/// indents queries at `HEAD`, or at the 40-hex `--commit`, which one of
+/// nvim-treesitter's branches must contain, from `runtime/queries/<name>/`
+/// or, in a commit from before the queries moved, `queries/<name>/`. Each
+/// file is written to `queries/<name>/` under the header that names its
+/// nvim-treesitter path and commit, and its `tool/query_provenance.json`
+/// entry records the same, unchanged. A `tags.scm` placeholder, with the
+/// provenance of a file written here, and a `config.json` skeleton are
+/// written when absent.
+///
+/// Everything is read and checked before anything is written, so a refused
+/// run writes nothing under `queries/` or `tool/`. It refuses a language
+/// that already has a `queries/<name>/` directory unless `--force` is
+/// given; `--force` replaces only what a bootstrap wrote there, removes an
+/// earlier unchanged import of a query type the commit no longer has, and
+/// refuses a file that holds other work. It prints every file and
+/// provenance entry before writing them; `--dry-run` writes none of them.
+library;
 
+import 'dart:convert';
 import 'dart:io';
 
-/// Map our language names to nvim-treesitter directory names when they differ
-const languageNameMap = <String, String>{'c-sharp': 'c_sharp'};
+import 'package:path/path.dart' as p;
 
-/// Query types to import from nvim-treesitter
-const queryTypesToImport = [
-  'highlights',
-  'folds',
-  'injections',
-  'locals',
-  'indents',
-];
+import 'src/query_bootstrap.dart';
 
-/// Custom query files that we maintain ourselves (not from nvim-treesitter)
-/// Tags files use a different format in nvim-treesitter, so we write our own
-const customQueryTypes = ['tags'];
+const _usage =
+    'usage: dart run tool/bootstrap_language.dart --language=<name> '
+    '[--commit=<sha>] [--force] [--dry-run]';
 
-void main(List<String> args) async {
-  final force = args.contains('--force');
-  final dryRun = args.contains('--dry-run');
-  final showHelp = args.contains('--help');
-  final languageName = args
-      .where((arg) => arg.startsWith('--language='))
-      .map((arg) => arg.substring('--language='.length))
-      .firstOrNull;
-
-  if (showHelp || languageName == null) {
-    print('''
-Bootstrap query files for a new language from nvim-treesitter
-
-This tool imports query files (.scm) from the nvim-treesitter project to
-queries/<language>/. Use this when adding support for a new language.
-
-Usage:
-  dart run tool/bootstrap_language.dart --language=<name> [options]
-
-Options:
-  --language=NAME  Language to bootstrap (required)
-  --force          Overwrite existing queries (use with caution)
-  --dry-run        Show what would be imported without copying
-  --help           Show this help
-
-Examples:
-  dart run tool/bootstrap_language.dart --language=rust
-  dart run tool/bootstrap_language.dart --language=kotlin --dry-run
-  dart run tool/bootstrap_language.dart --language=swift --force
-''');
-    exit(showHelp ? 0 : 1);
+Future<void> main(List<String> args) async {
+  if (args.contains('--help') || args.contains('-h')) {
+    print(_usage);
+    return;
   }
-
-  print('=== Bootstrap Language: $languageName ===\n');
-
-  // Check if queries already exist
-  final queriesDir = Directory('queries/$languageName');
-  if (queriesDir.existsSync() && !force) {
-    print('Error: Queries already exist for "$languageName"');
-    print('  Path: ${queriesDir.path}');
-    print('');
-    print('This tool is for bootstrapping NEW languages only.');
-    print(
-      'If you want to update existing queries, use --force (with caution).',
+  final request = parseBootstrapArguments(args);
+  if (request == null) {
+    stderr.writeln(_usage);
+    exit(64);
+  }
+  final root = p.dirname(p.dirname(p.fromUri(Platform.script)));
+  try {
+    await bootstrap(
+      root: root,
+      request: request,
+      beforeWriting: (plan) => _printPlan(plan, dryRun: request.dryRun),
     );
+  } on Exception catch (error) {
+    stderr.writeln('✗ $error');
     exit(1);
   }
-
-  if (queriesDir.existsSync() && force) {
-    print('Warning: Overwriting existing queries for "$languageName"\n');
-  }
-
-  // Clone or update nvim-treesitter
-  final nvimTsDir = Directory('/tmp/nvim-treesitter');
-  if (!nvimTsDir.existsSync()) {
-    print('Cloning nvim-treesitter repository...');
-    final result = await Process.run('git', [
-      'clone',
-      '--depth',
-      '1',
-      'https://github.com/nvim-treesitter/nvim-treesitter.git',
-      nvimTsDir.path,
-    ]);
-    if (result.exitCode != 0) {
-      print('Error cloning repository: ${result.stderr}');
-      exit(1);
-    }
-    print('Cloned nvim-treesitter\n');
-  } else {
-    print('Updating nvim-treesitter repository...');
-    final result = await Process.run('git', [
-      'pull',
-    ], workingDirectory: nvimTsDir.path);
-    if (result.exitCode != 0) {
-      print('Warning: Could not update repository: ${result.stderr}');
-    }
-    print('Updated nvim-treesitter\n');
-  }
-
-  // Find source queries
-  // Note: nvim-treesitter moved queries from queries/ to runtime/queries/
-  final nvimName = languageNameMap[languageName] ?? languageName;
-  final nvimQueryDir = Directory(
-    '/tmp/nvim-treesitter/runtime/queries/$nvimName',
-  );
-
-  if (!nvimQueryDir.existsSync()) {
-    print('Error: Language "$languageName" not found in nvim-treesitter');
-    print('  Tried: queries/$nvimName/');
-    print('');
-    print('Available languages can be found at:');
-    print(
-      '  https://github.com/nvim-treesitter/nvim-treesitter/tree/main/queries',
-    );
-    exit(1);
-  }
-
-  // Create target directory
-  if (!dryRun) {
-    await queriesDir.create(recursive: true);
-  }
-
-  // Import query files
-  var importedCount = 0;
-  var skippedCount = 0;
-
-  print('Importing queries from nvim-treesitter...\n');
-
-  for (final queryType in queryTypesToImport) {
-    final sourceFile = File('${nvimQueryDir.path}/$queryType.scm');
-    final targetFile = File('${queriesDir.path}/$queryType.scm');
-
-    if (!sourceFile.existsSync()) {
-      print('  $queryType.scm: Not available in nvim-treesitter');
-      skippedCount++;
-      continue;
-    }
-
-    if (dryRun) {
-      print('  $queryType.scm: Would import');
-    } else {
-      await sourceFile.copy(targetFile.path);
-      print('  $queryType.scm: Imported');
-    }
-    importedCount++;
-  }
-
-  // Create placeholder for custom query types
-  for (final queryType in customQueryTypes) {
-    final targetFile = File('${queriesDir.path}/$queryType.scm');
-
-    if (targetFile.existsSync()) {
-      print('  $queryType.scm: Already exists (preserved)');
-      continue;
-    }
-
-    if (dryRun) {
-      print('  $queryType.scm: Would create placeholder');
-    } else {
-      await targetFile.writeAsString('''; $queryType.scm for $languageName
-;
-; This file defines symbol extraction patterns for code navigation.
-; See: https://tree-sitter.github.io/tree-sitter/syntax-highlighting#tags
-;
-; TODO: Add language-specific patterns
-
-''');
-      print('  $queryType.scm: Created placeholder');
-    }
-  }
-
-  // Create config.json skeleton
-  final configFile = File('${queriesDir.path}/config.json');
-  if (!configFile.existsSync() || force) {
-    final displayName =
-        languageName[0].toUpperCase() + languageName.substring(1);
-
-    final configContent =
-        '''{
-  "displayName": "$displayName",
-  "symbol": "$languageName",
-  "scope": "source.$languageName",
-  "extensions": [
-    ".$languageName"
-  ],
-  "comments": {
-    "line": "//",
-    "block": ["/*", "*/"]
-  },
-  "brackets": [
-    {"open": "{", "close": "}", "autoClose": true, "newline": true},
-    {"open": "(", "close": ")", "autoClose": true, "newline": false},
-    {"open": "[", "close": "]", "autoClose": true, "newline": false},
-    {"open": "\\"", "close": "\\"", "autoClose": true, "newline": false},
-    {"open": "'", "close": "'", "autoClose": true, "newline": false}
-  ]
+  if (!request.dryRun) _printNextSteps(request.language);
 }
-''';
 
-    if (dryRun) {
-      print('  config.json: Would create skeleton');
-    } else {
-      await configFile.writeAsString(configContent);
-      print('  config.json: Created skeleton (edit to customize)');
-    }
-  } else {
-    print('  config.json: Already exists (preserved)');
+void _printPlan(BootstrapPlan plan, {required bool dryRun}) {
+  final verb = dryRun ? 'would' : 'will';
+  print('nvim-treesitter ${plan.commit}');
+  for (final file in plan.files.keys) {
+    print('  $verb write $file');
   }
+  for (final file in plan.removals) {
+    print('  $verb remove $file, which that commit no longer has');
+  }
+  print('  $verb record in tool/query_provenance.json:');
+  for (final MapEntry(key: file, value: entry) in plan.entries.entries) {
+    print('    $file: ${jsonEncode(entry)}');
+  }
+}
 
-  // Summary
-  print('\n=== Summary ===');
-  if (dryRun) {
-    print('Dry run complete. Use without --dry-run to actually import.');
-  } else {
-    print(
-      'Imported $importedCount query files ($skippedCount not available) to:',
-    );
-    print('  ${queriesDir.path}/');
-    print('');
-    print('Next steps:');
-    print('  1. Edit config.json: extensions, comments, brackets');
-    print('  2. Review and customize the imported queries as needed');
-    print('  3. Add symbol patterns to tags.scm for code navigation');
-    print(
-      '  4. Pin the grammar: dart run tool/pin_grammars.dart '
-      '--set <repo>=<sha>',
-    );
-    print('  5. Record each query file in tool/query_provenance.json');
-    print('  6. Run: dart run tool/build_tree_sitter_grammars.dart');
-    print('  7. Test syntax highlighting with example files');
-  }
+void _printNextSteps(String language) {
+  print('''
+Next steps:
+  1. Edit queries/$language/config.json: extensions, comments, brackets.
+  2. Adapt the imported queries. For every file you change, set
+     "changed": true in tool/query_provenance.json, then run
+     dart run tool/check_query_provenance.dart --write-headers
+  3. Add symbol patterns to queries/$language/tags.scm.
+  4. Add the grammar to tool/grammars.json with its url and license, then
+     dart run tool/pin_grammars.dart --set <repository>=<sha>
+  5. dart run tool/write_notices.dart
+  6. dart run tool/build_tree_sitter_grammars.dart''');
 }

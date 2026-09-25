@@ -110,6 +110,28 @@ int _headerLength(List<String> lines) {
   return 0;
 }
 
+/// The first line of a header naming an nvim-treesitter file and no grammar
+/// repository, capturing the file's path and commit.
+final _nvimDerivedLine = RegExp(
+  '^${RegExp.escape('$_derivedPrefix$nvimTreesitterUrl, ')}'
+  r'(.+\.scm) @ ([0-9a-f]{40}), Apache-2\.0\.$',
+);
+
+/// The nvim-treesitter file [content]'s header names when that header says
+/// the file is unchanged from it and names no grammar repository, as
+/// [queryHeader] writes one; null for any other header, or none.
+UpstreamFile? unchangedNvimSource(String content) {
+  final lines = content.split('\n');
+  if (_headerLength(lines) != 2 || lines[1] != _unchanged) return null;
+  final match = _nvimDerivedLine.firstMatch(lines.first);
+  if (match == null) return null;
+  return UpstreamFile(
+    repo: nvimTreesitterUrl,
+    commit: match[2]!,
+    path: match[1]!,
+  );
+}
+
 /// [content] with its header replaced by [header]: any header already at
 /// its top, and the blank line after it, are removed first. An empty
 /// [header] leaves the file with none.

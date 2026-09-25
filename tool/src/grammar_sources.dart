@@ -48,8 +48,7 @@ Future<void> ensureObjectStore(
   final origin = (await git(directory, ['remote', 'get-url', 'origin'])).trim();
   if (normalizeRepositoryUrl(origin) != normalizeRepositoryUrl(url)) {
     throw GrammarSourceException(
-      '$name: origin of $directory is $origin, '
-      'grammars.json says $url',
+      '$name: origin of $directory is $origin, not $url',
     );
   }
 }
