@@ -68,33 +68,29 @@ final _repoPattern = RegExp(r'^https://[^\s]+[^/\s]$');
 /// paths of every `.scm` file under `queries/`.
 ///
 /// Every query file must have exactly one entry, and every entry must name an
-/// existing query file. A duplicated key is reported even though a JSON
-/// decoder would keep only its last value.
+/// existing query file. A key that appears twice in one object, at any
+/// depth, is reported even though a JSON decoder keeps only its last value.
 ProvenanceReading readQueryProvenance(
   String json,
   Iterable<String> queryFiles,
 ) {
   final problems = <String>[];
-  final keyCounts = <String, int>{};
   final Object? decoded;
   try {
-    decoded = jsonDecode(
-      json,
-      reviver: (key, value) {
-        if (key is String && key.startsWith('queries/')) {
-          keyCounts[key] = (keyCounts[key] ?? 0) + 1;
-        }
-        return value;
-      },
-    );
+    decoded = jsonDecode(json);
   } on FormatException catch (error) {
     return (entries: const {}, problems: ['not valid JSON: ${error.message}']);
   }
   if (decoded is! Map<String, Object?>) {
     return (entries: const {}, problems: ['the top level is not an object']);
   }
-  for (final MapEntry(:key, :value) in keyCounts.entries) {
-    if (value > 1) problems.add('$key: $value entries');
+  for (final (:path, :count) in duplicateKeys(json)) {
+    problems.add(switch (path) {
+      [final file] => '$file: $count entries',
+      [final file, ...final inner] => '$file: ${inner.join('.')} '
+          'appears $count times',
+      [] => 'an empty key path',
+    });
   }
   final entries = <String, QueryProvenance>{};
   for (final MapEntry(:key, :value) in decoded.entries) {
@@ -182,4 +178,86 @@ UpstreamFile? _parseUpstream(
   }
   if (repo is! String || commit is! String || path is! String) return null;
   return UpstreamFile(repo: repo, commit: commit, path: path);
+}
+
+/// Every key that appears more than once in one object of [json], as the
+/// path of keys from the top level to it and the number of times it
+/// appears, in the order the keys first repeat. An array element's path
+/// segment is its index.
+///
+/// [json] must be valid JSON. Keys are compared after decoding their
+/// escapes, so `"a"` and `"\u0061"` are one key.
+List<({List<String> path, int count})> duplicateKeys(String json) {
+  final repeated = <(_Container, String)>[];
+  final open = <_Container>[];
+  var index = 0;
+  while (index < json.length) {
+    final char = json[index];
+    final container = open.isEmpty ? null : open.last;
+    switch (char) {
+      case '"':
+        final end = _stringEnd(json, index);
+        if (container != null && container.expectsKey) {
+          final key = jsonDecode(json.substring(index, end + 1)) as String;
+          final count = (container.keyCounts[key] ?? 0) + 1;
+          container.keyCounts[key] = count;
+          if (count == 2) repeated.add((container, key));
+          container.segment = key;
+          container.expectsKey = false;
+        }
+        index = end;
+      case '{' || '[':
+        open.add(_Container(
+          path: [
+            ...?container?.path,
+            if (container?.segment case final segment?) segment,
+          ],
+          isObject: char == '{',
+        ));
+      case '}' || ']':
+        open.removeLast();
+      case ',':
+        if (container case final container?) {
+          if (container.isObject) {
+            container.expectsKey = true;
+          } else {
+            container.segment = '${int.parse(container.segment!) + 1}';
+          }
+        }
+    }
+    index++;
+  }
+  return [
+    for (final (container, key) in repeated)
+      (path: [...container.path, key], count: container.keyCounts[key]!),
+  ];
+}
+
+/// One object or array that [duplicateKeys] has opened and not yet closed.
+final class _Container {
+  _Container({required this.path, required this.isObject})
+      : expectsKey = isObject,
+        segment = isObject ? null : '0';
+
+  /// The keys and indexes from the top level to this container.
+  final List<String> path;
+  final bool isObject;
+
+  /// How many times each key has appeared in this object.
+  final keyCounts = <String, int>{};
+
+  /// Whether the next string is a key rather than a value.
+  bool expectsKey;
+
+  /// The key or index of the member being read.
+  String? segment;
+}
+
+/// The index of the quote that closes the string opening at [start].
+int _stringEnd(String json, int start) {
+  var index = start + 1;
+  while (json[index] != '"') {
+    index += json[index] == '\\' ? 2 : 1;
+  }
+  return index;
 }

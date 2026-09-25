@@ -70,6 +70,55 @@ void main() {
     check(reading.problems).deepEquals(['queries/c/tags.scm: 2 entries']);
   });
 
+  test('a key duplicated inside an entry is reported', () {
+    const json = '{"queries/c/highlights.scm": {"origin": "nvim", '
+        '"changed": false, "changed": true, "upstream": {'
+        '"repo": "https://github.com/nvim-treesitter/nvim-treesitter", '
+        '"commit": "$_commit", "commit": "$_commit", '
+        '"path": "queries/c/highlights.scm"}}}';
+
+    final reading = readQueryProvenance(json, ['queries/c/highlights.scm']);
+
+    check(reading.problems).deepEquals([
+      'queries/c/highlights.scm: changed appears 2 times',
+      'queries/c/highlights.scm: upstream.commit appears 2 times',
+    ]);
+  });
+
+  test('a key escaped two ways is one key', () {
+    const json = r'{"queries/c/tags.scm": {"origin": "here", '
+        r'"changed": false, "upstream": null, "\u006frigin": "here"}}';
+
+    final reading = readQueryProvenance(json, ['queries/c/tags.scm']);
+
+    check(reading.problems)
+        .deepEquals(['queries/c/tags.scm: origin appears 2 times']);
+  });
+
+  test('duplicateKeys names array indexes and skips braces in strings', () {
+    const json = r'{"s": "a \"{\" b", "list": [1, {"x": 1, "x": 2}], '
+        r'"s": ""}';
+
+    check([
+      for (final (:path, :count) in duplicateKeys(json))
+        '${path.join('.')} $count',
+    ]).deepEquals(['list.1.x 2', 's 2']);
+  });
+
+  test('the same key in two objects is no duplicate', () {
+    final json = jsonEncode({
+      'queries/c/highlights.scm': _nvimEntry(),
+      'queries/c/locals.scm': _nvimEntry(),
+    });
+
+    final reading = readQueryProvenance(
+      json,
+      ['queries/c/highlights.scm', 'queries/c/locals.scm'],
+    );
+
+    check(reading.problems).isEmpty();
+  });
+
   test('here with an upstream, or changed, is refused', () {
     final json = jsonEncode({
       'queries/c/tags.scm': {..._nvimEntry(), 'origin': 'here'},
