@@ -36,6 +36,12 @@
 ///   `ts_query_new`; every language such a line names holds a file of the
 ///   same type, tsx's `locals.scm` naming `jsx` apart; and every
 ///   query-only file is read by one of those compositions.
+/// - Every composition reads as the patterns `ts_query_new` counts in it,
+///   and every pattern of a composed `injections.scm` that captures
+///   `@injection.content` names a language, by an `@injection.language`
+///   capture or a `#set! injection.language` directive, in every grammar
+///   but those `injectionsNamingNoLanguage` lists, each of which holds at
+///   least one pattern naming none.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -571,6 +577,11 @@ Map<String, Pointer<Void>> _checkGrammars(
 /// Composes every query file of every grammar as [composeArchiveQueries]
 /// does, which lists its problems, and compiles each composition with its
 /// grammar's language.
+///
+/// Each composition must read as the patterns `ts_query_new` counts in
+/// it, so [injectionPatternsNamingNoLanguage] reads every one of them,
+/// and [_checkInjectionLanguages] then holds each grammar's injection
+/// patterns to naming a language.
 void _checkQueries(
   TreeSitterRuntime runtime,
   String output,
@@ -584,13 +595,25 @@ void _checkQueries(
   final queries = composeArchiveQueries(output, grammarAt.keys, problems);
   var compiled = 0;
   var patterns = 0;
+  final namingNoLanguage = <String, List<int>>{};
   for (final (:directory, :fileName, :source) in queries.composed) {
     final name = grammarAt[directory]!.name;
+    if (fileName == 'injections.scm') {
+      final lines = injectionPatternsNamingNoLanguage(source);
+      if (lines.isNotEmpty) namingNoLanguage[name] = lines;
+    }
     final language = languages[name];
     if (language == null) continue;
     try {
       final query = runtime.compile(language, source);
       patterns += query.patternCount;
+      final read = queryPatterns(source).length;
+      if (read != query.patternCount) {
+        problems.add(
+          '$name/$fileName: read as $read patterns; ts_query_new counts '
+          '${query.patternCount}',
+        );
+      }
       query.delete();
       compiled++;
     } on QueryException catch (error) {
@@ -604,6 +627,43 @@ void _checkQueries(
     'queries: $compiled/${queries.fileCount} composed files compile, '
     '$patterns patterns; ${queries.queryOnlyReadCount}/'
     '${queries.queryOnlyCount} query-only files inherited',
+  );
+  _checkInjectionLanguages(namingNoLanguage, problems);
+}
+
+/// Requires the grammars in [namingNoLanguage], each with the composed
+/// lines of its injection patterns that name no language, to be exactly
+/// [injectionsNamingNoLanguage].
+void _checkInjectionLanguages(
+  Map<String, List<int>> namingNoLanguage,
+  List<String> problems,
+) {
+  for (final MapEntry(key: name, value: lines) in namingNoLanguage.entries) {
+    if (!injectionsNamingNoLanguage.contains(name)) {
+      problems.add(
+        '$name/injections.scm: ${lines.length} patterns name no language '
+        '(composed lines ${lines.join(', ')})',
+      );
+    }
+  }
+  for (final name in injectionsNamingNoLanguage) {
+    if (!namingNoLanguage.containsKey(name)) {
+      problems.add(
+        '$name: every injection pattern names a language; take it out of '
+        'injectionsNamingNoLanguage',
+      );
+    }
+  }
+  final counts = [
+    for (final MapEntry(key: name, value: lines) in namingNoLanguage.entries)
+      '$name ${lines.length}',
+  ]..sort();
+  print(
+    counts.isEmpty
+        ? 'injections: every pattern names a language'
+        : 'injections: '
+              '${namingNoLanguage.values.fold(0, (a, b) => a + b.length)} '
+              'patterns name no language, in ${counts.join(', ')}',
   );
 }
 

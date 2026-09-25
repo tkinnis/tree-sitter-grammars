@@ -1,6 +1,6 @@
 /// The parts of `tool/check_release.dart` that read files and text: query
-/// composition, `api.h`'s function list, and the inputs of each grammar's
-/// test corpus.
+/// composition, the patterns of a query's text, `api.h`'s function list,
+/// and the inputs of each grammar's test corpus.
 library;
 
 import 'dart:io';
@@ -171,6 +171,139 @@ String? _compose(String directory, String fileName, Set<String>? read) {
     own,
   ].join('\n\n');
 }
+
+/// The grammars whose composed `injections.scm` holds patterns that
+/// capture `@injection.content` and name no language, which the editor
+/// passes over without injecting anything.
+///
+/// Every other grammar's injection patterns each name a language, and
+/// each grammar listed here holds at least one pattern that names none,
+/// so the list is exactly the grammars left to repair.
+const injectionsNamingNoLanguage = {
+  'bash',
+  'c',
+  'go',
+  'html',
+  'java',
+  'javadoc',
+  'kotlin',
+  'make',
+  'markdown_inline',
+  'objc',
+  'pascal',
+  'python',
+  'ruby',
+  'sql',
+  'xml',
+  'yaml',
+};
+
+/// One top-level pattern of a query: the line it starts on and its text,
+/// comments left out.
+typedef QueryPattern = ({int line, String text});
+
+/// The top-level patterns of the query [source], in order.
+///
+/// A pattern is a parenthesised or bracketed form, a string or a bare
+/// token such as `_`, any of them after a field name such as `body:`,
+/// with the captures and quantifiers that follow it; a `;` comment outside
+/// a string is left out of its text. The count is the one `ts_query_new`
+/// gives the same text.
+List<QueryPattern> queryPatterns(String source) {
+  final patterns = <QueryPattern>[];
+  var line = 1;
+  var counted = 0;
+  var index = _skipSpace(source, 0);
+  while (index < source.length) {
+    line += '\n'.allMatches(source.substring(counted, index)).length;
+    counted = index;
+    final text = StringBuffer();
+    index = _form(source, index, text);
+    while (true) {
+      final next = _skipSpace(source, index);
+      final suffix = _suffix.matchAsPrefix(source, next);
+      if (suffix == null) break;
+      text.write(' ${suffix[0]}');
+      index = suffix.end;
+    }
+    patterns.add((line: line, text: text.toString()));
+    index = _skipSpace(source, index);
+  }
+  return patterns;
+}
+
+/// A capture or quantifier following a form.
+final _suffix = RegExp(r'@[\w.\-]+|[*+?]');
+
+/// A bare token at the top level of a query, such as `_`.
+final _token = RegExp(r'[^\s()\[\]";]+');
+
+/// The index of the first character at or after [index] in [source] that
+/// is neither whitespace nor part of a `;` comment.
+int _skipSpace(String source, int index) {
+  while (index < source.length) {
+    if (source[index] == ';') {
+      final end = source.indexOf('\n', index);
+      index = end < 0 ? source.length : end;
+    } else if (source[index].trim().isEmpty) {
+      index++;
+    } else {
+      break;
+    }
+  }
+  return index;
+}
+
+/// Writes the form of [source] starting at [index] to [text], comments
+/// left out, and returns the index just past it.
+int _form(String source, int index, StringBuffer text) {
+  var depth = 0;
+  while (index < source.length) {
+    final char = source[index];
+    if (char == ';') {
+      index = _skipSpace(source, index);
+      text.write(' ');
+    } else if (char == '"') {
+      var end = index + 1;
+      while (end < source.length && source[end] != '"') {
+        end += source[end] == r'\' ? 2 : 1;
+      }
+      end = end < source.length ? end + 1 : source.length;
+      text.write(source.substring(index, end));
+      index = end;
+      if (depth == 0) return index;
+    } else if (depth == 0 && char != '(' && char != '[') {
+      final end = _token.matchAsPrefix(source, index)?.end ?? index + 1;
+      final token = source.substring(index, end);
+      text.write(token);
+      if (!token.endsWith(':')) return end;
+      text.write(' ');
+      index = _skipSpace(source, end);
+    } else {
+      text.write(char);
+      index++;
+      if (char == '(' || char == '[') depth++;
+      if ((char == ')' || char == ']') && --depth == 0) return index;
+    }
+  }
+  return index;
+}
+
+final _injectionContent = RegExp(r'@injection\.content(?![\w.\-])');
+final _injectionLanguage = RegExp(
+  r'@injection\.language(?![\w.\-])|'
+  r'#set!\s+"?injection\.language(?![\w.\-])',
+);
+
+/// The line of every pattern of the injection query [source] that
+/// captures `@injection.content` and names no language: it has neither an
+/// `@injection.language` capture nor a `#set! injection.language`
+/// directive, so the editor injects nothing where it matches.
+List<int> injectionPatternsNamingNoLanguage(String source) => [
+  for (final (:line, :text) in queryPatterns(source))
+    if (_injectionContent.hasMatch(text) && !_injectionLanguage.hasMatch(text))
+      line,
+];
 
 /// One example of a tree-sitter test corpus.
 typedef CorpusExample = ({String name, String input, List<String> languages});

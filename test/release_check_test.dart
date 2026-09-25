@@ -4,6 +4,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/grammar_pins.dart';
 import '../tool/src/release_check.dart';
 
 void main() {
@@ -201,6 +202,70 @@ void ts_parser_delete(
     });
   });
 
+  group('queryPatterns', () {
+    test('reads each top-level form with its captures and quantifiers', () {
+      const query = '''
+; a comment (with a paren
+((comment) @x
+  (#match? @x "[(]") ; a trailing comment
+  (#set! injection.language "c"))
+
+[
+  (a)
+  (b)
+] @y
+
+body: (block) @fold
+
+(a)+ @z
+"keyword" @k
+_ @any
+''';
+
+      final patterns = queryPatterns(query);
+
+      check(
+        patterns.map((pattern) => pattern.line),
+      ).deepEquals([2, 6, 11, 13, 14, 15]);
+      check(patterns.first.text)
+        ..contains('(#match? @x "[(]")')
+        ..not((text) => text.contains('trailing'));
+      check(patterns.skip(1).map((pattern) => pattern.text)).deepEquals([
+        '[\n  (a)\n  (b)\n] @y',
+        'body: (block) @fold',
+        '(a) + @z',
+        '"keyword" @k',
+        '_ @any',
+      ]);
+    });
+  });
+
+  group('injectionPatternsNamingNoLanguage', () {
+    test('lists the lines of the patterns that inject naming none', () {
+      const query = '''
+((preproc_arg) @injection.content
+  (#set! injection.language "c"))
+
+((comment) @injection.content
+  ; (#set! injection.language "doxygen")
+  (#match? @injection.content "^/[*][*]"))
+
+(raw_string_literal
+  delimiter: (raw_string_delimiter) @injection.language
+  (raw_string_content) @injection.content)
+
+((description) @injection.content
+  (#set! "injection.language" "html"))
+
+((html_tag) @injection.content)
+
+((glimmer) @glimmer)
+''';
+
+      check(injectionPatternsNamingNoLanguage(query)).deepEquals([4, 15]);
+    });
+  });
+
   group("this repository's queries", () {
     test('every file composes, each name it inherits holding the file', () {
       for (final directory in Directory(
@@ -215,6 +280,64 @@ void ts_parser_delete(
         }
       }
     });
+
+    test('objc, cpp and tsx hold none of the patterns they inherit', () {
+      List<String> patterns(String source) => [
+        for (final pattern in queryPatterns(source))
+          pattern.text.replaceAll(RegExp(r'\s+'), ' '),
+      ];
+      for (final file in [
+        'objc/folds.scm',
+        'objc/highlights.scm',
+        'objc/indents.scm',
+        'objc/injections.scm',
+        'objc/locals.scm',
+        'cpp/indents.scm',
+        'cpp/locals.scm',
+        'tsx/highlights.scm',
+        'tsx/injections.scm',
+        'tsx/locals.scm',
+      ]) {
+        final path = p.join('queries', file);
+        final own = patterns(File(path).readAsStringSync());
+        final composed = patterns(
+          composeQuery(p.dirname(path), p.basename(path))!,
+        );
+        final inherited = composed.take(composed.length - own.length);
+
+        check(because: file, inherited).isNotEmpty();
+        check(
+          because: file,
+          inherited.toSet().intersection(own.toSet()),
+        ).isEmpty();
+      }
+    });
+
+    test(
+      'only the grammars listed hold injection patterns naming no language',
+      () {
+        final queryOnly = {
+          for (final entry in parseGrammars(
+            File(p.join('tool', 'grammars.json')).readAsStringSync(),
+          ))
+            if (entry['queryOnly'] == true) entry['name'],
+        };
+        final namingNone = [
+          for (final directory in Directory(
+            'queries',
+          ).listSync().whereType<Directory>())
+            if (!queryOnly.contains(p.basename(directory.path)))
+              if (composeQuery(directory.path, 'injections.scm')
+                  case final source?
+                  when injectionPatternsNamingNoLanguage(source).isNotEmpty)
+                p.basename(directory.path),
+        ]..sort();
+
+        check(
+          namingNone,
+        ).deepEquals(injectionsNamingNoLanguage.toList()..sort());
+      },
+    );
 
     test("php's folds and indents compose with php_only's", () {
       String compose(String file) =>
