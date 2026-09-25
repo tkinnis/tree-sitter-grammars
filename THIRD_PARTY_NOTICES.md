@@ -2143,7 +2143,7 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `markdown/highlights.scm` | `runtime/queries/markdown/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `markdown/indents.scm` | `runtime/queries/markdown/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `markdown_inline/highlights.scm` | `runtime/queries/markdown_inline/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
-| `markdown_inline/injections.scm` | `runtime/queries/markdown_inline/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
+| `markdown_inline/injections.scm` | `runtime/queries/markdown_inline/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `mermaid/injections.scm` | `runtime/queries/mermaid/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `objc/folds.scm` | `runtime/queries/objc/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `objc/highlights.scm` | `queries/objc/highlights.scm` | `dad1b7cd6606ffaa5c283ba73d707b4741a5f445` | by way of the grammar's file below |

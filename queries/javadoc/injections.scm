@@ -1,14 +1,6 @@
 ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/javadoc/injections.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
 ; Modified in tree-sitter-grammars.
 
-; @value tags without double-quotes
-((bare_format_string) @injection.content
-)
-
-; @value tags with double quotes
-((literal_format_string) @injection.content
-)
-
 ; injected code snippets
 ((snippet_tag
   (attributes
@@ -25,8 +17,8 @@
 
 ; html content
 ((description) @injection.content
-)
+  (#set! injection.language "html"))
 
 ; markdown content
 ((markdown_description) @injection.content
-)
+  (#set! injection.language "markdown_inline"))

@@ -181,15 +181,11 @@ String? _compose(String directory, String fileName, Set<String>? read) {
 /// so the list is exactly the grammars left to repair.
 const injectionsNamingNoLanguage = {
   'bash',
-  'c',
   'go',
   'html',
   'java',
-  'javadoc',
   'kotlin',
   'make',
-  'markdown_inline',
-  'objc',
   'pascal',
   'python',
   'ruby',
