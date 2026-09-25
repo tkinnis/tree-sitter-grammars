@@ -23,7 +23,9 @@
 /// `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset
 /// has.
 ///
-/// Any failure exits non-zero before anything is packed.
+/// The build writes into `build/out/` and moves it to `output/` only after
+/// every check passes, so a failed build leaves no `output/`. Any failure
+/// exits non-zero before anything is packed.
 library;
 
 import 'dart:io';
@@ -89,6 +91,10 @@ Future<void> _build(
   required String? release,
   required bool dryRun,
 }) async {
+  // output/ holds only a build that passed every check: it is removed
+  // before anything can fail, and the build fills build/out/ and moves it
+  // into place last.
+  _delete(p.join(root, 'output'));
   final toolchain = Toolchain.load(root);
   final entries = parseGrammars(
       File(p.join(root, 'tool', 'grammars.json')).readAsStringSync());
@@ -102,10 +108,7 @@ Future<void> _build(
     if (dryRun) print('  --dry-run: not requiring HEAD to be the tag $release');
   }
 
-  for (final directory in ['build', 'output']) {
-    final path = Directory(p.join(root, directory));
-    if (path.existsSync()) path.deleteSync(recursive: true);
-  }
+  _delete(p.join(root, 'build'));
 
   _step('Extracting the runtime and ${_urlEntries(entries).length} grammar '
       'repositories at their pins');
@@ -141,7 +144,7 @@ Future<void> _build(
   final environment = compilerEnvironment(Platform.environment);
   print('  ${compiler.version}\n  ${compiler.path}\n'
       '  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
-  final outputDirectory = p.join(root, 'output');
+  final outputDirectory = p.join(root, 'build', 'out');
   final runtime = runtimeCommand(
     compiler: compiler,
     flags: flags,
@@ -192,7 +195,7 @@ Future<void> _build(
   ]);
 
   _step('Writing query bundles, manifest.json and build_info.json');
-  final manifest = _writeBundles(root, entries, builds);
+  final manifest = _writeBundles(root, outputDirectory, entries, builds);
   File(p.join(outputDirectory, 'manifest.json'))
       .writeAsStringSync(encodeManifest(manifest));
   final info = buildInfo(
@@ -210,18 +213,23 @@ Future<void> _build(
       .writeAsStringSync(encodeBuildInfo(info));
 
   _step('Checking the recorded flags and the manifest');
-  await _checkRecords(root, builds);
+  await _checkRecords(root, outputDirectory, builds);
+  final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
 
   print('\n✓ Built libtree-sitter.dylib, ${builds.length} grammar dylibs and '
       '${manifest.values.where((e) => e['queryOnly'] == true).length} '
       'query-only bundles into output/');
   if (release != null) {
     _step('Packing $release${dryRun ? ' (dry run)' : ''}');
-    print('  ${await _createReleaseArchive(outputDirectory, dryRun: dryRun)}');
+    print('  ${await _createReleaseArchive(output.path, dryRun: dryRun)}');
   }
 }
 
 void _step(String title) => print('\n── $title');
+
+void _delete(String path) {
+  if (Directory(path).existsSync()) Directory(path).deleteSync(recursive: true);
+}
 
 void _requireNone(String what, List<String> problems) {
   if (problems.isEmpty) return;
@@ -343,7 +351,7 @@ List<CompileCommand> _grammarCommands(
       directory: root,
       libraryName: build.name,
       objects: [for (final compile in compiles) compile.output],
-      output: p.join('output', build.dylibDirectory, build.dylibFileName),
+      output: p.join('build', 'out', build.dylibDirectory, build.dylibFileName),
       environment: environment,
     ),
   ];
@@ -386,10 +394,11 @@ Future<List<R>> _pooled<T, R>(
   return results.cast<R>();
 }
 
-/// Bundles every language's queries into `output/` and returns the
+/// Bundles every language's queries into [outputDirectory] and returns the
 /// manifest, in `grammars.json` order.
 Map<String, Map<String, Object?>> _writeBundles(
   String root,
+  String outputDirectory,
   List<Map<String, Object?>> entries,
   List<GrammarBuild> builds,
 ) {
@@ -404,7 +413,7 @@ Map<String, Map<String, Object?>> _writeBundles(
           root,
           name,
           manifestEntry['queries']! as Map<String, Object?>,
-          p.join(root, 'output', 'queries', name));
+          p.join(outputDirectory, 'queries', name));
       manifest[name] = manifestEntry;
     } else {
       for (final build in builds.where((build) => build.entry == entry)) {
@@ -414,7 +423,7 @@ Map<String, Map<String, Object?>> _writeBundles(
             root,
             build.name,
             manifestEntry['queries']! as Map<String, Object?>,
-            p.join(root, 'output', build.dylibDirectory));
+            p.join(outputDirectory, build.dylibDirectory));
         manifest[build.name] = manifestEntry;
       }
     }
@@ -422,16 +431,29 @@ Map<String, Map<String, Object?>> _writeBundles(
   return manifest;
 }
 
-/// Reads `build_info.json` and `compile_commands.json` back from disk and
-/// requires every invocation to have passed exactly the recorded flags;
-/// then requires `validate_manifest.dart` to pass.
-Future<void> _checkRecords(String root, List<GrammarBuild> builds) async {
-  final problems = checkRecordedFlags(root, {for (final b in builds) b.name});
+/// Reads `build_info.json` in [outputDirectory] and
+/// `build/compile_commands.json` back from disk and requires every
+/// invocation to have passed exactly the recorded flags; then requires
+/// `validate_manifest.dart` to pass on [outputDirectory]'s manifest.
+Future<void> _checkRecords(
+  String root,
+  String outputDirectory,
+  List<GrammarBuild> builds,
+) async {
+  final problems = checkRecordedFlags(
+    buildInfoPath: p.join(outputDirectory, 'build_info.json'),
+    compileCommandsPath: p.join(root, 'build', 'compile_commands.json'),
+    grammarNames: {for (final build in builds) build.name},
+  );
   _requireNone('recorded flags', problems);
   print('  every compiler invocation passed exactly the recorded flags');
   final validation = await Process.run(
     Platform.resolvedExecutable,
-    ['run', p.join('tool', 'validate_manifest.dart'), 'output/manifest.json'],
+    [
+      'run',
+      p.join('tool', 'validate_manifest.dart'),
+      p.join(outputDirectory, 'manifest.json'),
+    ],
     workingDirectory: root,
   );
   if (validation.exitCode != 0) {

@@ -148,14 +148,17 @@ List<String> buildFlagProblems(
   return problems;
 }
 
-/// [buildFlagProblems] for the `output/build_info.json` and
-/// `build/compile_commands.json` under [root], read back from disk.
-List<String> checkRecordedFlags(String root, Set<String> grammarNames) {
-  final info = jsonDecode(
-          File(p.join(root, 'output', 'build_info.json')).readAsStringSync())
+/// [buildFlagProblems] for the `build_info.json` at [buildInfoPath] and the
+/// `compile_commands.json` at [compileCommandsPath], read back from disk.
+List<String> checkRecordedFlags({
+  required String buildInfoPath,
+  required String compileCommandsPath,
+  required Set<String> grammarNames,
+}) {
+  final info = jsonDecode(File(buildInfoPath).readAsStringSync())
       as Map<String, Object?>;
-  final commands = parseCompileCommands(
-      File(p.join(root, 'build', 'compile_commands.json')).readAsStringSync());
+  final commands =
+      parseCompileCommands(File(compileCommandsPath).readAsStringSync());
   return buildFlagProblems(info, commands, grammarNames);
 }
 
