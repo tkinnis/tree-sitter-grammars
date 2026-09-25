@@ -17,9 +17,11 @@
 /// `tool/src/compiler.dart`, and `output/build_info.json` records them.
 ///
 /// `--release=vX.Y.Z` first requires a clean working tree whose `HEAD` is
-/// the tag `vX.Y.Z`, and then packs `output/` into
+/// the annotated tag `vX.Y.Z`, and then packs `output/` into
 /// `output/grammars-macos-arm64.tar.gz`. `--dry-run` skips only the tag
-/// requirement.
+/// requirement and packs the same bytes into
+/// `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset
+/// has.
 ///
 /// Any failure exits non-zero before anything is packed.
 library;
@@ -38,6 +40,7 @@ import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/manifest.dart';
 import 'src/query_provenance.dart';
+import 'src/release.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
 
@@ -93,7 +96,11 @@ Future<void> _build(
   _requireNone('grammars.json', pinProblems(entries));
   _requireNone('query_provenance.json', _provenanceProblems(root));
   await _requireRuntimeSubmodule(root, toolchain);
-  if (release != null) await _preflight(root, release, dryRun: dryRun);
+  if (release != null) {
+    await checkReleasePreflight(runGit, root, release,
+        runtimeCommit: toolchain.treeSitterCommit, dryRun: dryRun);
+    if (dryRun) print('  --dry-run: not requiring HEAD to be the tag $release');
+  }
 
   for (final directory in ['build', 'output']) {
     final path = Directory(p.join(root, directory));
@@ -209,8 +216,8 @@ Future<void> _build(
       '${manifest.values.where((e) => e['queryOnly'] == true).length} '
       'query-only bundles into output/');
   if (release != null) {
-    _step('Packing $release');
-    print('  ${await _createReleaseArchive(outputDirectory)}');
+    _step('Packing $release${dryRun ? ' (dry run)' : ''}');
+    print('  ${await _createReleaseArchive(outputDirectory, dryRun: dryRun)}');
   }
 }
 
@@ -246,43 +253,6 @@ Future<void> _requireRuntimeSubmodule(String root, Toolchain toolchain) async {
     throw BuildException('tree-sitter is checked out at $head; '
         'toolchain.json pins ${toolchain.treeSitterTag} '
         '(${toolchain.treeSitterCommit})');
-  }
-}
-
-/// Requires a clean working tree, a submodule recorded at the toolchain's
-/// commit, and, unless [dryRun], `HEAD` at the tag [release].
-Future<void> _preflight(
-  String root,
-  String release, {
-  required bool dryRun,
-}) async {
-  final status = (await runGit(root, ['status', '--porcelain'])).trim();
-  if (status.isNotEmpty) {
-    throw BuildException('a release builds from a clean working tree:\n'
-        '$status');
-  }
-  final toolchain = Toolchain.load(root);
-  final gitlink = (await runGit(root, ['ls-tree', 'HEAD', 'tree-sitter']))
-      .trim()
-      .split(RegExp(r'\s+'));
-  if (gitlink.length < 3 || gitlink[2] != toolchain.treeSitterCommit) {
-    throw BuildException('HEAD records the tree-sitter submodule at '
-        '${gitlink.length < 3 ? 'nothing' : gitlink[2]}, not '
-        '${toolchain.treeSitterCommit}');
-  }
-  if (dryRun) {
-    print('  --dry-run: not requiring HEAD to be $release');
-    return;
-  }
-  final head = (await runGit(root, ['rev-parse', 'HEAD'])).trim();
-  final String tagged;
-  try {
-    tagged = (await runGit(root, ['rev-parse', '$release^{commit}'])).trim();
-  } on GitException {
-    throw BuildException('no tag $release; tag the release commit first');
-  }
-  if (tagged != head) {
-    throw BuildException('HEAD is $head, but $release is $tagged');
   }
 }
 
@@ -471,9 +441,13 @@ Future<void> _checkRecords(String root, List<GrammarBuild> builds) async {
   print('  validate_manifest.dart passed');
 }
 
-/// Packs `output/` into `grammars-<platform>.tar.gz`.
-Future<String> _createReleaseArchive(String outputDirectory) async {
-  const archiveName = 'grammars-macos-arm64.tar.gz';
+/// Packs `output/` into [releaseArchiveName], or into [dryRunArchiveName]
+/// when [dryRun].
+Future<String> _createReleaseArchive(
+  String outputDirectory, {
+  required bool dryRun,
+}) async {
+  final archiveName = dryRun ? dryRunArchiveName : releaseArchiveName;
   final result = await Process.run(
     'tar',
     [
