@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 /// Compares current config.json files with the last released version.
 ///
 /// This script extracts the release archive and compares each language's
@@ -72,7 +73,8 @@ void main(List<String> args) async {
     Map<String, dynamic> released;
 
     try {
-      current = jsonDecode(await currentConfig.readAsString()) as Map<String, dynamic>;
+      current = jsonDecode(await currentConfig.readAsString())
+          as Map<String, dynamic>;
     } catch (e) {
       print('$lang: Error reading current config: $e');
       continue;
@@ -85,7 +87,8 @@ void main(List<String> args) async {
     }
 
     try {
-      released = jsonDecode(await releasedConfig.readAsString()) as Map<String, dynamic>;
+      released = jsonDecode(await releasedConfig.readAsString())
+          as Map<String, dynamic>;
     } catch (e) {
       print('$lang: Error reading released config: $e');
       continue;

@@ -2,7 +2,8 @@
 
 /// Converts nvim-treesitter queries to standard tree-sitter queries
 ///
-/// This script converts Neovim-specific predicates to standard tree-sitter predicates:
+/// This script converts Neovim-specific predicates to standard tree-sitter
+/// predicates:
 /// - `#lua-match?` -> `#match?` (with pattern conversion if needed)
 /// - `#any-of?` -> Multiple query patterns (one per value)
 /// - `#eq?` -> `#match?` with exact match
@@ -41,12 +42,9 @@ void main(List<String> args) async {
   print('  Files processed: $filesProcessed');
   print('  Files modified: $filesModified');
   print('\nNext steps:');
-  print(
-    '  1. Manually merge inherited queries (cpp, javascript, typescript, tsx, objc, php)',
-  );
-  print(
-    '  2. Run: dart run tool/build_tree_sitter_grammars.dart tool/grammars.json',
-  );
+  print('  1. Manually merge inherited queries '
+      '(cpp, javascript, typescript, tsx, objc, php)');
+  print('  2. Run: dart run tool/build_tree_sitter_grammars.dart');
   print('  3. Test the changes');
 }
 
@@ -84,7 +82,8 @@ Future<bool> convertQueryFile(File file) async {
     modified = true;
   }
 
-  // Step 4: Remove #set! directives (metadata, not needed for standard tree-sitter)
+  // Step 4: Remove #set! directives, metadata that standard tree-sitter
+  // does not need.
   final setPattern = RegExp(r'\s*\(#set!\s+[^)]+\)\s*', multiLine: true);
   if (content.contains(setPattern)) {
     content = content.replaceAll(setPattern, '\n');
@@ -247,7 +246,8 @@ Map<String, dynamic>? extractQueryPattern(List<String> lines, int startIndex) {
 /// Parses a `#any-of?` predicate from a pattern
 ///
 /// Returns:
-/// `{ 'capture': String, 'values': List<String>, 'basePattern': String, 'originalPredicate': String }`
+/// a map with `capture` (a `String`), `values` (a `List<String>`),
+/// `basePattern` (a `String`) and `originalPredicate` (a `String`).
 Map<String, dynamic>? parseAnyOf(String pattern) {
   // Pattern: (#any-of? @capture "value1" "value2" ...)
   // Can contain comments within the predicate

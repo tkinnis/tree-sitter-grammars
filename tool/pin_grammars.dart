@@ -4,7 +4,8 @@
 ///
 /// ```sh
 /// dart run tool/pin_grammars.dart --from-checkouts
-/// dart run tool/pin_grammars.dart --set tree-sitter-perl=<sha> [--source-commit=<sha>]
+/// dart run tool/pin_grammars.dart --set tree-sitter-perl=<sha> \
+///     [--source-commit=<sha>]
 /// dart run tool/pin_grammars.dart --check
 /// ```
 ///

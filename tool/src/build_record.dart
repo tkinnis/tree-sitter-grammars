@@ -83,9 +83,9 @@ List<CompileCommand> parseCompileCommands(String json) => [
 ///
 /// The runtime and grammar compile lists must each pass `-O3` once and no
 /// other optimisation level; the link list, which compiles nothing, passes
-/// none. No list may define `NDEBUG`. The runtime must have one invocation and each of
-/// [grammarNames] one link, every object a link names must have been
-/// compiled, and no invocation may see a variable outside
+/// none. No list may define `NDEBUG`. The runtime must have one invocation
+/// and each of [grammarNames] one link, every object a link names must have
+/// been compiled, and no invocation may see a variable outside
 /// [allowedCompilerVariables].
 List<String> buildFlagProblems(
   Map<String, Object?> info,

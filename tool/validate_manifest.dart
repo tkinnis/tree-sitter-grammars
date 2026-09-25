@@ -47,8 +47,8 @@ void main(List<String> args) {
         continue;
       }
 
-      // Check required fields
-      // Note: 'symbol' is only required for tree-sitter languages (those with dylib_dir)
+      // 'symbol' is required only of tree-sitter languages, which have a
+      // dylib_dir.
       final isTreeSitterLanguage = data.containsKey('dylib_dir');
       final requiredFields = isTreeSitterLanguage
           ? ['displayName', 'symbol', 'scope']
@@ -86,7 +86,8 @@ void main(List<String> args) {
           errorCount++;
         } else if (!RegExp(r'^[a-zA-Z0-9_.+-]+$').hasMatch(symbol)) {
           print(
-            '✗ $languageId: symbol contains invalid characters (allowed: a-z, A-Z, 0-9, _, ., -, +)',
+            '✗ $languageId: symbol contains invalid characters '
+            '(allowed: a-z, A-Z, 0-9, _, ., -, +)',
           );
           errorCount++;
         }
@@ -100,7 +101,8 @@ void main(List<String> args) {
           errorCount++;
         } else if (!RegExp(r'^[a-zA-Z][a-zA-Z0-9._-]*$').hasMatch(scope)) {
           print(
-            '✗ $languageId: scope must start with a letter and contain only letters, numbers, dots, underscores, and hyphens',
+            '✗ $languageId: scope must start with a letter and contain '
+            'only letters, numbers, dots, underscores, and hyphens',
           );
           errorCount++;
         }
@@ -126,7 +128,9 @@ void main(List<String> args) {
             } else if (!RegExp(r'^\.[.a-zA-Z0-9_-]+$|^[A-Z][a-zA-Z0-9_-]*$')
                 .hasMatch(ext)) {
               print(
-                '✗ $languageId: extensions[$i] "$ext" must start with a dot (e.g., ".js", "..bashrc") or be a filename (e.g., "Makefile")',
+                '✗ $languageId: extensions[$i] "$ext" must start with a '
+                'dot (e.g., ".js", "..bashrc") or be a filename '
+                '(e.g., "Makefile")',
               );
               errorCount++;
             }
@@ -163,7 +167,8 @@ void main(List<String> args) {
 
             if (!validQueryTypes.contains(queryType)) {
               print(
-                '⚠ $languageId: queries["$queryType"] is not a standard query type',
+                '⚠ $languageId: queries["$queryType"] is not a standard '
+                'query type',
               );
               warningCount++;
             }

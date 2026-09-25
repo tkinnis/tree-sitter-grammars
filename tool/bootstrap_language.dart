@@ -237,12 +237,13 @@ Examples:
     print('  ${queriesDir.path}/');
     print('');
     print('Next steps:');
-    print('  1. Edit config.json to set correct extensions, comments, brackets');
+    print('  1. Edit config.json: extensions, comments, brackets');
     print('  2. Review and customize the imported queries as needed');
     print('  3. Add symbol patterns to tags.scm for code navigation');
-    print(
-      '  4. Run: dart run tool/build_tree_sitter_grammars.dart tool/grammars.json',
-    );
-    print('  5. Test syntax highlighting with example files');
+    print('  4. Pin the grammar: dart run tool/pin_grammars.dart '
+        '--set <repo>=<sha>');
+    print('  5. Record each query file in tool/query_provenance.json');
+    print('  6. Run: dart run tool/build_tree_sitter_grammars.dart');
+    print('  7. Test syntax highlighting with example files');
   }
 }

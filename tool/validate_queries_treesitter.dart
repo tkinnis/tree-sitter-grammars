@@ -199,12 +199,9 @@ void main() async {
   print('Summary');
   print('═' * 80);
   print('Total queries tested: $totalQueries');
-  print(
-    'Passed: $passedQueries (${(passedQueries / totalQueries * 100).toStringAsFixed(1)}%)',
-  );
-  print(
-    'Failed: $failedQueries (${(failedQueries / totalQueries * 100).toStringAsFixed(1)}%)',
-  );
+  String percent(int count) => (count / totalQueries * 100).toStringAsFixed(1);
+  print('Passed: $passedQueries (${percent(passedQueries)}%)');
+  print('Failed: $failedQueries (${percent(failedQueries)}%)');
   print('Skipped: $skippedQueries (no sample)');
   print('');
 

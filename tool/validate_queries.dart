@@ -59,7 +59,7 @@ void main() async {
       final queryName = queryFile.uri.pathSegments.last.replaceAll('.scm', '');
       totalQueries++;
 
-      // For now, just validate that the file can be read and has balanced parens
+      // Checks only that the file reads and its parentheses balance.
       try {
         final content = await queryFile.readAsString();
         final error = validateQuerySyntax(content);
@@ -88,12 +88,9 @@ void main() async {
   print('Summary');
   print('═' * 80);
   print('Total queries tested: $totalQueries');
-  print(
-    'Passed: $passedQueries (${(passedQueries / totalQueries * 100).toStringAsFixed(1)}%)',
-  );
-  print(
-    'Failed: $failedQueries (${(failedQueries / totalQueries * 100).toStringAsFixed(1)}%)',
-  );
+  String percent(int count) => (count / totalQueries * 100).toStringAsFixed(1);
+  print('Passed: $passedQueries (${percent(passedQueries)}%)');
+  print('Failed: $failedQueries (${percent(failedQueries)}%)');
   print('');
 
   if (failedQueries > 0) {
