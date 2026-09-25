@@ -2045,7 +2045,7 @@ Every query file came from one of three places: nvim-treesitter, a grammar's own
 
 ### Derived from nvim-treesitter
 
-These files are derived from https://github.com/nvim-treesitter/nvim-treesitter, under the Apache License 2.0 reproduced below. Each one names, in a header at its top, the nvim-treesitter file and commit it derives from and whether tree-sitter-grammars modified it.
+These files are derived from https://github.com/nvim-treesitter/nvim-treesitter, under the Apache License 2.0 reproduced below, which is nvim-treesitter's `LICENSE` at every commit named. Each one names, in a header at its top, the nvim-treesitter file and commit it derives from and whether tree-sitter-grammars modified it.
 
 | File | nvim-treesitter file | Commit | State |
 | --- | --- | --- | --- |
@@ -2109,7 +2109,7 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `idl/indents.scm` | `runtime/queries/idl/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `idl/injections.scm` | `runtime/queries/idl/injections.scm` | `864e75a85d4bbe77745929a1ce4d4c63bef11480` | modified in tree-sitter-grammars |
 | `java/folds.scm` | `runtime/queries/java/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
-| `java/highlights.scm` | `queries/java/highlights.scm` | `65b3a8e6d7b3777bbea326dd96d21d17d937fd7d` | by way of the grammar's file below |
+| `java/highlights.scm` | `queries/java/highlights.scm` | `bcf421b4e7f164dfc8aca8a94949adda2bdda10f` | by way of the grammar's file below |
 | `java/indents.scm` | `runtime/queries/java/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `java/injections.scm` | `runtime/queries/java/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `java/locals.scm` | `runtime/queries/java/locals.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
@@ -2117,7 +2117,7 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `javadoc/injections.scm` | `runtime/queries/javadoc/injections.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `javascript/folds.scm` | `runtime/queries/javascript/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `javascript/indents.scm` | `runtime/queries/javascript/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
-| `javascript/locals.scm` | `queries/javascript/locals.scm` | `ac8ae3b1c7b5644f8317cdc88d604cdb558b6296` | by way of the grammar's file below |
+| `javascript/locals.scm` | `queries/javascript/locals.scm` | `337756d2f632fa94461dbfddd73898568f46c43d` | by way of the grammar's file below |
 | `jsdoc/highlights.scm` | `runtime/queries/jsdoc/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `json/folds.scm` | `runtime/queries/json/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `json/injections.scm` | `runtime/queries/json/injections.scm` | `9d47b2558b29fc8c0bce5f54b8424c5f8e2c80c7` | unchanged |
@@ -2206,7 +2206,7 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 | `tsx/locals.scm` | `runtime/queries/tsx/locals.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | by way of the grammar's file below |
 | `typescript/folds.scm` | `runtime/queries/typescript/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `typescript/indents.scm` | `runtime/queries/typescript/indents.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
-| `typescript/locals.scm` | `queries/typescript/locals.scm` | `ac8ae3b1c7b5644f8317cdc88d604cdb558b6296` | by way of the grammar's file below |
+| `typescript/locals.scm` | `queries/typescript/locals.scm` | `28bc7a070372c4ad6cbf3d98d4743b08defc0561` | by way of the grammar's file below |
 | `xml/folds.scm` | `runtime/queries/xml/folds.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | unchanged |
 | `xml/highlights.scm` | `runtime/queries/xml/highlights.scm` | `692b051b09935653befdb8f7ba8afdb640adf17b` | modified in tree-sitter-grammars |
 | `xml/indents.scm` | `queries/xml/indents.scm` | `5b3dd8cff1064db583ddd3edd314e94a02ea1bef` | modified in tree-sitter-grammars |
@@ -2224,14 +2224,14 @@ These files are derived from https://github.com/nvim-treesitter/nvim-treesitter,
 
 ### From a grammar's repository
 
-These files come from the repository of a grammar listed under "Grammars" above, under the licence reproduced there.
+These files come from the repository of a grammar listed under "Grammars" above, under the licence reproduced there: the licence and NOTICE files at every commit named are the ones reproduced there.
 
 | File | Repository | Path | Commit | Licence | State |
 | --- | --- | --- | --- | --- | --- |
-| `ada/textobjects.scm` | tree-sitter-ada | `queries/textobjects.scm` | `42cc2eb141529b03a91c18ec8646a0a58fb111ba` | MIT | modified in tree-sitter-grammars |
+| `ada/textobjects.scm` | tree-sitter-ada | `queries/textobjects.scm` | `ba7951a8f3fb08f9ea923625153e7670c89f30b4` | MIT | modified in tree-sitter-grammars |
 | `bash/highlights.scm` | tree-sitter-bash | `queries/highlights.scm` | `422a07cb221b92c6b117e854efa8945a506b5214` | MIT | unchanged |
-| `c-sharp/highlights.scm` | tree-sitter-c-sharp | `queries/highlights.scm` | `4b5502f7de37769c39e5d8e3766ee7b142d31e20` | MIT | unchanged |
-| `c-sharp/tags.scm` | tree-sitter-c-sharp | `queries/tags.scm` | `4b5502f7de37769c39e5d8e3766ee7b142d31e20` | MIT | unchanged |
+| `c-sharp/highlights.scm` | tree-sitter-c-sharp | `queries/highlights.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | unchanged |
+| `c-sharp/tags.scm` | tree-sitter-c-sharp | `queries/tags.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | unchanged |
 | `c/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |
 | `c/tags.scm` | tree-sitter-c | `queries/tags.scm` | `0d33f0422ad391c6d652283645d546ffa048f503` | MIT | unchanged |
 | `cpp/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |
@@ -2265,11 +2265,11 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `ocaml/tags.scm` | tree-sitter-ocaml | `queries/tags.scm` | `f9fea5ffc334fc2148085e74ace008af244695b1` | MIT | unchanged |
 | `pascal/highlights.scm` | tree-sitter-pascal | `queries/highlights.scm` | `d0ebabefaea9ac3f6fc3004cf08cd121b66da9e4` | MIT | unchanged |
 | `pascal/locals.scm` | tree-sitter-pascal | `queries/locals.scm` | `22fb8f8fe5e6822266e82794a1d19444f9f3879e` | MIT | unchanged |
-| `perl/folds.scm` | tree-sitter-perl | `queries/folds.scm` | `35e58380131853a4f453325286d397c8c6fc08e4` | MIT | modified in tree-sitter-grammars |
-| `perl/highlights.scm` | tree-sitter-perl | `queries/highlights.scm` | `2872c35355a17b3c13b422d6d9b04a0530558951` | MIT | modified in tree-sitter-grammars |
-| `perl/injections.scm` | tree-sitter-perl | `queries/injections.scm` | `ad5b6f3967e46423cda1dbef3823c9cd031a5c6b` | MIT | unchanged |
+| `perl/folds.scm` | tree-sitter-perl | `queries/folds.scm` | `bfb130c6f954b69ac71796892cf340891d670b7a` | MIT | modified in tree-sitter-grammars |
+| `perl/highlights.scm` | tree-sitter-perl | `queries/highlights.scm` | `bfb130c6f954b69ac71796892cf340891d670b7a` | MIT | modified in tree-sitter-grammars |
+| `perl/injections.scm` | tree-sitter-perl | `queries/injections.scm` | `bfb130c6f954b69ac71796892cf340891d670b7a` | MIT | unchanged |
 | `php/highlights.scm` | tree-sitter-php | `queries/highlights.scm` | `43fbdd53c34a82d9a27c83f9798a2918b3dcd270` | MIT | unchanged |
-| `php/injections.scm` | tree-sitter-php | `queries/injections.scm` | `b221172574da385f86cd6c133e959b6e2629ba06` | MIT | modified in tree-sitter-grammars |
+| `php/injections.scm` | tree-sitter-php | `queries/injections.scm` | `ad1c8c837e34222839c804bf96466e518787e180` | MIT | modified in tree-sitter-grammars |
 | `php/tags.scm` | tree-sitter-php | `queries/tags.scm` | `cb4fac2ee6c34b5e32f98a3ad3e7c17f5288cc85` | MIT | unchanged |
 | `python/highlights.scm` | tree-sitter-python | `queries/highlights.scm` | `1124c1872b6cc499b1a8848c366e07da156b505a` | MIT | unchanged |
 | `ruby/highlights.scm` | tree-sitter-ruby | `queries/highlights.scm` | `d60f2a5a68e1b41ba51caa6d3d21593a810c01d6` | MIT | unchanged |
@@ -2284,7 +2284,7 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `tsx/highlights.scm` | tree-sitter-javascript | `queries/highlights.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |
 | `tsx/injections.scm` | tree-sitter-javascript | `queries/injections.scm` | `1c751f8a4420f880b65b461bcf617ad2126ebc58` | MIT | modified in tree-sitter-grammars |
 | `tsx/locals.scm` | tree-sitter-javascript | `queries/locals.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |
-| `tsx/tags.scm` | tree-sitter-typescript | `queries/tags.scm` | `f289f293f092bf76fd6d052bce606b65633c9187` | MIT | modified in tree-sitter-grammars |
+| `tsx/tags.scm` | tree-sitter-javascript | `queries/tags.scm` | `687e20a18ea2a003482aacb44d8ede5511cc95f7` | MIT | modified in tree-sitter-grammars |
 | `typescript/highlights.scm` | tree-sitter-javascript | `queries/highlights.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |
 | `typescript/injections.scm` | tree-sitter-javascript | `queries/injections.scm` | `1c751f8a4420f880b65b461bcf617ad2126ebc58` | MIT | modified in tree-sitter-grammars |
 | `typescript/locals.scm` | tree-sitter-javascript | `queries/locals.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |

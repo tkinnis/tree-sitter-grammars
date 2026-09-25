@@ -1,4 +1,4 @@
-; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/java/highlights.scm @ 65b3a8e6d7b3777bbea326dd96d21d17d937fd7d, Apache-2.0.
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/java/highlights.scm @ bcf421b4e7f164dfc8aca8a94949adda2bdda10f, Apache-2.0.
 ; Taken from https://github.com/tree-sitter/tree-sitter-java, queries/highlights.scm @ 04a649d1a0c40e53f946677463d7d8c4e8d6d0db, MIT.
 ; Unchanged.
 

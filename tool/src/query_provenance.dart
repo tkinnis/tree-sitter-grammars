@@ -13,6 +13,13 @@
 ///   null for `here`.
 /// - `nvimUpstream`: only on `both` entries whose closest upstream is the
 ///   grammar's repository; the closest nvim-treesitter file.
+///
+/// Every file cited is the closest one published under the licence the
+/// notices reproduce for its repository: its commit's licence and NOTICE
+/// files are the grammar's at its pin, or, for nvim-treesitter, the Apache
+/// License 2.0 of `LICENSES/Apache-2.0.txt`. The same text at an earlier
+/// commit under another licence, or under none, is never cited;
+/// `write_notices.dart` refuses such a citation.
 library;
 
 import 'dart:convert';

@@ -7,8 +7,10 @@ import 'package:test/test.dart';
 
 import '../tool/src/grammar_plan.dart';
 import '../tool/src/notices.dart';
+import '../tool/src/query_headers.dart';
 import '../tool/src/query_provenance.dart';
 import '../tool/src/toolchain.dart';
+import 'support/git_fixture.dart';
 
 const _pin = '0123456789abcdef0123456789abcdef01234567';
 
@@ -301,6 +303,186 @@ void main() {
         ),
       ),
     ).throws<NoticesException>();
+  });
+
+  group('citedLicenseProblems', () {
+    const grammar = 'https://github.com/example/tree-sitter-x';
+    const cited = '1111111111111111111111111111111111111111';
+    final mit = bytes('MIT, Copyright (c) 2020 A\n');
+
+    /// One grammar-derived file, x/tags.scm, cited at [commit] of [repo],
+    /// and one both-derived file whose nvim-treesitter side is cited at
+    /// [nvimCommit].
+    Map<String, QueryProvenance> provenance({
+      String repo = grammar,
+      String commit = cited,
+      String nvimCommit = cited,
+    }) => {
+      'queries/x/tags.scm': QueryProvenance(
+        origin: QueryOrigin.grammar,
+        changed: false,
+        upstream: UpstreamFile(
+          repo: repo,
+          commit: commit,
+          path: 'queries/tags.scm',
+        ),
+      ),
+      'queries/x/locals.scm': QueryProvenance(
+        origin: QueryOrigin.both,
+        changed: true,
+        upstream: UpstreamFile(
+          repo: grammar,
+          commit: cited,
+          path: 'queries/locals.scm',
+        ),
+        nvimUpstream: UpstreamFile(
+          repo: nvimTreesitterUrl,
+          commit: nvimCommit,
+          path: 'queries/x/locals.scm',
+        ),
+      ),
+    };
+
+    final reproduced = {
+      grammar: {'LICENSE': mit},
+      nvimTreesitterUrl: {'LICENSE': bytes('Apache\n')},
+    };
+
+    /// Answers each citation with [grammarFiles] for the grammar and the
+    /// reproduced Apache text for nvim-treesitter, counting the reads.
+    ({
+      Future<Map<String, List<int>>> Function(UpstreamFile) filesAt,
+      List<String> reads,
+    })
+    fake(Map<String, List<int>> grammarFiles, {Map<String, List<int>>? nvim}) {
+      final reads = <String>[];
+      return (
+        filesAt: (cited) async {
+          reads.add('${cited.repo}@${cited.commit}');
+          return cited.repo == nvimTreesitterUrl
+              ? (nvim ?? reproduced[nvimTreesitterUrl]!)
+              : grammarFiles;
+        },
+        reads: reads,
+      );
+    }
+
+    test('accepts commits carrying the reproduced files, reading each '
+        'once', () async {
+      final (:filesAt, :reads) = fake({
+        'LICENSE': bytes('MIT, Copyright (c) 2020 A\n'),
+      });
+
+      check(
+        await citedLicenseProblems(provenance(), reproduced, filesAt),
+      ).isEmpty();
+      check(reads).deepEquals(['$grammar@$cited', '$nvimTreesitterUrl@$cited']);
+    });
+
+    test('refuses a commit under another licence', () async {
+      final (:filesAt, reads: _) = fake({
+        'LICENSE': bytes('The Artistic License 2.0\n'),
+      });
+
+      check(
+        await citedLicenseProblems(provenance(), reproduced, filesAt),
+      ).deepEquals([
+        'queries/x/locals.scm: cites $grammar @ $cited, whose LICENSE is '
+            'not the one the notices reproduce',
+        'queries/x/tags.scm: cites $grammar @ $cited, whose LICENSE is not '
+            'the one the notices reproduce',
+      ]);
+    });
+
+    test('refuses a commit whose copyright line differs', () async {
+      final (:filesAt, reads: _) = fake({
+        'LICENSE': bytes('MIT, Copyright (c) 2020 B\n'),
+      });
+
+      check(
+        await citedLicenseProblems(provenance(), reproduced, filesAt),
+      ).length.equals(2);
+    });
+
+    test('refuses a commit with no licence file, or only a NOTICE', () async {
+      for (final files in [
+        <String, List<int>>{},
+        {'NOTICE': bytes('notice\n')},
+      ]) {
+        final (:filesAt, reads: _) = fake(files);
+
+        check(
+          await citedLicenseProblems(provenance(), reproduced, filesAt),
+        ).contains(
+          'queries/x/tags.scm: cites $grammar @ $cited, which has no '
+          'licence file',
+        );
+      }
+    });
+
+    test('refuses a NOTICE the notices do not reproduce', () async {
+      final (:filesAt, reads: _) = fake({
+        'LICENSE': mit,
+        'NOTICE.md': bytes('notice\n'),
+      });
+
+      check(
+        await citedLicenseProblems(provenance(), reproduced, filesAt),
+      ).contains(
+        'queries/x/tags.scm: cites $grammar @ $cited, whose NOTICE.md is '
+        'not the one the notices reproduce',
+      );
+    });
+
+    test('refuses an nvim-treesitter commit without its licence', () async {
+      final (:filesAt, reads: _) = fake({'LICENSE': mit}, nvim: const {});
+
+      check(
+        await citedLicenseProblems(provenance(), reproduced, filesAt),
+      ).deepEquals([
+        'queries/x/locals.scm: cites $nvimTreesitterUrl @ $cited, which has '
+            'no licence file',
+      ]);
+    });
+
+    test('refuses a repository whose licence the notices lack', () async {
+      const other = 'https://github.com/example/other';
+      final (:filesAt, :reads) = fake({'LICENSE': mit});
+
+      check(
+        await citedLicenseProblems(
+          provenance(repo: other),
+          reproduced,
+          filesAt,
+        ),
+      ).deepEquals([
+        'queries/x/tags.scm: cites $other @ $cited, whose licence the '
+            'notices lack',
+      ]);
+      check(reads).not((it) => it.contains('$other@$cited'));
+    });
+
+    test(
+      'reads the licence files a commit holds, not the working tree',
+      () async {
+        final repository = await FixtureRepository.create(path('store'));
+        final first = await repository.commit({
+          'LICENSE.txt': bytes('first\n'),
+          'NOTICE': bytes('notice\n'),
+          'README.md': bytes('readme\n'),
+          'queries/LICENSE': bytes('nested\n'),
+        });
+        await repository.commit({'LICENSE.txt': bytes('second\n')});
+        File(path('store/LICENSE.txt')).writeAsStringSync('working tree\n');
+
+        final files = await committedLicenseFiles(repository.path, first);
+
+        check(
+          files.keys.toList()..sort(),
+        ).deepEquals(['LICENSE.txt', 'NOTICE']);
+        check(utf8.decode(files['LICENSE.txt']!)).equals('first\n');
+      },
+    );
   });
 
   group('licenseComments', () {

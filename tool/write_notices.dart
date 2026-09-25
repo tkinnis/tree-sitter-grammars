@@ -12,16 +12,26 @@
 /// temporary directory, as the build unpacks them, so the text is the one
 /// the build produces and requires. Commit the written file: the build
 /// refuses to run while the committed copy differs from what it produces.
+///
+/// Every upstream commit `tool/query_provenance.json` cites is read from
+/// its object store (`grammars/<repo>` for a grammar,
+/// `.cache/nvim-treesitter` for nvim-treesitter), fetching it when the
+/// store lacks it, and both modes fail unless the licence and NOTICE files
+/// at its root are exactly the ones the notices reproduce for that
+/// repository: the grammar's at its pin, or `LICENSES/Apache-2.0.txt`.
 library;
 
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/git.dart';
 import 'src/grammar_pins.dart';
 import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/notices.dart';
+import 'src/query_bootstrap.dart';
+import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/toolchain.dart';
 
@@ -77,18 +87,48 @@ Future<String> generateNotices(String root, String scratch) async {
     sourceRoot: sourceRoot,
     bundleDirectory: p.join(scratch, 'sources'),
   );
-  return thirdPartyNotices(
+  final provenance = readRepositoryProvenance(root);
+  final apacheLicense = File(p.join(root, 'LICENSES', 'Apache-2.0.txt'));
+  final notices = thirdPartyNotices(
     NoticesInput(
       toolchain: toolchain,
       runtimeDirectory: p.join(sourceRoot, 'tree-sitter'),
       entries: entries,
       builds: planGrammars(scratch, entries),
       sourceRoot: sourceRoot,
-      provenance: readRepositoryProvenance(root),
-      apacheLicense: File(
-        p.join(root, 'LICENSES', 'Apache-2.0.txt'),
-      ).readAsStringSync(),
+      provenance: provenance,
+      apacheLicense: apacheLicense.readAsStringSync(),
       ownLicense: File(p.join(root, 'LICENSE')).readAsStringSync(),
     ),
   );
+  final problems = await citedLicenseProblems(provenance.entries, {
+    nvimTreesitterUrl: {'LICENSE': apacheLicense.readAsBytesSync()},
+    for (final entry in entries)
+      if (entry['url'] case final String url)
+        normalizeRepositoryUrl(url): reproducedLicenseFiles(
+          p.join(sourceRoot, repositoryName(url)),
+        ),
+  }, (cited) => _licenseFilesAt(root, cited));
+  if (problems.isNotEmpty) throw NoticesException(problems);
+  return notices;
+}
+
+/// The licence and NOTICE files at [cited]'s commit, read from the
+/// repository's object store under [root], which is created and fetched
+/// as needed.
+Future<Map<String, List<int>>> _licenseFilesAt(
+  String root,
+  UpstreamFile cited,
+) async {
+  final name = repositoryName(cited.repo);
+  // Each store is fetched with the runner the tool that owns it uses.
+  final (
+    GitRunner git,
+    String store,
+  ) = normalizeRepositoryUrl(cited.repo) == nvimTreesitterUrl
+      ? (runIsolatedGit, nvimStoreDirectory(root))
+      : (runGit, p.join(root, 'grammars', name));
+  await ensureObjectStore(git, store, cited.repo);
+  await ensureCommit(git, store, cited.commit, name);
+  return committedLicenseFiles(store, cited.commit);
 }

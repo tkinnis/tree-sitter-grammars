@@ -248,3 +248,5 @@ Every query file comes from one of three places, and `tool/query_provenance.json
 - **This repository**, under its MIT licence.
 
 Some files carry lines from both of the first two; when such a file's closest upstream is the grammar's own file, its header names that file as well. `THIRD_PARTY_NOTICES.md` at the repository root lists every file by origin and reproduces each licence.
+
+Each file cited is the closest one published under the licence the notices reproduce for its repository: the grammar's licence files at its pin, or nvim-treesitter's Apache License 2.0. Where an upstream changed its licence, or added one, the text is cited at a commit carrying that licence, never at an earlier one. `dart run tool/write_notices.dart` reads the licence and NOTICE files at every cited commit and fails unless they are the ones the notices reproduce.

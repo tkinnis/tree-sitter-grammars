@@ -294,7 +294,7 @@ This repository's own work (its tools, tests and the query files written here) i
 
 Every query file derived from nvim-treesitter opens with a header naming the nvim-treesitter file and commit it derives from and whether it was modified here, as `tool/query_provenance.json` records. `dart run tool/check_query_provenance.dart` checks the provenance and the headers, and `--write-headers` writes the headers.
 
-`THIRD_PARTY_NOTICES.md` is generated from the pinned sources, the query provenance and the licence files, and the build refuses to run while the committed copy differs from what it generates. After changing a pin, a query file's provenance or a licence, regenerate it and commit the result:
+`THIRD_PARTY_NOTICES.md` is generated from the pinned sources, the query provenance and the licence files, and the build refuses to run while the committed copy differs from what it generates. `tool/write_notices.dart` also reads the root licence and NOTICE files at every upstream commit `tool/query_provenance.json` cites, fetching the commit into `grammars/<repo>` or `.cache/nvim-treesitter` when the store lacks it, and fails unless they are exactly the ones the notices reproduce for that repository (the grammar's at its pin, or `LICENSES/Apache-2.0.txt`), so no query file is attributed to a licence its cited commit does not carry. After changing a pin, a query file's provenance or a licence, regenerate it and commit the result:
 
 ```bash
 dart run tool/write_notices.dart           # rewrite THIRD_PARTY_NOTICES.md

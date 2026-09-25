@@ -14,6 +14,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'git.dart';
 import 'grammar_pins.dart';
 import 'grammar_plan.dart';
 import 'query_headers.dart';
@@ -226,6 +227,101 @@ String _runtimeSection(
     buffer.write(_fenced(path, text));
   }
   return (buffer..write(extraNotices)).toString();
+}
+
+/// The licence and NOTICE files the notices reproduce of the repository
+/// tree extracted at [directory], each name mapped to its bytes.
+Map<String, List<int>> reproducedLicenseFiles(String directory) => {
+  for (final name in [
+    ..._rootFiles(directory, licenseFilePattern),
+    ..._rootFiles(directory, noticeFilePattern),
+  ])
+    name: File(p.join(directory, name)).readAsBytesSync(),
+};
+
+/// The licence and NOTICE files at the root of [commit] in the git object
+/// store [store], each name mapped to its committed bytes.
+Future<Map<String, List<int>>> committedLicenseFiles(
+  String store,
+  String commit,
+) async {
+  final listing = await runIsolatedGit(store, ['ls-tree', '-z', commit]);
+  final files = <String, List<int>>{};
+  for (final record in listing.split('\x00').where((r) => r.isNotEmpty)) {
+    final tab = record.indexOf('\t');
+    final [_, type, object] = record.substring(0, tab).split(' ');
+    final name = record.substring(tab + 1);
+    if (type != 'blob' ||
+        !(licenseFilePattern.hasMatch(name) ||
+            noticeFilePattern.hasMatch(name))) {
+      continue;
+    }
+    files[name] = await runIsolatedGitBytes(store, [
+      'cat-file',
+      'blob',
+      object,
+    ]);
+  }
+  return files;
+}
+
+/// Every citation in [provenance] of an upstream file whose commit is not
+/// covered by the licence the notices reproduce for its repository.
+///
+/// [reproduced] maps each repository URL, as [normalizeRepositoryUrl]
+/// writes it, to the licence and NOTICE files the notices reproduce for it:
+/// for a grammar, those at its pin; for nvim-treesitter, the Apache License
+/// 2.0 as its `LICENSE`. [filesAt] answers the licence and NOTICE files at
+/// a cited commit, as [committedLicenseFiles] reads them; each repository
+/// and commit is read once.
+///
+/// A citation is a problem when its repository is not in [reproduced],
+/// when its commit has no licence file at its root, or when a licence or
+/// NOTICE file there is not byte for byte the file of that name the notices
+/// reproduce. A file cited at such a commit is attributed to a licence it
+/// was never published under.
+Future<List<String>> citedLicenseProblems(
+  Map<String, QueryProvenance> provenance,
+  Map<String, Map<String, List<int>>> reproduced,
+  Future<Map<String, List<int>>> Function(UpstreamFile cited) filesAt,
+) async {
+  final read = <String, Map<String, List<int>>>{};
+  final problems = <String>[];
+  for (final file in provenance.keys.toList()..sort()) {
+    final entry = provenance[file]!;
+    for (final cited in [entry.upstream, entry.nvimUpstream].nonNulls) {
+      final repository = normalizeRepositoryUrl(cited.repo);
+      final expected = reproduced[repository];
+      final at = '$repository @ ${cited.commit}';
+      if (expected == null) {
+        problems.add('$file: cites $at, whose licence the notices lack');
+        continue;
+      }
+      final files = read['$repository@${cited.commit}'] ??= await filesAt(
+        cited,
+      );
+      if (!files.keys.any(licenseFilePattern.hasMatch)) {
+        problems.add('$file: cites $at, which has no licence file');
+      }
+      for (final MapEntry(key: name, value: bytes) in files.entries) {
+        if (!_sameBytes(expected[name], bytes)) {
+          problems.add(
+            '$file: cites $at, whose $name is not the one the notices '
+            'reproduce',
+          );
+        }
+      }
+    }
+  }
+  return problems;
+}
+
+bool _sameBytes(List<int>? a, List<int> b) {
+  if (a == null || a.length != b.length) return false;
+  for (var index = 0; index < a.length; index++) {
+    if (a[index] != b[index]) return false;
+  }
+  return true;
 }
 
 /// The files at [directory]'s root whose names [pattern] matches, sorted;
@@ -574,15 +670,18 @@ String _querySection(
       'can carry lines from both of the first two.\n\n'
       '### Derived from nvim-treesitter\n\n'
       'These files are derived from $nvimTreesitterUrl, under the Apache '
-      'License 2.0 reproduced below. Each one names, in a header at its '
-      'top, the nvim-treesitter file and commit it derives from and '
-      'whether tree-sitter-grammars modified it.\n\n'
+      'License 2.0 reproduced below, which is nvim-treesitter\'s `LICENSE` '
+      'at every commit named. Each one names, in a header at its top, the '
+      'nvim-treesitter file and commit it derives from and whether '
+      'tree-sitter-grammars modified it.\n\n'
       '| File | nvim-treesitter file | Commit | State |\n'
       '| --- | --- | --- | --- |\n'
       '${nvim.join('\n')}\n\n'
       '### From a grammar\'s repository\n\n'
       'These files come from the repository of a grammar listed under '
-      '"Grammars" above, under the licence reproduced there.\n\n'
+      '"Grammars" above, under the licence reproduced there: the licence '
+      'and NOTICE files at every commit named are the ones reproduced '
+      'there.\n\n'
       '| File | Repository | Path | Commit | Licence | State |\n'
       '| --- | --- | --- | --- | --- | --- |\n'
       '${grammar.join('\n')}\n\n'

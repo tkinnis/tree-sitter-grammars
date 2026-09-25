@@ -1,4 +1,4 @@
-; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/javascript/locals.scm @ ac8ae3b1c7b5644f8317cdc88d604cdb558b6296, Apache-2.0.
+; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/javascript/locals.scm @ 337756d2f632fa94461dbfddd73898568f46c43d, Apache-2.0.
 ; Taken from https://github.com/tree-sitter/tree-sitter-javascript, queries/locals.scm @ 9802cc5812a19cd28168076af36e88b463dd3a18, MIT.
 ; Modified in tree-sitter-grammars.
 
