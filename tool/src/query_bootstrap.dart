@@ -726,21 +726,22 @@ void _requireNone(String what, List<String> problems) {
 ///
 /// It refuses, writing nothing, when any path in [BootstrapPlan.seen] no
 /// longer holds the text the plan was made from. Each file is written into
-/// a directory under `.cache/` and renamed into place, so none is ever
-/// left half written and no temporary file is left beside it. A run
-/// stopped part way leaves files the entries do not yet describe, or files
-/// the entries no longer name; `--force` plans the same work again from
-/// either.
+/// a staging directory under `.cache/` that this run alone creates and
+/// removes, and renamed into place, so none is ever left half written, no
+/// temporary file is left beside it, and a run writing at the same time
+/// keeps its own staged files. A run stopped part way leaves files the
+/// entries do not yet describe, or files the entries no longer name;
+/// `--force` plans the same work again from either.
 void writeBootstrap(String root, BootstrapPlan plan) {
   _requireNone('changed since the bootstrap was planned; run it again', [
     for (final MapEntry(key: file, value: text) in plan.seen.entries)
       if (_readFile(root, file) != text) file,
   ]);
-  // A run killed before its finally block leaves this directory behind;
-  // it holds nothing a later run needs.
-  final staging = Directory(p.join(root, '.cache', 'bootstrap-staging'));
-  if (staging.existsSync()) staging.deleteSync(recursive: true);
-  staging.createSync(recursive: true);
+  final cache = Directory(p.join(root, '.cache'))..createSync(recursive: true);
+  // A run killed before its finally block leaves this directory behind; a
+  // later run neither reads nor removes it, since it cannot tell it from
+  // the directory of a run still writing.
+  final staging = cache.createTempSync('bootstrap-staging-');
   try {
     var index = 0;
     void replace(String file, String content) {

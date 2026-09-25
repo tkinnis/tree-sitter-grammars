@@ -879,15 +879,27 @@ void main() {
       check(exists('.cache')).isFalse();
     });
 
-    test('clears a staging directory a killed run left', () async {
-      // A leftover where the first staged file is written.
-      Directory(
-        p.join(root, '.cache', 'bootstrap-staging', '0'),
-      ).createSync(recursive: true);
+    test('leaves what another run has staged alone', () async {
+      // Files another run is writing at the same time has staged, in
+      // directories whose names a run could choose.
+      final others = [
+        for (final name in ['bootstrap-staging', 'bootstrap-staging-other'])
+          File(p.join(root, '.cache', name, '0'))
+            ..createSync(recursive: true)
+            ..writeAsStringSync(_otherQuery),
+      ];
 
       await run(request());
 
-      check(staging()).isEmpty();
+      for (final file in others) {
+        check(file.readAsStringSync()).equals(_otherQuery);
+      }
+      check(
+        staging()..sort(),
+      ).deepEquals(['bootstrap-staging', 'bootstrap-staging-other']);
+      check(
+        read('queries/mylang/highlights.scm'),
+      ).equals(imported(newCommit, _newHighlights));
     });
 
     test('with force allows a missing entry only for its own files', () async {
