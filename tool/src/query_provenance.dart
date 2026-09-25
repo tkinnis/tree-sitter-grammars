@@ -16,6 +16,9 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
+
+import 'package:path/path.dart' as p;
 
 /// Where a query file's text came from.
 enum QueryOrigin { nvim, grammar, both, here }
@@ -63,6 +66,23 @@ typedef ProvenanceReading = ({
 
 final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
 final _repoPattern = RegExp(r'^https://[^\s]+[^/\s]$');
+
+/// Every `.scm` file under [root]`/queries`, as a repository-relative path
+/// with `/` separators, sorted.
+List<String> repositoryQueryFiles(String root) => [
+  for (final entity in Directory(
+    p.join(root, 'queries'),
+  ).listSync(recursive: true))
+    if (entity is File && entity.path.endsWith('.scm'))
+      p.posix.joinAll(p.split(p.relative(entity.path, from: root))),
+]..sort();
+
+/// [readQueryProvenance] of [root]`/tool/query_provenance.json` against
+/// [repositoryQueryFiles].
+ProvenanceReading readRepositoryProvenance(String root) => readQueryProvenance(
+  File(p.join(root, 'tool', 'query_provenance.json')).readAsStringSync(),
+  repositoryQueryFiles(root),
+);
 
 /// Parses [json] and checks it against [queryFiles], the repository-relative
 /// paths of every `.scm` file under `queries/`.

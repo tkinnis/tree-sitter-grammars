@@ -29,11 +29,15 @@ tree-sitter-grammars/
 │   ├── query_provenance.json       # Where each query file came from
 │   ├── build_tree_sitter_grammars.dart  # The build
 │   ├── pin_grammars.dart           # Sets and checks grammar pins
-│   ├── check_query_provenance.dart # Checks query_provenance.json
+│   ├── check_query_provenance.dart # Checks query_provenance.json and each query file's header
+│   ├── write_notices.dart          # Generates THIRD_PARTY_NOTICES.md
 │   ├── validate_manifest.dart      # Checks a built manifest.json
 │   ├── bootstrap_language.dart     # Imports queries from nvim-treesitter
 │   └── src/                        # Libraries the tools share
 ├── test/                           # Tests of the tools
+├── LICENSE                         # This repository's licence (MIT)
+├── LICENSES/Apache-2.0.txt         # nvim-treesitter's licence
+├── THIRD_PARTY_NOTICES.md          # Every licence the archive carries (generated)
 ├── tree-sitter/                    # The tree-sitter runtime (submodule)
 ├── grammars/                       # Git object stores of the grammars (gitignored)
 ├── build/                          # Extracted sources and objects (gitignored)
@@ -87,7 +91,8 @@ Download `grammars-macos-arm64.tar.gz` from [GitHub Releases](../../releases).
 grammars-macos-arm64.tar.gz
 ├── libtree-sitter.dylib       # The tree-sitter runtime
 ├── manifest.json              # Every language, its library and its pinned source
-├── build_info.json            # The runtime, compiler and flags the build used
+├── build_info.json            # The runtime, compiler, flags and source bundles the build used
+├── THIRD_PARTY_NOTICES.md     # Every licence of the runtime, the grammars and the queries
 ├── dylibs/
 │   ├── c/
 │   │   ├── libc.dylib
@@ -123,11 +128,12 @@ dart tool/bootstrap_language.dart --language=mylang
 
 3. Customize queries in `queries/mylang/` as needed
 
-4. Pin it, record where its query files came from in `tool/query_provenance.json`, then build and test:
+4. Pin it with its `license`, record where its query files came from in `tool/query_provenance.json`, give the files derived from nvim-treesitter their headers, regenerate the notices, then build and test:
 
 ```bash
 dart run tool/pin_grammars.dart --set tree-sitter-mylang=<sha>
-dart run tool/check_query_provenance.dart
+dart run tool/check_query_provenance.dart --write-headers
+dart run tool/write_notices.dart
 dart run tool/build_tree_sitter_grammars.dart
 dart tool/validate_queries.dart
 ```
@@ -230,6 +236,15 @@ With `--sources`, the build reads no git object store and needs neither `grammar
 
 ## License
 
-Query files are sourced from [nvim-treesitter](https://github.com/nvim-treesitter/nvim-treesitter) and individual grammar repositories. See each grammar repository for its specific license.
+This repository's own work (its tools, tests and the query files written here) is under the MIT licence in `LICENSE`. The tree-sitter runtime, each grammar and the query files that come from nvim-treesitter or from a grammar's own repository keep their own licences. `THIRD_PARTY_NOTICES.md` reproduces every one of them verbatim, lists where each query file came from, and travels in the release archive; `LICENSES/Apache-2.0.txt` is nvim-treesitter's licence.
 
-Tree-sitter is licensed under the MIT License.
+Every query file derived from nvim-treesitter opens with a header naming the nvim-treesitter file and commit it derives from and whether it was modified here, as `tool/query_provenance.json` records. `dart run tool/check_query_provenance.dart` checks the provenance and the headers, and `--write-headers` writes the headers.
+
+`THIRD_PARTY_NOTICES.md` is generated from the pinned sources, the query provenance and the licence files, and the build refuses to run while the committed copy differs from what it generates. After changing a pin, a query file's provenance or a licence, regenerate it and commit the result:
+
+```bash
+dart run tool/write_notices.dart           # rewrite THIRD_PARTY_NOTICES.md
+dart run tool/write_notices.dart --check   # exit 1 unless it is current
+```
+
+The build also refuses a grammar with no licence file at its root, and a compiled source outside `src/tree_sitter/` whose comments carry a copyright notice unless the grammar's `extraNotices` in `tool/grammars.json` names that file, so the notices reproduce it.

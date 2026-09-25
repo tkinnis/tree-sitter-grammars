@@ -34,16 +34,8 @@ void main(List<String> args) {
     exit(64);
   }
   final root = p.dirname(p.dirname(p.fromUri(Platform.script)));
-  final queriesDir = Directory(p.join(root, 'queries'));
-  final queryFiles = [
-    for (final entity in queriesDir.listSync(recursive: true))
-      if (entity is File && entity.path.endsWith('.scm'))
-        p.posix.joinAll(p.split(p.relative(entity.path, from: root))),
-  ]..sort();
-  final json = File(
-    p.join(root, 'tool', 'query_provenance.json'),
-  ).readAsStringSync();
-  final (:entries, :problems) = readQueryProvenance(json, queryFiles);
+  final queryFiles = repositoryQueryFiles(root);
+  final (:entries, :problems) = readRepositoryProvenance(root);
   final licenseOf = licenseLookup(
     parseGrammars(
       File(p.join(root, 'tool', 'grammars.json')).readAsStringSync(),

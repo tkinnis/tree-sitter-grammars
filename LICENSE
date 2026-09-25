@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2025 tkinnis
+Copyright (c) 2025-2026 Tony Kinnis
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -22,31 +22,7 @@ SOFTWARE.
 
 --------------------------------------------------------------------------------
 
-THIRD-PARTY LICENSES
-
-This project includes components from various sources with their own licenses:
-
-1. Tree-sitter (https://github.com/tree-sitter/tree-sitter)
-   License: MIT
-   Copyright (c) 2018-2024 Max Brunsfeld
-
-2. Query files from nvim-treesitter (https://github.com/nvim-treesitter/nvim-treesitter)
-   License: Apache-2.0
-   Copyright (c) nvim-treesitter contributors
-
-3. Individual grammar repositories
-   Each grammar has its own license. Most use MIT or Apache-2.0.
-   See the original repository for each grammar's specific license:
-   - tree-sitter-c: MIT
-   - tree-sitter-cpp: MIT
-   - tree-sitter-javascript: MIT
-   - tree-sitter-typescript: MIT
-   - tree-sitter-python: MIT
-   - tree-sitter-rust: MIT
-   - tree-sitter-go: MIT
-   - tree-sitter-java: MIT
-   - tree-sitter-dart: MIT
-   - (and others - see tool/grammars.json for the full list)
-
-The compiled grammar libraries (.dylib, .so, .dll) are derived works of the
-original grammar source code and are subject to their respective licenses.
+This licence covers the work of this repository itself. The tree-sitter
+runtime, each grammar, and the query files that come from nvim-treesitter or
+from a grammar's own repository are covered by their own licences, which
+THIRD_PARTY_NOTICES.md reproduces in full.

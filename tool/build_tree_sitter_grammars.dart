@@ -46,6 +46,7 @@ import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/manifest.dart';
+import 'src/notices.dart';
 import 'src/pool.dart';
 import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
@@ -176,6 +177,24 @@ Future<void> _build(String root, _Options options) async {
   for (final build in builds) {
     checkSources(root, build);
   }
+
+  _step('Writing $noticesFileName');
+  _writeNotices(
+    root,
+    outputDirectory,
+    NoticesInput(
+      toolchain: toolchain,
+      runtimeDirectory: runtimeDirectory,
+      entries: entries,
+      builds: builds,
+      sourceRoot: p.join(root, 'build', 'src'),
+      provenance: readRepositoryProvenance(root),
+      apacheLicense: File(
+        p.join(root, 'LICENSES', 'Apache-2.0.txt'),
+      ).readAsStringSync(),
+      ownLicense: File(p.join(root, 'LICENSE')).readAsStringSync(),
+    ),
+  );
   final generated = builds.where((build) => build.generate).toList();
   if (generated.isNotEmpty) {
     _step(
@@ -319,19 +338,27 @@ List<String> _provenanceProblems(
   String root,
   List<Map<String, Object?>> entries,
 ) {
-  final queryFiles = [
-    for (final entity in Directory(
-      p.join(root, 'queries'),
-    ).listSync(recursive: true))
-      if (entity is File && entity.path.endsWith('.scm'))
-        p.posix.joinAll(p.split(p.relative(entity.path, from: root))),
-  ];
-  final json = File(
-    p.join(root, 'tool', 'query_provenance.json'),
-  ).readAsStringSync();
-  final reading = readQueryProvenance(json, queryFiles);
+  final reading = readRepositoryProvenance(root);
   if (reading.problems.isNotEmpty) return reading.problems;
   return queryHeaderCheck(root, reading.entries, licenseLookup(entries));
+}
+
+/// Writes `THIRD_PARTY_NOTICES.md` into [outputDirectory] and requires the
+/// committed copy at [root] to be the same text.
+void _writeNotices(String root, String outputDirectory, NoticesInput input) {
+  final notices = thirdPartyNotices(input);
+  File(p.join(outputDirectory, noticesFileName))
+    ..createSync(recursive: true)
+    ..writeAsStringSync(notices);
+  final committed = File(p.join(root, noticesFileName));
+  if (!committed.existsSync() || committed.readAsStringSync() != notices) {
+    throw BuildException(
+      '$noticesFileName is not what the pinned sources, the query '
+      'provenance and the licences produce; run '
+      'dart run tool/write_notices.dart and commit it',
+    );
+  }
+  print('  $noticesFileName is the committed text');
 }
 
 /// Requires the `tree-sitter` submodule's checkout to be the toolchain's
@@ -533,6 +560,7 @@ Future<String> _createReleaseArchive(
     'queries',
     'manifest.json',
     'build_info.json',
+    noticesFileName,
   ], workingDirectory: outputDirectory);
   if (result.exitCode != 0) {
     throw BuildException('tar failed: ${result.stderr}');
