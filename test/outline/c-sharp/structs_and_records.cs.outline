@@ -1,0 +1,15 @@
+module Geometry.Tests
+struct Geometry.Tests.Point
+method Geometry.Tests.Point.DistanceTo
+method Geometry.Tests.Point.Square
+class Geometry.Tests.Segment
+method Geometry.Tests.Segment.Length
+class Geometry.Tests.Range
+method Geometry.Tests.Range.Contains
+struct Geometry.Tests.Range.Enumerator
+method Geometry.Tests.Range.Enumerator.MoveNext
+class Geometry.Tests.Polygon
+method Geometry.Tests.Polygon.Sides
+class Geometry.Tests.Marker
+class Geometry.Tests.PointTests
+method Geometry.Tests.PointTests.MeasuresTheDistanceBetweenTwoPoints
