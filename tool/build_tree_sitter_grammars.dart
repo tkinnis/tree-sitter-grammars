@@ -34,9 +34,9 @@
 /// has. Packing also writes the archive's sha256 beside it and the release
 /// notes into `output/release-notes.md`. `--publish` then creates the
 /// GitHub release of the pushed tag with the archive, its sha256,
-/// `build_info.json` and every source and generated bundle attached; it refuses a
-/// release that exists, so an asset is never replaced, and a tag on GitHub
-/// that is not the local tag naming the built commit.
+/// `build_info.json` and every source and generated bundle attached; it
+/// refuses a release that exists, so an asset is never replaced, and a tag
+/// on GitHub that is not the local tag naming the built commit.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
 /// every check passes, so a failed build leaves no `output/`. Any failure

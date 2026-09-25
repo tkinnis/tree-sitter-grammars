@@ -333,9 +333,10 @@ void _checkBundleFiles(
 /// An entry with a `dylib_dir` is a compiled grammar's and must name its
 /// `source` (url, commit and path) and its `extensions`; one with
 /// `queryOnly` is a query-only language's; any other is a no-op
-/// language's. Each must be the kind `grammars.json` plans for its name. Every name planned and missing, and every
-/// entry unplanned or unreadable, is a problem, so no entry drops out of
-/// the checks that follow unseen.
+/// language's. Each must be the kind `grammars.json` plans for its name.
+/// Every name planned and missing, and every entry unplanned or
+/// unreadable, is a problem, so no entry drops out of the checks that
+/// follow unseen.
 List<_Grammar> _checkManifest(
   String output,
   Map<String, Object?> manifest,

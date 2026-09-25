@@ -84,11 +84,12 @@ void main() {
         0,
       ]);
 
-    check(digest).equals(
-      '${(await Process.run('/usr/bin/shasum', ['-a', '256', listing.path])).stdout}'
-          .split(' ')
-          .first,
-    );
+    final shasum = await Process.run('/usr/bin/shasum', [
+      '-a',
+      '256',
+      listing.path,
+    ]);
+    check(digest).equals('${shasum.stdout}'.split(' ').first);
     check(filesDigestPattern.hasMatch(digest)).isTrue();
   });
 }

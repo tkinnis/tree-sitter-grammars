@@ -120,8 +120,9 @@ Future<Map<String, String>> packingToolVersions() async {
 /// system's configuration, with no attributes file, no line-ending
 /// conversion and a `tar.umask` of 0022; `gzip -n -9` compresses it with no
 /// name or time. The same commit therefore packs to the same bytes with the
-/// same git and gzip, whose versions [packingToolVersions] reads. [environment] replaces this process's environment as the one
-/// git's isolation starts from.
+/// same git and gzip, whose versions [packingToolVersions] reads.
+/// [environment] replaces this process's environment as the one git's
+/// isolation starts from.
 Future<void> packBundle(
   String directory,
   String commit,
