@@ -65,6 +65,8 @@ A pattern in `injections.scm` marks a node's text as another language with `@inj
 
 Every grammar whose comments are their own node injects `comment` into them, so a `TODO:`, `FIXME(user):` or `NOTE:` tag is read by the comment grammar wherever it is written; JavaScript, TypeScript and TSX inject `jsdoc` into a comment shaped like documentation as well, through a `#match?` on the comment's text, and the two are read side by side. The name a directive gives has to be a grammar in `tool/grammars.json` — `comment`, `regex`, `jsdoc`, `markdown_inline` and the rest — since the editor loads the injected language by that name, and a name no grammar answers to is a layer that never parses.
 
+Javadoc injects `html` into the description of a `/**` comment and of each of its block tags, and into an `@see` tag's link from its `<`, and `markdown_inline` into the description of a `///` comment and of its block tag. A description inside an inline tag, a `{@snippet}` body among them, lies within the description around it and is not injected on its own, so no node is injected twice.
+
 A predicate on an injection pattern — `#match?`, `#eq?`, `#any-of?` and their `not-` forms — is evaluated by the editor before the pattern injects, so a directive can be confined to the comments that look like documentation. Bash's `regex` nodes are left uninjected on purpose: the grammar files the pattern of a parameter expansion — `${file%.txt}` — under that node, and read as a regular expression it draws a shell glob in the wrong colours.
 
 ### Indentation

@@ -15,10 +15,30 @@
   body: (description) @injection.content)
   (#match? @_attribute_key "^lang$"))
 
-; html content
-((description) @injection.content
+; A "/**" comment holds HTML in its description and in each block tag's,
+; and an @see tag's link is HTML from its "<". A description inside an
+; inline tag, a snippet's body among them, lies within the description
+; around it and is not injected on its own.
+((document
+  (description) @injection.content)
   (#set! injection.language "html"))
 
-; markdown content
+((document
+  (_
+    (description) @injection.content)) @_comment
+  (#match? @_comment "^/[*][*]")
+  (#set! injection.language "html"))
+
+((url_title) @injection.content
+  (#set! injection.language "html"))
+
+; A "///" comment holds Markdown in its description and in its block
+; tag's.
 ((markdown_description) @injection.content
+  (#set! injection.language "markdown_inline"))
+
+((document
+  (_
+    (description) @injection.content)) @_comment
+  (#match? @_comment "^///")
   (#set! injection.language "markdown_inline"))

@@ -1,0 +1,6 @@
+html "Returns a {@code Map<K,V>} of every <b>open</b> account.\n * {@link Ledger the <i>ledger</i>} holds them, and {@return the\n * <em>accounts</em>}\n * {@snippet lang=c :\n *   int open = 1;\n * }"
+c " *   int open = 1;\n * "
+html " the <code>owner</code> of each, see {@link Owner}"
+html "<a href=\"https://example.com/accounts\">Accounts</a>"
+html " the ledger's accounts"
+html " use <b>accountsOf</b>"

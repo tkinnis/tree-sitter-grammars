@@ -1,0 +1,13 @@
+/**
+ * Returns a {@code Map<K,V>} of every <b>open</b> account.
+ * {@link Ledger the <i>ledger</i>} holds them, and {@return the
+ * <em>accounts</em>}
+ * {@snippet lang=c :
+ *   int open = 1;
+ * }
+ *
+ * @param owner the <code>owner</code> of each, see {@link Owner}
+ * @see <a href="https://example.com/accounts">Accounts</a>
+ * @see Ledger#accounts the ledger's accounts
+ * @deprecated use <b>accountsOf</b>
+ */
