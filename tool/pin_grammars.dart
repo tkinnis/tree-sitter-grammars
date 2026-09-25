@@ -14,13 +14,20 @@
 /// its tree holds (see `src/files_digest.dart`), read from the object
 /// store; the build checks every tree it compiles against it.
 ///
-/// `--from-checkouts` pins each grammar at its `grammars/<repo>` checkout's
-/// `HEAD`. It refuses the whole run, writing nothing, if any checkout's
-/// origin differs from the entry's `url` or if no branch on origin contains
-/// its `HEAD`.
+/// `--from-checkouts` moves each grammar's pin forward to its
+/// `grammars/<repo>` checkout's `HEAD`, when that `HEAD` contains the pin,
+/// recording `filesSha256` and, for a generated grammar, `generatedSha256`
+/// afresh. It keeps, and names with the `--set` that moves it, a pin that
+/// `HEAD` does not contain (one chosen ahead of the checkout or on another
+/// line of history) and a pin on a deploy branch, whose checkout names the
+/// source commit rather than the deploy commit. It refuses the whole run,
+/// writing nothing, if any checkout's origin differs from the entry's
+/// `url` or if no branch on origin contains its `HEAD`.
 ///
 /// `--set` pins one grammar. It fetches the grammar's origin and refuses a
-/// commit (or `--source-commit`) that no branch on origin contains.
+/// commit (or `--source-commit`) that no branch on origin contains. A pin
+/// on a deploy branch takes the commit it was deployed from as
+/// `--source-commit`.
 ///
 /// `--record-files` records `filesSha256` afresh for every grammar at its
 /// pin and for the runtime at `tool/toolchain.json`'s commit, from their
@@ -28,7 +35,8 @@
 ///
 /// `--check` exits 1 unless every entry with a `url` has a 40-hex `commit`,
 /// a 64-hex `filesSha256` and a `license`, and its optional pin fields are
-/// well formed.
+/// well formed. Every other mode writes only a result that passes the same
+/// check, and writes nothing otherwise.
 library;
 
 import 'dart:convert';
@@ -54,22 +62,27 @@ Future<void> main(List<String> args) async {
       case ['--check']:
         _check(entries);
       case ['--from-checkouts']:
-        final pinned = await _fromCheckouts(root, entries);
-        grammarsFile.writeAsStringSync(encodeGrammars(pinned));
-        _check(pinned);
+        _write(grammarsFile, await _fromCheckouts(root, entries));
       case ['--record-files']:
-        final pinned = await _recordFiles(root, entries);
-        grammarsFile.writeAsStringSync(encodeGrammars(pinned));
-        _check(pinned);
+        final (:pinned, :toolchain, :runtime) = await _recordFiles(
+          root,
+          entries,
+        );
+        _write(grammarsFile, pinned);
+        File(
+          p.join(root, 'tool', 'toolchain.json'),
+        ).writeAsStringSync(toolchain);
+        print('tree-sitter: filesSha256 $runtime');
       case ['--set', final assignment, ...final rest]
           when rest.length <= 1 &&
               rest.every((arg) => arg.startsWith('--source-commit=')):
         final sourceCommit = rest.isEmpty
             ? null
             : rest.single.substring('--source-commit='.length);
-        final pinned = await _set(root, entries, assignment, sourceCommit);
-        grammarsFile.writeAsStringSync(encodeGrammars(pinned));
-        _check(pinned);
+        _write(
+          grammarsFile,
+          await _set(root, entries, assignment, sourceCommit),
+        );
       default:
         stderr.writeln(
           'usage: dart run tool/pin_grammars.dart '
@@ -82,6 +95,19 @@ Future<void> main(List<String> args) async {
     stderr.writeln(error);
     exitCode = 1;
   }
+}
+
+/// Writes [pinned] to [file] when it passes every pin check, and throws a
+/// [PinException] listing the problems, writing nothing, when it does not.
+void _write(File file, List<Map<String, Object?>> pinned) {
+  final problems = pinProblems(pinned);
+  if (problems.isNotEmpty) {
+    throw PinException(
+      ['grammars.json left unchanged:', ...problems].join('\n  '),
+    );
+  }
+  file.writeAsStringSync(encodeGrammars(pinned));
+  _check(pinned);
 }
 
 void _check(List<Map<String, Object?>> entries) {
@@ -100,39 +126,65 @@ Future<List<Map<String, Object?>>> _fromCheckouts(
 ) async {
   final refusals = <String>[];
   final pinned = <Map<String, Object?>>[];
+  final moved = <String>[];
+  final kept = <String>[];
   for (final entry in entries) {
     final url = entry['url'];
     if (url is! String) {
       pinned.add(entry);
       continue;
     }
-    final directory = p.join(root, 'grammars', repositoryName(url));
+    final name = repositoryName(url);
+    final directory = p.join(root, 'grammars', name);
     try {
       if (!Directory(p.join(directory, '.git')).existsSync()) {
-        throw PinException('${repositoryName(url)}: no checkout at $directory');
+        throw PinException('$name: no checkout at $directory');
       }
-      final commit = await pinFromCheckout(runGit, directory, url);
+      final (:moveTo, kept: reason) = await checkoutMove(
+        runGit,
+        directory,
+        entry,
+      );
+      if (reason != null) kept.add(reason);
+      if (moveTo == null) {
+        pinned.add(entry);
+        continue;
+      }
       pinned.add(
         withPin(
           entry,
-          commit,
+          moveTo,
           filesSha256: await filesDigest(
-            await committedFiles(directory, commit),
+            await committedFiles(directory, moveTo),
           ),
+          generatedSha256: entry['generate'] == true
+              ? await _generatedDigest(
+                  root,
+                  Toolchain.load(root),
+                  entry,
+                  directory,
+                  moveTo,
+                )
+              : null,
         ),
       );
+      moved.add('$name: ${entry['commit']} -> $moveTo');
     } on PinException catch (error) {
       refusals.add(error.message);
     } on GitException catch (error) {
-      refusals.add('${repositoryName(url)}: $error');
-    } on FilesDigestException catch (error) {
-      refusals.add('${repositoryName(url)}: $error');
+      refusals.add('$name: $error');
+    } on Exception catch (error) {
+      refusals.add('$name: $error');
     }
   }
   if (refusals.isNotEmpty) {
     throw PinException(
       ['grammars.json left unchanged:', ...refusals].join('\n  '),
     );
+  }
+  print('${moved.length} pins moved forward, ${kept.length} kept');
+  for (final line in [...moved, ...kept]) {
+    print('  $line');
   }
   return pinned;
 }
@@ -204,16 +256,15 @@ Future<List<Map<String, Object?>>> _set(
 }
 
 /// [entries] with each grammar's `filesSha256`, and a generated grammar's
-/// `generatedSha256`, read afresh at its pin, after writing the runtime's
-/// `filesSha256` into `tool/toolchain.json`.
+/// `generatedSha256`, read afresh at its pin, with the text of
+/// `tool/toolchain.json` recording the runtime's `filesSha256`, and that
+/// digest.
 ///
 /// A store that lacks its pinned commit fetches exactly that commit. Throws
-/// a [PinException] listing every repository that could not be read,
-/// writing nothing.
-Future<List<Map<String, Object?>>> _recordFiles(
-  String root,
-  List<Map<String, Object?>> entries,
-) async {
+/// a [PinException] listing every repository that could not be read. It
+/// writes nothing.
+Future<({List<Map<String, Object?>> pinned, String toolchain, String runtime})>
+_recordFiles(String root, List<Map<String, Object?>> entries) async {
   final refusals = <String>[];
   // Read as JSON, not as a Toolchain, which requires the digest this
   // records.
@@ -273,11 +324,11 @@ Future<List<Map<String, Object?>>> _recordFiles(
       ].join('\n  '),
     );
   }
-  toolchainFile.writeAsStringSync(
-    '${const JsonEncoder.withIndent('  ').convert(json)}\n',
+  return (
+    pinned: pinned,
+    toolchain: '${const JsonEncoder.withIndent('  ').convert(json)}\n',
+    runtime: runtime,
   );
-  print('tree-sitter: filesSha256 $runtime');
-  return pinned;
 }
 
 /// The digest of what the pinned CLI of [toolchain] generates for the

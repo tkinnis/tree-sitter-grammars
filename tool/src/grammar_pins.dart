@@ -171,6 +171,62 @@ Future<String> pinFromCheckout(
   return head;
 }
 
+/// What `--from-checkouts` makes of one entry: the commit it moves the pin
+/// to, or why it keeps the pin; both null when the pin is already the
+/// checkout's `HEAD`.
+typedef CheckoutMove = ({String? moveTo, String? kept});
+
+/// Decides whether the grammar [entry] moves to the `HEAD` of its checkout
+/// at [directory].
+///
+/// A pin moves only forward, to a `HEAD` that contains it, so a pin chosen
+/// ahead of the checkout, or on another line of history, is kept. A pin on
+/// a deploy branch, which records a `sourceCommit`, is kept too: a checkout
+/// names its source commit, never the deploy commit the pin needs. Each
+/// kept pin comes with the reason and the `--set` that moves it.
+///
+/// Throws a [PinException] as [pinFromCheckout] does, and when git cannot
+/// tell whether `HEAD` contains the pin, for example because the store
+/// lacks it.
+Future<CheckoutMove> checkoutMove(
+  GitRunner git,
+  String directory,
+  Map<String, Object?> entry,
+) async {
+  final url = entry['url']! as String;
+  final name = repositoryName(url);
+  final pin = entry['commit'];
+  if (entry['sourceCommit'] case final String source) {
+    return (
+      moveTo: null,
+      kept:
+          '$name: kept at its deploy pin $pin, deployed from $source; move '
+          'it with --set $name=<deploy commit> --source-commit=<source '
+          'commit>',
+    );
+  }
+  final head = await pinFromCheckout(git, directory, url);
+  if (head == pin) return (moveTo: null, kept: null);
+  if (pin is! String) return (moveTo: head, kept: null);
+  try {
+    await git(directory, ['merge-base', '--is-ancestor', pin, head]);
+  } on GitException catch (error) {
+    if (error.exitCode != 1) {
+      throw PinException(
+        '$name: cannot tell whether HEAD $head contains the pin $pin: '
+        '${error.stderr.trim()}',
+      );
+    }
+    return (
+      moveTo: null,
+      kept:
+          '$name: kept at $pin, which its checkout\'s HEAD $head does not '
+          'contain; move it with --set $name=<sha>',
+    );
+  }
+  return (moveTo: head, kept: null);
+}
+
 /// Throws a [PinException] unless one of `origin`'s remote-tracking
 /// branches in [directory] contains [commit]; another remote's branch does
 /// not count.

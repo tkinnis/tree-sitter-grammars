@@ -208,6 +208,87 @@ void main() {
     });
   });
 
+  group('checkoutMove', () {
+    late Directory temporary;
+    late String url;
+    late String checkout;
+    late String first;
+    late String second;
+    late String third;
+    late String aside;
+
+    setUpAll(() async {
+      temporary = Directory.systemTemp.createTempSync('checkout_move');
+      final upstream = await FixtureRepository.create(
+        p.join(temporary.path, 'tree-sitter-x'),
+      );
+      url = upstream.path;
+      first = await upstream.commit({'grammar.js': bytes('1')});
+      second = await upstream.commit({'grammar.js': bytes('2')});
+      third = await upstream.commit({'grammar.js': bytes('3')});
+      await upstream.git(['checkout', '--quiet', '-b', 'other', first]);
+      aside = await upstream.commit({'grammar.js': bytes('aside')});
+      await upstream.git(['checkout', '--quiet', 'main']);
+      checkout = p.join(temporary.path, 'checkout');
+      await fixtureGit(temporary.path, ['clone', '--quiet', url, checkout]);
+    });
+
+    tearDownAll(() => temporary.deleteSync(recursive: true));
+
+    Future<CheckoutMove> move(String head, Map<String, Object?> pin) async {
+      await fixtureGit(checkout, ['checkout', '--quiet', '--detach', head]);
+      return checkoutMove(runGit, checkout, {'url': url, ...pin});
+    }
+
+    test('moves a pin forward to a HEAD that contains it', () async {
+      check(
+        await move(third, {'commit': first}),
+      ).equals((moveTo: third, kept: null));
+    });
+
+    test('leaves a pin that is HEAD as it is', () async {
+      check(
+        await move(second, {'commit': second}),
+      ).equals((moveTo: null, kept: null));
+    });
+
+    test('keeps a pin chosen ahead of the checkout', () async {
+      final (:moveTo, :kept) = await move(first, {'commit': third});
+
+      check(moveTo).isNull();
+      check(kept).isNotNull().contains(
+        "kept at $third, which its checkout's HEAD $first does not contain",
+      );
+    });
+
+    test('keeps a pin on another line of history', () async {
+      final (:moveTo, :kept) = await move(third, {'commit': aside});
+
+      check(moveTo).isNull();
+      check(kept).isNotNull().contains('kept at $aside');
+    });
+
+    test('keeps a deploy pin, naming the --set that moves it', () async {
+      final (:moveTo, :kept) = await move(third, {
+        'commit': aside,
+        'sourceCommit': first,
+      });
+
+      check(moveTo).isNull();
+      check(kept).isNotNull()
+        ..contains('kept at its deploy pin $aside, deployed from $first')
+        ..contains('--source-commit=');
+    });
+
+    test('refuses a pin the store does not hold', () async {
+      await check(move(third, {'commit': '1' * 40})).throws<PinException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .contains('cannot tell whether HEAD $third contains the pin'),
+      );
+    });
+  });
+
   group('requireOnOrigin', () {
     late Directory temporary;
     late String store;
