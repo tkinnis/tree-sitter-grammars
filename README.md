@@ -236,7 +236,7 @@ git push origin v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --publish
 ```
 
-`--publish` creates the GitHub release of the pushed tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json` and every source bundle, then reads the release back and fails unless GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
+`--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json` and every source bundle, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
 
 ### Rebuilding a Release from Its Source Bundles
 

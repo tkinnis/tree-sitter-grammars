@@ -32,7 +32,8 @@
 /// notes into `output/release-notes.md`. `--publish` then creates the
 /// GitHub release of the pushed tag with the archive, its sha256,
 /// `build_info.json` and every source bundle attached; it refuses a
-/// release that exists, so an asset is never replaced.
+/// release that exists, so an asset is never replaced, and a tag on GitHub
+/// that is not the local tag naming the built commit.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
 /// every check passes, so a failed build leaves no `output/`. Any failure
@@ -346,7 +347,17 @@ Future<void> _build(String root, _Options options) async {
     if (publish) {
       _step('Publishing $release to $releaseRepository');
       final assets = await _releaseAssets(output.path, archive, info);
-      await publishRelease(tag: release, assets: assets, notesFile: notes);
+      await publishRelease(
+        tag: release,
+        tagObject: (await runGit(root, [
+          'rev-parse',
+          '--verify',
+          'refs/tags/$release',
+        ])).trim(),
+        commit: (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
+        assets: assets,
+        notesFile: notes,
+      );
       print(
         '  published ${assets.length} assets; GitHub reports the digest '
         'of each as the local sha256',

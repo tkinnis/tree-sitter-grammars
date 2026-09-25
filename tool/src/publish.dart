@@ -34,11 +34,17 @@ final class PublishException implements Exception {
 /// [notesFile].
 ///
 /// Refuses when the release exists already, so an asset is never replaced.
-/// `gh release create --verify-tag` refuses a tag not yet pushed. After the
-/// upload, every asset's digest as GitHub reports it must be the local
-/// one. Throws a [PublishException] naming the first step that fails.
+/// Before creating it, [tag] on GitHub must be an annotated tag whose
+/// object is [tagObject], the local tag the build checked, and which names
+/// [commit], the commit that was built: a tag re-created locally after the
+/// push, or moved on GitHub, is refused. After the upload, the tag must
+/// still name [commit] and every asset's digest as GitHub reports it must
+/// be the local one. Throws a [PublishException] naming the first step
+/// that fails.
 Future<void> publishRelease({
   required String tag,
+  required String tagObject,
+  required String commit,
   required Map<String, String> assets,
   required String notesFile,
   ProcessRunner run = _run,
@@ -48,6 +54,47 @@ Future<void> publishRelease({
       return await run('gh', arguments);
     } on ProcessException catch (error) {
       throw PublishException('gh could not run: ${error.message}');
+    }
+  }
+
+  /// Requires [tag] on GitHub to be [tagObject], naming [commit].
+  Future<void> requirePushedTag(String when) async {
+    Future<(String, String)> object(String path) async {
+      final result = await gh([
+        'api',
+        'repos/$releaseRepository/$path',
+        '--jq',
+        '.object.type + " " + .object.sha',
+      ]);
+      if (result.exitCode != 0) {
+        throw PublishException(
+          '$when, GitHub could not resolve $tag: '
+          '${'${result.stderr}'.trim()}; push it with git push origin $tag',
+        );
+      }
+      final [type, sha] = '${result.stdout}'.trim().split(' ');
+      return (type, sha);
+    }
+
+    final (type, sha) = await object('git/ref/tags/$tag');
+    if (type != 'tag') {
+      throw PublishException(
+        '$when, $tag on GitHub is a lightweight tag of $sha; a release tag '
+        'is annotated',
+      );
+    }
+    if (sha != tagObject) {
+      throw PublishException(
+        '$when, $tag on GitHub is the tag object $sha, not the local tag '
+        '$tagObject the build checked',
+      );
+    }
+    final (targetType, target) = await object('git/tags/$sha');
+    if (targetType != 'commit' || target != commit) {
+      throw PublishException(
+        '$when, $tag on GitHub names $targetType $target, not the built '
+        'commit $commit',
+      );
     }
   }
 
@@ -71,6 +118,7 @@ Future<void> publishRelease({
       'gh release view $tag failed: ${'${existing.stderr}'.trim()}',
     );
   }
+  await requirePushedTag('before publishing');
   final created = await gh([
     'release',
     'create',
@@ -89,6 +137,7 @@ Future<void> publishRelease({
       'gh release create $tag failed: ${'${created.stderr}'.trim()}',
     );
   }
+  await requirePushedTag('after publishing');
   final listed = await gh([
     'api',
     'repos/$releaseRepository/releases/tags/$tag',
