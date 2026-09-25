@@ -205,7 +205,7 @@ Future<void> _checkSources(
       );
       good++;
     } on SourceBundleException catch (error) {
-      problems.add('$error');
+      problems.add('${source.name}: $error');
     }
   }
   final extra = recorded.keys.toSet().difference({

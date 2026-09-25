@@ -193,7 +193,8 @@ Map<String, Object?> bundleRecord(PinnedSource source, String sha256) => {
 /// The bundle must be named for [source]'s pin, `recorded` must name the
 /// same commit and file, its sha256 must be the recorded one, and the
 /// commit id in its header must be the pin. Throws a
-/// [SourceBundleException] naming the first requirement that fails.
+/// [SourceBundleException] naming the first requirement that fails; its
+/// message leaves naming [source] to the caller.
 Future<String> checkRecordedBundle(
   String directory,
   PinnedSource source,
@@ -201,20 +202,18 @@ Future<String> checkRecordedBundle(
 ) async {
   final record = recorded[source.name];
   if (record is! Map<String, Object?>) {
-    throw SourceBundleException(
-      '${source.name}: build_info.json records no bundle',
-    );
+    throw const SourceBundleException('build_info.json records no bundle');
   }
   final file = '$sourcesDirectoryName/${source.bundleName}';
   if (record['commit'] != source.commit || record['file'] != file) {
     throw SourceBundleException(
-      '${source.name}: build_info.json records ${record['file']} at '
-      '${record['commit']}; the pin is ${source.commit}',
+      'build_info.json records ${record['file']} at ${record['commit']}; '
+      'the pin is ${source.commit}',
     );
   }
   final bundle = p.join(directory, source.bundleName);
   if (!File(bundle).existsSync()) {
-    throw SourceBundleException('${source.name}: no $bundle');
+    throw SourceBundleException('no $bundle');
   }
   final digest = await fileSha256(bundle);
   if (digest != record['sha256']) {
