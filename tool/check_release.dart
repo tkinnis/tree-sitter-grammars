@@ -88,6 +88,7 @@ Future<void> main(List<String> args) async {
       directory,
       scratch.path,
       problems,
+      unpackGrammars: against != null,
     );
     if (problems.isNotEmpty) {
       stderr.writeln('\n✗ ${problems.length} problems:');
@@ -125,8 +126,9 @@ _check(
   String root,
   String output,
   String scratch,
-  List<String> problems,
-) async {
+  List<String> problems, {
+  required bool unpackGrammars,
+}) async {
   final toolchain = Toolchain.load(root);
   final info = _json(p.join(output, 'build_info.json'));
   final manifest = _json(p.join(output, 'manifest.json'));
@@ -141,7 +143,15 @@ _check(
   }
 
   final sourceRoot = p.join(scratch, 'src');
-  await _checkSources(root, output, toolchain, info, sourceRoot, problems);
+  await _checkSources(
+    root,
+    output,
+    toolchain,
+    info,
+    sourceRoot,
+    problems,
+    unpackGrammars: unpackGrammars,
+  );
 
   final runtimePath = p.join(output, 'libtree-sitter.dylib');
   final runtime = TreeSitterRuntime.open(runtimePath);
@@ -174,15 +184,17 @@ _check(
 }
 
 /// Checks every bundle against `build_info.json` and the pins, and unpacks
-/// each into [sourceRoot].
+/// the runtime's into [sourceRoot], with every grammar's when
+/// [unpackGrammars].
 Future<void> _checkSources(
   String root,
   String output,
   Toolchain toolchain,
   Map<String, Object?> info,
   String sourceRoot,
-  List<String> problems,
-) async {
+  List<String> problems, {
+  required bool unpackGrammars,
+}) async {
   final recorded = info['sources'];
   if (recorded is! Map<String, Object?>) {
     problems.add('build_info.json records no sources');
@@ -199,6 +211,10 @@ Future<void> _checkSources(
   for (final source in pinned) {
     try {
       await checkRecordedBundle(bundles, source, recorded);
+      if (!unpackGrammars && source.url != runtimeRepositoryUrl) {
+        good++;
+        continue;
+      }
       await unpackBundle(
         p.join(bundles, source.bundleName),
         p.join(sourceRoot, source.name),
