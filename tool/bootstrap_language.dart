@@ -22,11 +22,45 @@
 ///
 /// Everything is read and checked before anything is written, so a refused
 /// run writes nothing under `queries/` or `tool/`. It refuses a language
-/// that already has a `queries/<name>/` directory unless `--force` is
-/// given; `--force` replaces only what a bootstrap wrote there, removes an
-/// earlier unchanged import of a query type the commit no longer has, and
-/// refuses a file that holds other work. It prints every file and
-/// provenance entry before writing them; `--dry-run` writes none of them.
+/// whose other spelling, one nvim-treesitter names the same, such as
+/// `c_sharp` for `c-sharp`, has a directory under `queries/`. It refuses a
+/// language that already has a `queries/<name>/` directory unless
+/// `--force` is given; `--force` replaces only what a bootstrap wrote
+/// there, removes an earlier unchanged import of a query type the commit
+/// no longer has, and refuses a file that holds other work. It prints
+/// every file and provenance entry before writing them; `--dry-run` writes
+/// none of them.
+///
+/// Its limits:
+///
+/// - It knows one language whose name differs from nvim-treesitter's:
+///   `c-sharp`, which nvim-treesitter names `c_sharp`. A grammar named
+///   differently in any other way needs an entry in the alias table in
+///   `tool/src/query_bootstrap.dart`, both for its queries to be found and
+///   for its other spelling to be refused.
+/// - It imports the five query types above and no other file: `tags.scm`
+///   is a placeholder to fill, and textobjects are left out.
+/// - It copies each file as nvim-treesitter has it and compiles none of
+///   them. nvim-treesitter's own predicates and directives, and
+///   `; inherits:` lines naming a language this repository lacks, pass
+///   through as they are; `tool/check_release.dart` compiles the files
+///   when the grammar is built.
+/// - The `config.json` skeleton is a guess: a display name made from the
+///   id, one extension named after it, C-style comments and the common
+///   brackets.
+/// - It neither adds the grammar to `tool/grammars.json`, nor pins it, nor
+///   regenerates `THIRD_PARTY_NOTICES.md`; the steps it prints name those.
+/// - Every run fetches from nvim-treesitter, a dry run included, so it
+///   needs the network.
+/// - Runs at once stage their files apart, but each rewrites
+///   `tool/query_provenance.json`, and its check that nothing changed
+///   since planning is not atomic with the rename. When two runs write at
+///   the same moment, the later one's file can drop the earlier one's
+///   entries, which rerunning that bootstrap with `--force` restores. Run
+///   one bootstrap at a time.
+/// - A run killed while writing leaves its `.cache/bootstrap-staging-*`
+///   directory behind. No later run removes it; delete it by hand when no
+///   bootstrap is running.
 library;
 
 import 'dart:convert';

@@ -16,31 +16,42 @@ This directory contains query files for syntax highlighting, code folding, inden
 
 ## Ownership
 
-These files are maintained locally and are the source of truth. They are NOT generated or copied from external sources during the build process.
+These files are maintained here. The build copies every `.scm` file into the archive as it is, and each `config.json` with a `queries` map of the query files the language has added; it generates no query file. `tool/query_provenance.json` records where each one came from: nvim-treesitter, the grammar's own repository, both, or this repository.
 
 ## Adding a New Language
 
-Use `bootstrap_language.dart` to import queries from nvim-treesitter:
+`tool/bootstrap_language.dart` imports the language's queries from nvim-treesitter at one commit, which each file's header and provenance entry record:
 
 ```bash
 dart run tool/bootstrap_language.dart --language=<name>
 ```
 
-This imports high-quality queries from the nvim-treesitter project as a starting point. After bootstrapping:
+After bootstrapping:
 
-1. Review and customize the imported queries as needed
+1. Adapt the imported queries. For every file you change, set `"changed": true` in its `tool/query_provenance.json` entry, then run `dart run tool/check_query_provenance.dart --write-headers`
 2. Add symbol patterns to `tags.scm` for code navigation
-3. Ensure `highlights.scm` captures align with `theme_scope_map.json`
+3. Use the captures the editor maps to theme scopes, listed in `theme_scope_map.json` in finch's `origami_source` package
 
-The bootstrap script will fail if queries already exist for a language. Use `--force` to overwrite (with caution).
+The bootstrap refuses a language whose other spelling, one nvim-treesitter names the same (`c_sharp` for `c-sharp`), has a directory here. It refuses a language that already has a directory here unless given `--force`, which replaces only what a bootstrap wrote there, removes an unchanged import of a query type the commit no longer has, and refuses a file that holds other work. The repository's README lists the remaining steps: pinning the grammar, the notices and the build.
+
+### Limits of the Bootstrap
+
+- It knows one language whose name differs from nvim-treesitter's: `c-sharp`, which nvim-treesitter names `c_sharp`. A grammar named differently in any other way needs an entry in the alias table in `tool/src/query_bootstrap.dart`, both for its queries to be found and for its other spelling to be refused.
+- It imports highlights, folds, injections, locals and indents, and no other file: `tags.scm` is a placeholder to fill, and textobjects are left out.
+- It copies each file as nvim-treesitter has it and compiles none of them. nvim-treesitter's own predicates and directives, and `; inherits:` lines naming a language this repository lacks, pass through as they are; `tool/check_release.dart` compiles the files when the grammar is built.
+- The `config.json` skeleton is a guess: a display name made from the id, one extension named after it, C-style comments and the common brackets.
+- It neither adds the grammar to `tool/grammars.json`, nor pins it, nor regenerates `THIRD_PARTY_NOTICES.md`.
+- Every run fetches from nvim-treesitter, a dry run included, so it needs the network.
+- Runs at once stage their files apart, but each rewrites `tool/query_provenance.json`, and its check that nothing changed since planning is not atomic with the rename. When two runs write at the same moment, the later one's file can drop the earlier one's entries, which rerunning that bootstrap with `--force` restores. Run one bootstrap at a time.
+- A run killed while writing leaves its `.cache/bootstrap-staging-*` directory behind. No later run removes it; delete it by hand when no bootstrap is running.
 
 ## Customizing Queries
 
-Edit files directly in `queries/<language>/`. Changes take effect immediately without rebuilding native libraries.
+Edit files directly in `queries/<language>/`. A query change needs no change to any grammar library: the build copies each language's queries beside its library in the archive, and `tool/check_release.dart` compiles every one. A file taken from nvim-treesitter or a grammar's repository that you change needs `"changed": true` in its provenance entry and the header `check_query_provenance.dart --write-headers` then writes.
 
 ### Highlights
 
-Captures in `highlights.scm` are mapped to TextMate scopes via `theme_scope_map.json`. Common captures:
+Captures in `highlights.scm` are mapped to TextMate scopes by the editor, through `theme_scope_map.json` in finch's `origami_source` package. Common captures:
 
 - `@keyword` - language keywords
 - `@function` - function names
