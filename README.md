@@ -59,7 +59,7 @@ dart pub get
 dart run tool/build_tree_sitter_grammars.dart
 ```
 
-The build starts from empty `build/` and `output/` directories. It extracts the runtime and every grammar with `git archive` at its pin, using `grammars/<repo>` only as a git object store (created and fetched as needed; its working tree is never read), with git's user and system configuration shut out, and checks every extracted file against its committed blob. It compiles each library with `-O3` and tree-sitter's assertions on. `output/build_info.json` records the runtime, the compiler and the exact flags; `build/compile_commands.json` records every compiler invocation, and the build fails unless each one passed exactly the recorded flags.
+The build starts from empty `build/` and `output/` directories. For the runtime and every grammar repository it packs a source bundle: the tree `git archive` writes at the pin, with git's user and system configuration shut out, compressed by `gzip -n -9` into `output/sources/<repository>-<commit>.tar.gz`. It uses `tree-sitter/` and `grammars/<repo>` only as git object stores (a grammar's store is created and fetched as needed; its working tree is never read), unpacks each bundle into `build/src/`, and checks every unpacked file against its committed blob. It compiles each library with `-O3` and tree-sitter's assertions on. `output/build_info.json` records the runtime, the compiler, the exact flags and the sha256 of every source bundle; `build/compile_commands.json` records every compiler invocation, and the build fails unless each one passed exactly the recorded flags.
 
 The build writes into `build/out/` and moves it to `output/` only after every check passes, so `output/` exists only after a successful build.
 
@@ -209,12 +209,24 @@ dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 
 It writes `output/grammars-macos-arm64.tar.gz`. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has.
 
-3. Push the tag and upload the archive with the GitHub CLI:
+3. Push the tag and upload the archive, `build_info.json` and every source bundle with the GitHub CLI:
 
 ```bash
 git push origin v1.1.0
-gh release create v1.1.0 output/grammars-macos-arm64.tar.gz --verify-tag --title v1.1.0 --notes "..."
+gh release create v1.1.0 output/grammars-macos-arm64.tar.gz output/build_info.json output/sources/*.tar.gz --verify-tag --title v1.1.0 --notes "..."
 ```
+
+### Rebuilding a Release from Its Source Bundles
+
+A release carries the source of every repository it compiles from, at the commit it pins, so it can be rebuilt after an upstream rewrites or deletes that commit. Download every asset of the release into one directory outside `build/` and `output/`, check out the release's tag, and point the build at that directory:
+
+```bash
+gh release download v1.1.0 --repo tkinnis/tree-sitter-grammars --dir ../v1.1.0-assets
+git checkout v1.1.0
+dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets
+```
+
+With `--sources`, the build reads no git object store and needs neither `grammars/` nor the `tree-sitter` submodule. Each bundle must have the sha256 the release's `build_info.json` records and must name its pinned commit in its header. The two grammars the build generates (latex and swift) still need the tree-sitter CLI, which the build downloads from tree-sitter's release and checks against the sha256 in `tool/toolchain.json`. The same Xcode produces the same bytes.
 
 ## License
 

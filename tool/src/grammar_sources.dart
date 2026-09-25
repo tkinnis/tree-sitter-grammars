@@ -2,12 +2,16 @@
 /// as a git object store: its working tree is never read.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
 import 'git.dart';
 import 'grammar_pins.dart';
+import 'pool.dart';
+import 'source_bundles.dart';
+import 'toolchain.dart';
 
 /// Thrown when a grammar's object store cannot supply its pinned source.
 final class GrammarSourceException implements Exception {
@@ -77,6 +81,10 @@ Future<bool> _hasCommit(GitRunner git, String directory, String commit) async {
 /// [destination], which must not exist yet, and proves every extracted file
 /// is its committed blob.
 ///
+/// The tree is packed into the source bundle [bundle] by [packBundle] and
+/// unpacked from it, so what is checked is what the bundle holds. Without a
+/// [bundle] a temporary one beside [destination] is used and removed.
+///
 /// `git archive` runs with [runIsolatedGit], so no global, system or
 /// environment configuration of the user's converts line endings or leaves
 /// files out. A conversion or exclusion that the repository itself asks
@@ -93,6 +101,7 @@ Future<void> extractCommit(
   String directory,
   String commit,
   String destination, {
+  String? bundle,
   Map<String, String>? environment,
 }) async {
   if (FileSystemEntity.typeSync(destination) != FileSystemEntityType.notFound) {
@@ -104,26 +113,14 @@ Future<void> extractCommit(
     environment: environment,
     input: input,
   );
-  Directory(destination).createSync(recursive: true);
-  final archive = '$destination.tar';
-  await git([
-    '-c',
-    'core.attributesFile=/dev/null',
-    '-c',
-    'core.autocrlf=false',
-    '-c',
-    'core.eol=lf',
-    'archive',
-    '--format=tar',
-    '--output=${p.absolute(archive)}',
-    commit,
-  ]);
-  final tar = await Process.run('tar', ['-xf', archive, '-C', destination]);
-  File(archive).deleteSync();
-  if (tar.exitCode != 0) {
-    throw GrammarSourceException(
-      'tar could not extract $commit into $destination: ${tar.stderr}',
-    );
+  final packed = bundle ?? '$destination.tar.gz';
+  await packBundle(directory, commit, packed, environment: environment);
+  try {
+    await unpackBundle(packed, destination);
+  } on SourceBundleException catch (error) {
+    throw GrammarSourceException('$commit: $error');
+  } finally {
+    if (bundle == null) File(packed).deleteSync();
   }
   final problems = await _extractionProblems(git, commit, destination);
   if (problems.isNotEmpty) {
@@ -212,4 +209,87 @@ Future<List<String>> _hashObjects(_Git git, List<String> paths) async {
     );
   }
   return hashes;
+}
+
+/// Unpacks the runtime and every grammar repository at its pin into
+/// [sourceRoot]`/<repository>`, writing each one's source bundle into
+/// [bundleDirectory], and returns what `build_info.json` records of the
+/// bundles, runtime first.
+///
+/// Without [recordedBundles], each tree comes from its git object store
+/// under [root] (`tree-sitter/` for the runtime, `grammars/<repository>`
+/// for a grammar, created and fetched as needed) through [extractCommit].
+/// With it, each bundle comes from that directory instead, checked against
+/// the `build_info.json` there by [checkRecordedBundle]; no object store is
+/// read. Throws a [GrammarSourceException] listing every repository that
+/// could not be supplied.
+Future<Map<String, Map<String, Object?>>> supplySources({
+  required String root,
+  required Toolchain toolchain,
+  required List<Map<String, Object?>> entries,
+  required String sourceRoot,
+  required String bundleDirectory,
+  String? recordedBundles,
+}) async {
+  final Map<String, Object?>? recorded;
+  if (recordedBundles == null) {
+    recorded = null;
+  } else {
+    final info = File(p.join(recordedBundles, 'build_info.json'));
+    if (!info.existsSync()) {
+      throw GrammarSourceException(
+        '$recordedBundles holds no build_info.json; download every asset '
+        'of the release, build_info.json among them, into one directory',
+      );
+    }
+    final sources = (jsonDecode(info.readAsStringSync()) as Map)['sources'];
+    if (sources is! Map<String, Object?>) {
+      throw GrammarSourceException('${info.path} records no sources');
+    }
+    recorded = sources;
+  }
+  Directory(bundleDirectory).createSync(recursive: true);
+  final sources = pinnedSources(toolchain, entries);
+  final results = await pooled(sources, (source) async {
+    final bundle = p.join(bundleDirectory, source.bundleName);
+    final destination = p.join(sourceRoot, source.name);
+    try {
+      if (recorded != null) {
+        final digest = await checkRecordedBundle(
+          recordedBundles!,
+          source,
+          recorded,
+        );
+        File(p.join(recordedBundles, source.bundleName)).copySync(bundle);
+        await unpackBundle(bundle, destination);
+        return (record: bundleRecord(source, digest), problem: null);
+      }
+      final String store;
+      if (source.url == runtimeRepositoryUrl) {
+        store = p.join(root, 'tree-sitter');
+      } else {
+        store = p.join(root, 'grammars', source.name);
+        await ensureObjectStore(runGit, store, source.url);
+        await ensureCommit(runGit, store, source.commit, source.name);
+      }
+      await extractCommit(store, source.commit, destination, bundle: bundle);
+      return (
+        record: bundleRecord(source, await fileSha256(bundle)),
+        problem: null,
+      );
+    } on Exception catch (error) {
+      return (record: null, problem: '${source.name}: $error');
+    }
+  }, limit: 8);
+  final problems = [
+    for (final result in results)
+      if (result.problem case final problem?) problem,
+  ];
+  if (problems.isNotEmpty) {
+    throw GrammarSourceException(['sources:', ...problems].join('\n  '));
+  }
+  return {
+    for (final (index, source) in sources.indexed)
+      source.name: results[index].record!,
+  };
 }

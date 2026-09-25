@@ -18,6 +18,9 @@ const repositoryUrl = 'https://github.com/tkinnis/tree-sitter-grammars';
 const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 
 /// The contents of `output/build_info.json`.
+///
+/// [sources] records each source bundle the build compiled from, by
+/// repository name, as `bundleRecord` writes it.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -27,6 +30,7 @@ Map<String, Object?> buildInfo({
   required bool repositoryDirty,
   required int languageVersion,
   required int minCompatibleLanguageVersion,
+  required Map<String, Map<String, Object?>> sources,
 }) => {
   'release': release,
   'platform': 'macos-${toolchain.arch}',
@@ -59,6 +63,7 @@ Map<String, Object?> buildInfo({
       'grammarLink': flags.grammarLink,
     },
   },
+  'sources': sources,
 };
 
 /// Encodes [info] as `output/build_info.json` is written.

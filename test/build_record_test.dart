@@ -73,6 +73,7 @@ Map<String, Object?> _info(BuildFlags flags) =>
               repositoryDirty: false,
               languageVersion: 15,
               minCompatibleLanguageVersion: 13,
+              sources: const {},
             ),
           ),
         )
