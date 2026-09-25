@@ -134,9 +134,8 @@
             },
             "abi": {
               "type": "integer",
-              "description": "The LANGUAGE_VERSION of the compiled parser.c",
-              "minimum": 13,
-              "maximum": 15
+              "description": "The LANGUAGE_VERSION of the compiled parser.c, from the treeSitter.minCompatibleLanguageVersion to the treeSitter.languageVersion that build_info.json records of the runtime's api.h",
+              "minimum": 1
             },
             "license": {
               "type": "string",

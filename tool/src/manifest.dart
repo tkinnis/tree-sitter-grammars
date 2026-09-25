@@ -143,7 +143,14 @@ final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
 
 /// Every problem with a compiled grammar's `source` object, as
 /// [grammarEntry] writes it; empty when it is well formed.
-List<String> sourceProblems(Object? source) {
+///
+/// Its `abi` must lie in the range of [languageVersions], the
+/// `TREE_SITTER_MIN_COMPATIBLE_LANGUAGE_VERSION` and
+/// `TREE_SITTER_LANGUAGE_VERSION` of the runtime the grammar ships with.
+List<String> sourceProblems(
+  Object? source, {
+  required ({int current, int minCompatible}) languageVersions,
+}) {
   if (source is! Map<String, Object?>) return ['source must be an object'];
   final url = source['url'];
   final commit = source['commit'];
@@ -171,9 +178,12 @@ List<String> sourceProblems(Object? source) {
     if (path is! String || path.isEmpty) 'source.path must be a path',
     if (!const {'committed', 'generated'}.contains(source['parser']))
       'source.parser must be "committed" or "generated"',
-    // The language ABIs the pinned runtime, tree-sitter v0.27.0, loads.
-    if (abi is! int || abi < 13 || abi > 15)
-      'source.abi must be a language ABI from 13 to 15',
+    if (abi is! int ||
+        abi < languageVersions.minCompatible ||
+        abi > languageVersions.current)
+      'source.abi must be a language ABI from '
+          '${languageVersions.minCompatible} to ${languageVersions.current}, '
+          'the ones the runtime loads',
     if (license is! String || license.isEmpty)
       'source.license must name a licence',
     for (final field in source.keys)

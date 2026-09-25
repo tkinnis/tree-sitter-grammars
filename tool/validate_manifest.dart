@@ -4,11 +4,16 @@
 /// Usage: `dart run tool/validate_manifest.dart output/manifest.json`
 ///
 /// Exits 1 on any error. Every compiled grammar (an entry with `dylib_dir`)
-/// must name its `source`, including the 40-hex commit it was built from.
+/// must name its `source`, including the 40-hex commit it was built from
+/// and a language ABI the runtime loads: one from the
+/// `minCompatibleLanguageVersion` to the `languageVersion` that the
+/// `build_info.json` beside the manifest records of the runtime.
 library;
 
 import 'dart:convert';
 import 'dart:io';
+
+import 'package:path/path.dart' as p;
 
 import 'src/manifest.dart';
 
@@ -33,6 +38,14 @@ void main(List<String> args) {
   try {
     final content = manifestFile.readAsStringSync();
     final manifest = jsonDecode(content) as Map<String, dynamic>;
+    final languageVersions = _languageVersions(manifestPath);
+    if (languageVersions == null) {
+      print(
+        '✗ no build_info.json beside $manifestPath records the runtime\'s '
+        'treeSitter.languageVersion and minCompatibleLanguageVersion',
+      );
+      exit(1);
+    }
 
     var errorCount = 0;
     var warningCount = 0;
@@ -206,7 +219,10 @@ void main(List<String> args) {
         errorCount++;
       }
       if (data.containsKey('source')) {
-        for (final problem in sourceProblems(data['source'])) {
+        for (final problem in sourceProblems(
+          data['source'],
+          languageVersions: languageVersions,
+        )) {
           print('✗ $languageId: $problem');
           errorCount++;
         }
@@ -273,4 +289,21 @@ void main(List<String> args) {
     print(stackTrace);
     exit(1);
   }
+}
+
+/// The runtime's language versions as the `build_info.json` beside the
+/// manifest at [manifestPath] records them, or null when it records none.
+({int current, int minCompatible})? _languageVersions(String manifestPath) {
+  final file = File(p.join(p.dirname(manifestPath), 'build_info.json'));
+  if (!file.existsSync()) return null;
+  final info = jsonDecode(file.readAsStringSync());
+  if (info case {
+    'treeSitter': {
+      'languageVersion': final int current,
+      'minCompatibleLanguageVersion': final int minCompatible,
+    },
+  }) {
+    return (current: current, minCompatible: minCompatible);
+  }
+  return null;
 }

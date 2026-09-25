@@ -27,9 +27,10 @@
 /// - The runtime and every grammar library is a thin binary of the
 ///   toolchain's architecture with its `minos`, an `@rpath` install name
 ///   and no dependency beyond `libSystem`.
-/// - `ts_parser_set_language` accepts every grammar, whose
-///   `ts_language_abi_version` is 13 to 15, found through its
-///   `config.json` `symbol`.
+/// - `build_info.json` records the language versions the runtime's
+///   `api.h` defines, and `ts_parser_set_language` accepts every grammar,
+///   found through its `config.json` `symbol`, whose
+///   `ts_language_abi_version` lies between them.
 /// - Every query file of every grammar, composed with what its
 ///   `; inherits:` line names as the editor composes it, compiles with
 ///   `ts_query_new`, and every query-only file is read by one of those
@@ -73,6 +74,7 @@ import 'src/notices.dart';
 import 'src/release_check.dart';
 import 'src/source_bundles.dart';
 import 'src/toolchain.dart';
+import 'src/tree_sitter_cli.dart';
 import 'src/tree_sitter_ffi.dart';
 
 const _usage =
@@ -188,6 +190,11 @@ _check(
   final runtimePath = p.join(output, 'libtree-sitter.dylib');
   final runtime = TreeSitterRuntime.open(runtimePath);
   _checkExports(runtime, p.join(sourceRoot, 'tree-sitter'), problems);
+  final languageVersions = _checkLanguageVersions(
+    p.join(sourceRoot, 'tree-sitter'),
+    treeSitter,
+    problems,
+  );
 
   List<GrammarBuild> plan = const [];
   try {
@@ -199,7 +206,12 @@ _check(
   _checkBundleFiles(output, toolchain, entries, plan, problems);
   final grammars = _checkManifest(output, manifest, entries, plan, problems);
   await _checkLibraries(runtimePath, grammars, toolchain, problems);
-  final languages = _checkGrammars(runtime, grammars, problems);
+  final languages = _checkGrammars(
+    runtime,
+    grammars,
+    languageVersions,
+    problems,
+  );
   _checkQueries(runtime, output, grammars, languages, problems);
   _checkNotices(root, output, info, problems);
   return (runtime: runtime, grammars: grammars, sources: sourceRoot);
@@ -477,10 +489,45 @@ Future<void> _checkLibraries(
   );
 }
 
+/// The language versions the runtime's `api.h` under [runtimeSource]
+/// defines, after requiring [treeSitter], the `treeSitter` object of
+/// `build_info.json`, to record the same; null, with a problem, when
+/// `api.h` defines none.
+({int current, int minCompatible})? _checkLanguageVersions(
+  String runtimeSource,
+  Map<String, Object?> treeSitter,
+  List<String> problems,
+) {
+  final header = File(
+    p.join(runtimeSource, 'lib', 'include', 'tree_sitter', 'api.h'),
+  );
+  final ({int current, int minCompatible}) versions;
+  try {
+    versions = apiLanguageVersions(header.readAsStringSync());
+  } on Exception catch (error) {
+    problems.add('the runtime\'s language versions: $error');
+    return null;
+  }
+  if (treeSitter['languageVersion'] != versions.current ||
+      treeSitter['minCompatibleLanguageVersion'] != versions.minCompatible) {
+    problems.add(
+      'build_info.json records language versions '
+      '${treeSitter['minCompatibleLanguageVersion']} to '
+      '${treeSitter['languageVersion']}; the runtime\'s api.h defines '
+      '${versions.minCompatible} to ${versions.current}',
+    );
+  }
+  return versions;
+}
+
 /// Opens every grammar and returns its language by name.
+///
+/// Each grammar's language ABI must lie in the range of [languageVersions],
+/// which the runtime's `api.h` defines.
 Map<String, Pointer<Void>> _checkGrammars(
   TreeSitterRuntime runtime,
   List<_Grammar> grammars,
+  ({int current, int minCompatible})? languageVersions,
   List<String> problems,
 ) {
   final languages = <String, Pointer<Void>>{};
@@ -498,8 +545,14 @@ Map<String, Pointer<Void>> _checkGrammars(
     }
     final abi = runtime.abiVersion(language);
     abis.add(abi);
-    if (abi < 13 || abi > 15) {
-      problems.add('${grammar.name}: language ABI $abi is outside 13..15');
+    if (languageVersions case (
+      :final current,
+      :final minCompatible,
+    ) when abi < minCompatible || abi > current) {
+      problems.add(
+        '${grammar.name}: language ABI $abi is outside '
+        '$minCompatible..$current',
+      );
     } else if (!runtime.acceptsLanguage(language)) {
       problems.add('${grammar.name}: ts_parser_set_language refused it');
     } else {
