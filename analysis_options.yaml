@@ -1,5 +1,13 @@
 include: package:lints/recommended.yaml
 
+analyzer:
+  exclude:
+    - grammars/**
+    - tree-sitter/**
+    - build/**
+    - output/**
+    - .cache/**
+
 linter:
   rules:
     avoid_print: false

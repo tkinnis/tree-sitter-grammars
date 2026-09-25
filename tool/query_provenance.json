@@ -1,0 +1,2315 @@
+{
+  "queries/ada/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ada/folds.scm"
+    }
+  },
+  "queries/ada/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ada/highlights.scm"
+    }
+  },
+  "queries/ada/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/ada/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "aaf5b7fdf7664581601063f7804cff02e849525e",
+      "path": "runtime/queries/ada/injections.scm"
+    }
+  },
+  "queries/ada/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ada/locals.scm"
+    }
+  },
+  "queries/ada/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/ada/textobjects.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/briot/tree-sitter-ada",
+      "commit": "42cc2eb141529b03a91c18ec8646a0a58fb111ba",
+      "path": "queries/textobjects.scm"
+    }
+  },
+  "queries/bash/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/bash/folds.scm"
+    }
+  },
+  "queries/bash/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-bash",
+      "commit": "422a07cb221b92c6b117e854efa8945a506b5214",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/bash/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "433779916223596dce3ea64f4b77300c3aa2bfdc",
+      "path": "runtime/queries/bash/indents.scm"
+    }
+  },
+  "queries/bash/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/bash/injections.scm"
+    }
+  },
+  "queries/bash/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/bash/locals.scm"
+    }
+  },
+  "queries/bash/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/c-sharp/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c_sharp/folds.scm"
+    }
+  },
+  "queries/c-sharp/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-c-sharp",
+      "commit": "4b5502f7de37769c39e5d8e3766ee7b142d31e20",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/c-sharp/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/c-sharp/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c_sharp/injections.scm"
+    }
+  },
+  "queries/c-sharp/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c_sharp/locals.scm"
+    }
+  },
+  "queries/c-sharp/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-c-sharp",
+      "commit": "4b5502f7de37769c39e5d8e3766ee7b142d31e20",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/c/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c/folds.scm"
+    }
+  },
+  "queries/c/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-c",
+      "commit": "70c0ddee618f4967c49143636c34982dd3375f89",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/c/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c/indents.scm"
+    }
+  },
+  "queries/c/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c/injections.scm"
+    }
+  },
+  "queries/c/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/c/locals.scm"
+    }
+  },
+  "queries/c/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-c",
+      "commit": "0d33f0422ad391c6d652283645d546ffa048f503",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/comment/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/comment/highlights.scm"
+    }
+  },
+  "queries/commonlisp/folds.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/commonlisp/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "d198a75e2c2e24885b05650515538d055d0c64e4",
+      "path": "queries/commonlisp/highlights.scm"
+    }
+  },
+  "queries/commonlisp/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/commonlisp/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/commonlisp/injections.scm"
+    }
+  },
+  "queries/commonlisp/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/commonlisp/locals.scm"
+    }
+  },
+  "queries/commonlisp/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/cpp/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/cpp/folds.scm"
+    }
+  },
+  "queries/cpp/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-c",
+      "commit": "70c0ddee618f4967c49143636c34982dd3375f89",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/cpp/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/cpp/indents.scm"
+    }
+  },
+  "queries/cpp/injections.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "b5f203031282a6e9e025080fe71b58dbb43f7509",
+      "path": "queries/cpp/injections.scm"
+    }
+  },
+  "queries/cpp/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/cpp/locals.scm"
+    }
+  },
+  "queries/cpp/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-cpp",
+      "commit": "a71474021410973b29bfe99440d57bcd750246b1",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/css/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/css/folds.scm"
+    }
+  },
+  "queries/css/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-css",
+      "commit": "5c89b88a37a2e1e36c031469462d6ee85ff2c13c",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/css/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/css/indents.scm"
+    }
+  },
+  "queries/css/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/css/injections.scm"
+    }
+  },
+  "queries/css/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/csv/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/csv/highlights.scm"
+    }
+  },
+  "queries/dart/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dart/folds.scm"
+    }
+  },
+  "queries/dart/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/UserNobody14/tree-sitter-dart",
+      "commit": "590410cc679eca9955f7f3789e00ffa4d7c69d49",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/dart/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dart/indents.scm"
+    }
+  },
+  "queries/dart/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dart/injections.scm"
+    }
+  },
+  "queries/dart/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dart/locals.scm"
+    }
+  },
+  "queries/dart/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/UserNobody14/tree-sitter-dart",
+      "commit": "c2cc0993e67a61fad209728a128a9e25887459bc",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/diff/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/diff/folds.scm"
+    }
+  },
+  "queries/diff/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/diff/highlights.scm"
+    }
+  },
+  "queries/diff/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/diff/injections.scm"
+    }
+  },
+  "queries/dot/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "bc319bd0c2dba4ddfda7549042adeb6758b57c4a",
+      "path": "queries/dot/highlights.scm"
+    }
+  },
+  "queries/dtd/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dtd/folds.scm"
+    }
+  },
+  "queries/dtd/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dtd/highlights.scm"
+    }
+  },
+  "queries/dtd/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/dtd/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dtd/injections.scm"
+    }
+  },
+  "queries/dtd/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/dtd/locals.scm"
+    }
+  },
+  "queries/dtd/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/ecma/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ecma/folds.scm"
+    }
+  },
+  "queries/ecma/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ecma/highlights.scm"
+    }
+  },
+  "queries/ecma/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ecma/indents.scm"
+    }
+  },
+  "queries/ecma/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ecma/injections.scm"
+    }
+  },
+  "queries/ecma/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ecma/locals.scm"
+    }
+  },
+  "queries/go/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/go/folds.scm"
+    }
+  },
+  "queries/go/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-go",
+      "commit": "174bc4405b312fde1c5d78468fccf0ad27e41617",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/go/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/go/indents.scm"
+    }
+  },
+  "queries/go/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/go/injections.scm"
+    }
+  },
+  "queries/go/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/go/locals.scm"
+    }
+  },
+  "queries/go/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-go",
+      "commit": "319e36193cdaf065ff4407f0a826b69d4eddc907",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/haskell/folds.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/haskell/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-haskell",
+      "commit": "d9b04afe59cf6bcf76c43c48212ffae888eaeab4",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "d6ebbd5039954ecd47463802a16b5d8d7f223eef",
+      "path": "runtime/queries/haskell/highlights.scm"
+    }
+  },
+  "queries/haskell/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/haskell/injections.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-haskell",
+      "commit": "50a04bf6d208a8f1aa90048c500fc4eb94b2df0f",
+      "path": "queries/injections.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "77e298e4de607d69aa7f37dc6dcba6aee131ac7f",
+      "path": "queries/haskell/injections.scm"
+    }
+  },
+  "queries/haskell/locals.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-haskell",
+      "commit": "50a04bf6d208a8f1aa90048c500fc4eb94b2df0f",
+      "path": "queries/locals.scm"
+    }
+  },
+  "queries/haskell/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/html/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html/folds.scm"
+    }
+  },
+  "queries/html/highlights.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html/highlights.scm"
+    }
+  },
+  "queries/html/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html/indents.scm"
+    }
+  },
+  "queries/html/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "f2204e58dbb2031cb6783caa4541c4483edbb426",
+      "path": "runtime/queries/html/injections.scm"
+    }
+  },
+  "queries/html/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html/locals.scm"
+    }
+  },
+  "queries/html/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/html_tags/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "f7c05e3e0510df7c742d455c802e27b6ee7ab384",
+      "path": "queries/html_tags/highlights.scm"
+    }
+  },
+  "queries/html_tags/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html_tags/indents.scm"
+    }
+  },
+  "queries/html_tags/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/html_tags/injections.scm"
+    }
+  },
+  "queries/idl/highlights.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/idl/highlights.scm"
+    }
+  },
+  "queries/idl/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/idl/indents.scm"
+    }
+  },
+  "queries/idl/injections.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "864e75a85d4bbe77745929a1ce4d4c63bef11480",
+      "path": "runtime/queries/idl/injections.scm"
+    }
+  },
+  "queries/idl/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/java/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/java/folds.scm"
+    }
+  },
+  "queries/java/highlights.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-java",
+      "commit": "04a649d1a0c40e53f946677463d7d8c4e8d6d0db",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "65b3a8e6d7b3777bbea326dd96d21d17d937fd7d",
+      "path": "queries/java/highlights.scm"
+    }
+  },
+  "queries/java/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/java/indents.scm"
+    }
+  },
+  "queries/java/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/java/injections.scm"
+    }
+  },
+  "queries/java/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/java/locals.scm"
+    }
+  },
+  "queries/java/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-java",
+      "commit": "4548c60eac1cecb2538bef5a1c4d0af2bfaa9eb4",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/javadoc/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/rmuir/tree-sitter-javadoc",
+      "commit": "4dba597e88b02c6e7cfb58cbcd5802a6ee58cf7f",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/javadoc/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/javadoc/indents.scm"
+    }
+  },
+  "queries/javadoc/injections.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/javadoc/injections.scm"
+    }
+  },
+  "queries/javascript/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/javascript/folds.scm"
+    }
+  },
+  "queries/javascript/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/javascript/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/javascript/indents.scm"
+    }
+  },
+  "queries/javascript/injections.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "1c751f8a4420f880b65b461bcf617ad2126ebc58",
+      "path": "queries/injections.scm"
+    }
+  },
+  "queries/javascript/locals.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/locals.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "ac8ae3b1c7b5644f8317cdc88d604cdb558b6296",
+      "path": "queries/javascript/locals.scm"
+    }
+  },
+  "queries/javascript/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "f85369d14306244a62c1e1f11c26a3fdb972daad",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/jsdoc/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/jsdoc/highlights.scm"
+    }
+  },
+  "queries/json/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/json/folds.scm"
+    }
+  },
+  "queries/json/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-json",
+      "commit": "368736a6137770f785e1e7479a6be29417eb13aa",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/json/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/json/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "9d47b2558b29fc8c0bce5f54b8424c5f8e2c80c7",
+      "path": "runtime/queries/json/injections.scm"
+    }
+  },
+  "queries/json/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/json/locals.scm"
+    }
+  },
+  "queries/jsx/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/jsx/folds.scm"
+    }
+  },
+  "queries/jsx/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/jsx/highlights.scm"
+    }
+  },
+  "queries/jsx/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/jsx/indents.scm"
+    }
+  },
+  "queries/jsx/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/jsx/injections.scm"
+    }
+  },
+  "queries/kotlin/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/kotlin/folds.scm"
+    }
+  },
+  "queries/kotlin/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/fwcd/tree-sitter-kotlin",
+      "commit": "e72b9d5acf709bf2f73561797a0107fb5370625a",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "a2629ebcc0da7542f8723fb7f7b2e653ad230d3f",
+      "path": "queries/kotlin/highlights.scm"
+    }
+  },
+  "queries/kotlin/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/kotlin/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/kotlin/injections.scm"
+    }
+  },
+  "queries/kotlin/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/kotlin/locals.scm"
+    }
+  },
+  "queries/kotlin/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/latex/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/latex/folds.scm"
+    }
+  },
+  "queries/latex/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "2c30e515ebe79037ab8d15f7e59c0e2690f50626",
+      "path": "runtime/queries/latex/highlights.scm"
+    }
+  },
+  "queries/latex/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/latex/injections.scm"
+    }
+  },
+  "queries/lua/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/lua/folds.scm"
+    }
+  },
+  "queries/lua/highlights.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-lua",
+      "commit": "d76023017f7485eae629cb60d406c7a1ca0f40c9",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "107e61afb7129d637ea6c3c68b97a22194b0bf16",
+      "path": "queries/lua/highlights.scm"
+    }
+  },
+  "queries/lua/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/lua/indents.scm"
+    }
+  },
+  "queries/lua/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "c80715f883b8c7963782973b23297c5dec7924be",
+      "path": "queries/lua/injections.scm"
+    }
+  },
+  "queries/lua/locals.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-lua",
+      "commit": "f5e84ffc2b06858401e0d2edf5dce009efbe34b3",
+      "path": "queries/locals.scm"
+    }
+  },
+  "queries/lua/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-lua",
+      "commit": "54689a9876d4b249244036327eb10f34ed750bc6",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/make/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/make/folds.scm"
+    }
+  },
+  "queries/make/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-make",
+      "commit": "c8b7faa8b427785c7b6ca15ee324ed0ff7c7f1e8",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/make/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/make/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/make/injections.scm"
+    }
+  },
+  "queries/make/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/make/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/markdown/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/markdown/folds.scm"
+    }
+  },
+  "queries/markdown/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/markdown/highlights.scm"
+    }
+  },
+  "queries/markdown/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/markdown/indents.scm"
+    }
+  },
+  "queries/markdown/injections.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-markdown",
+      "commit": "b7e263b722ce34fa6de983e1053b99b7a5ea6478",
+      "path": "tree-sitter-markdown/queries/injections.scm"
+    }
+  },
+  "queries/markdown/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/markdown_inline/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/markdown_inline/highlights.scm"
+    }
+  },
+  "queries/markdown_inline/injections.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/markdown_inline/injections.scm"
+    }
+  },
+  "queries/mermaid/folds.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/mermaid/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/mikkihugo/tree-sitter-mermaid",
+      "commit": "d1a99ef2c2907e33cd5d4c7ee62b75e4459dadbc",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/mermaid/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/mermaid/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/mermaid/injections.scm"
+    }
+  },
+  "queries/mermaid/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/objc/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/objc/folds.scm"
+    }
+  },
+  "queries/objc/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-objc",
+      "commit": "a360943e0f108b7d0935924a4eb772ce1a6aaec7",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "dad1b7cd6606ffaa5c283ba73d707b4741a5f445",
+      "path": "queries/objc/highlights.scm"
+    }
+  },
+  "queries/objc/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/objc/indents.scm"
+    }
+  },
+  "queries/objc/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/objc/injections.scm"
+    }
+  },
+  "queries/objc/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/objc/locals.scm"
+    }
+  },
+  "queries/objc/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/ocaml/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ocaml/folds.scm"
+    }
+  },
+  "queries/ocaml/highlights.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ocaml",
+      "commit": "45ddc92d18fa11b2ca1a18cd94de4e63feea0806",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "a6063b22c9e6d8660b82255d251c19d150725d9f",
+      "path": "queries/ocaml/highlights.scm"
+    }
+  },
+  "queries/ocaml/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ocaml/indents.scm"
+    }
+  },
+  "queries/ocaml/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ocaml/injections.scm"
+    }
+  },
+  "queries/ocaml/locals.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ocaml",
+      "commit": "e0e760fe206e5a860687dd5f14e6911c515e5c70",
+      "path": "queries/locals.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "7be8e6ca5c5dfe8414641c9d33605db31418debc",
+      "path": "queries/ocaml/locals.scm"
+    }
+  },
+  "queries/ocaml/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ocaml",
+      "commit": "f9fea5ffc334fc2148085e74ace008af244695b1",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/pascal/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/pascal/folds.scm"
+    }
+  },
+  "queries/pascal/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/Isopod/tree-sitter-pascal",
+      "commit": "d0ebabefaea9ac3f6fc3004cf08cd121b66da9e4",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/pascal/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/pascal/indents.scm"
+    }
+  },
+  "queries/pascal/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/pascal/injections.scm"
+    }
+  },
+  "queries/pascal/locals.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/Isopod/tree-sitter-pascal",
+      "commit": "22fb8f8fe5e6822266e82794a1d19444f9f3879e",
+      "path": "queries/locals.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "5b90ea2abaa4303b9205b5c9002a8cdd0acd11a5",
+      "path": "queries/pascal/locals.scm"
+    }
+  },
+  "queries/pascal/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/perl/folds.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-perl/tree-sitter-perl",
+      "commit": "35e58380131853a4f453325286d397c8c6fc08e4",
+      "path": "queries/folds.scm"
+    }
+  },
+  "queries/perl/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-perl/tree-sitter-perl",
+      "commit": "2872c35355a17b3c13b422d6d9b04a0530558951",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/perl/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/perl/injections.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-perl/tree-sitter-perl",
+      "commit": "ad5b6f3967e46423cda1dbef3823c9cd031a5c6b",
+      "path": "queries/injections.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "57a8acf0c4ed5e7f6dda83c3f9b073f8a99a70f9",
+      "path": "queries/perl/injections.scm"
+    }
+  },
+  "queries/perl/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/perl/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/php/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "3cb46f0c81a5640cd3b342e8a50e77058d7923d5",
+      "path": "queries/php/folds.scm"
+    }
+  },
+  "queries/php/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-php",
+      "commit": "43fbdd53c34a82d9a27c83f9798a2918b3dcd270",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/php/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/php/indents.scm"
+    }
+  },
+  "queries/php/injections.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-php",
+      "commit": "b221172574da385f86cd6c133e959b6e2629ba06",
+      "path": "queries/injections.scm"
+    }
+  },
+  "queries/php/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/php/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-php",
+      "commit": "cb4fac2ee6c34b5e32f98a3ad3e7c17f5288cc85",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/proto/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/proto/folds.scm"
+    }
+  },
+  "queries/proto/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/proto/highlights.scm"
+    }
+  },
+  "queries/proto/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/proto/indents.scm"
+    }
+  },
+  "queries/proto/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/proto/injections.scm"
+    }
+  },
+  "queries/proto/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/proto/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/python/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/python/folds.scm"
+    }
+  },
+  "queries/python/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-python",
+      "commit": "1124c1872b6cc499b1a8848c366e07da156b505a",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/python/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/python/indents.scm"
+    }
+  },
+  "queries/python/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/python/injections.scm"
+    }
+  },
+  "queries/python/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/python/locals.scm"
+    }
+  },
+  "queries/python/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/regex/highlights.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/regex/highlights.scm"
+    }
+  },
+  "queries/ruby/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ruby/folds.scm"
+    }
+  },
+  "queries/ruby/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ruby",
+      "commit": "d60f2a5a68e1b41ba51caa6d3d21593a810c01d6",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/ruby/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ruby/indents.scm"
+    }
+  },
+  "queries/ruby/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/ruby/injections.scm"
+    }
+  },
+  "queries/ruby/locals.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ruby",
+      "commit": "6ad22db67f131eb01adf1a98d2e22c6d3a689a13",
+      "path": "queries/locals.scm"
+    }
+  },
+  "queries/ruby/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-ruby",
+      "commit": "49c5f6e9cc9ea1a3b9fb5414ba0c2d697acb2448",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/rust/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/rust/folds.scm"
+    }
+  },
+  "queries/rust/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-rust",
+      "commit": "5274df6aa92d9016edf566aeff4d77206184dfaa",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/rust/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "1b050206e490a4146cdf25c7b38969c1711b5620",
+      "path": "queries/rust/indents.scm"
+    }
+  },
+  "queries/rust/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "a4f4fcdd3ef1b36ebdad72741bbd85dd9ef5013e",
+      "path": "queries/rust/injections.scm"
+    }
+  },
+  "queries/rust/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/rust/locals.scm"
+    }
+  },
+  "queries/rust/tags.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-rust",
+      "commit": "1f63b33efee17e833e0ea29266dd3d713e27e321",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/scala/folds.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/scala/folds.scm"
+    }
+  },
+  "queries/scala/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/scala/highlights.scm"
+    }
+  },
+  "queries/scala/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/scala/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "024e6c5e46f8ec4237695b9e3020ecb601d817df",
+      "path": "runtime/queries/scala/injections.scm"
+    }
+  },
+  "queries/scala/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/scala/locals.scm"
+    }
+  },
+  "queries/scala/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-scala",
+      "commit": "b6a91556ef76f1f903eebb8c8a4dbac1f52cced2",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/scheme/folds.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/scheme/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/6cdh/tree-sitter-scheme",
+      "commit": "184e7596ee0cbaef79230cae1b4ee5bb4fbad314",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/scheme/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/scheme/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/scheme/injections.scm"
+    }
+  },
+  "queries/scheme/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/scheme/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/sql/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/sql/folds.scm"
+    }
+  },
+  "queries/sql/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/sql/highlights.scm"
+    }
+  },
+  "queries/sql/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/sql/indents.scm"
+    }
+  },
+  "queries/sql/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/sql/injections.scm"
+    }
+  },
+  "queries/sql/locals.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/sql/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/swift/folds.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "13ddd4d7522ce3e5a1abc0ea34e10ec4e445908a",
+      "path": "runtime/queries/swift/folds.scm"
+    }
+  },
+  "queries/swift/highlights.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/alex-pinkus/tree-sitter-swift",
+      "commit": "c79af47572af041d5df15e9d805cf575bb0265e0",
+      "path": "queries/highlights.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "13ddd4d7522ce3e5a1abc0ea34e10ec4e445908a",
+      "path": "runtime/queries/swift/highlights.scm"
+    }
+  },
+  "queries/swift/indents.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "13ddd4d7522ce3e5a1abc0ea34e10ec4e445908a",
+      "path": "runtime/queries/swift/indents.scm"
+    }
+  },
+  "queries/swift/injections.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/swift/injections.scm"
+    }
+  },
+  "queries/swift/locals.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/swift/locals.scm"
+    }
+  },
+  "queries/swift/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/swift/textobjects.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/alex-pinkus/tree-sitter-swift",
+      "commit": "f1a48a33a7ceaf8817f7a340ea4ef1b549ffa176",
+      "path": "queries/textobjects.scm"
+    }
+  },
+  "queries/thrift/folds.scm": {
+    "origin": "both",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/thrift/folds.scm"
+    }
+  },
+  "queries/thrift/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/thrift/highlights.scm"
+    }
+  },
+  "queries/thrift/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/thrift/indents.scm"
+    }
+  },
+  "queries/thrift/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/thrift/injections.scm"
+    }
+  },
+  "queries/thrift/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/thrift/locals.scm"
+    }
+  },
+  "queries/thrift/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/toml/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/toml/folds.scm"
+    }
+  },
+  "queries/toml/highlights.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/toml/highlights.scm"
+    }
+  },
+  "queries/toml/indents.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/toml/injections.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/toml/injections.scm"
+    }
+  },
+  "queries/toml/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/toml/locals.scm"
+    }
+  },
+  "queries/toml/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/tsx/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/tsx/folds.scm"
+    }
+  },
+  "queries/tsx/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/tsx/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/tsx/indents.scm"
+    }
+  },
+  "queries/tsx/injections.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "1c751f8a4420f880b65b461bcf617ad2126ebc58",
+      "path": "queries/injections.scm"
+    }
+  },
+  "queries/tsx/locals.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/locals.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/tsx/locals.scm"
+    }
+  },
+  "queries/tsx/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-typescript",
+      "commit": "f289f293f092bf76fd6d052bce606b65633c9187",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/typescript/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/typescript/folds.scm"
+    }
+  },
+  "queries/typescript/highlights.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/typescript/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/typescript/indents.scm"
+    }
+  },
+  "queries/typescript/injections.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "1c751f8a4420f880b65b461bcf617ad2126ebc58",
+      "path": "queries/injections.scm"
+    }
+  },
+  "queries/typescript/locals.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "9802cc5812a19cd28168076af36e88b463dd3a18",
+      "path": "queries/locals.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "ac8ae3b1c7b5644f8317cdc88d604cdb558b6296",
+      "path": "queries/typescript/locals.scm"
+    }
+  },
+  "queries/typescript/tags.scm": {
+    "origin": "grammar",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
+      "commit": "f85369d14306244a62c1e1f11c26a3fdb972daad",
+      "path": "queries/tags.scm"
+    }
+  },
+  "queries/xml/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/xml/folds.scm"
+    }
+  },
+  "queries/xml/highlights.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/xml/highlights.scm"
+    }
+  },
+  "queries/xml/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "5b3dd8cff1064db583ddd3edd314e94a02ea1bef",
+      "path": "queries/xml/indents.scm"
+    }
+  },
+  "queries/xml/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/xml/injections.scm"
+    }
+  },
+  "queries/xml/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/xml/locals.scm"
+    }
+  },
+  "queries/xml/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/yaml/folds.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/yaml/folds.scm"
+    }
+  },
+  "queries/yaml/highlights.scm": {
+    "origin": "grammar",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-yaml",
+      "commit": "af011e6e1a448c1080b8281203436fe2ed27b101",
+      "path": "queries/highlights.scm"
+    }
+  },
+  "queries/yaml/indents.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/yaml/indents.scm"
+    }
+  },
+  "queries/yaml/injections.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/yaml/injections.scm"
+    }
+  },
+  "queries/yaml/locals.scm": {
+    "origin": "nvim",
+    "changed": false,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/yaml/locals.scm"
+    }
+  },
+  "queries/yaml/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
+  "queries/zig/folds.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/tree-sitter-grammars/tree-sitter-zig",
+      "commit": "b3d906d56ab4c5839581deae3a1ca7d83c38e756",
+      "path": "queries/folds.scm"
+    },
+    "nvimUpstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/zig/folds.scm"
+    }
+  },
+  "queries/zig/highlights.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "77362027f7aa850c87419fd571151e76b0b342a6",
+      "path": "runtime/queries/zig/highlights.scm"
+    }
+  },
+  "queries/zig/indents.scm": {
+    "origin": "nvim",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/zig/indents.scm"
+    }
+  },
+  "queries/zig/injections.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/zig/injections.scm"
+    }
+  },
+  "queries/zig/locals.scm": {
+    "origin": "both",
+    "changed": true,
+    "upstream": {
+      "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
+      "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
+      "path": "runtime/queries/zig/locals.scm"
+    }
+  },
+  "queries/zig/tags.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  }
+}
