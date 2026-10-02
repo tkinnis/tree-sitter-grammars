@@ -926,7 +926,7 @@ SOFTWARE.
 
 ### tree-sitter-ruby
 
-`libruby.dylib` is compiled from https://github.com/tree-sitter/tree-sitter-ruby at ab6dca77a8184abc94af6e3e82538741b5078d63. Licence: MIT.
+`libruby.dylib` is compiled from https://github.com/tree-sitter/tree-sitter-ruby at ad907a69da0c8a4f7a943a7fe012712208da6dee. Licence: MIT.
 
 #### LICENSE
 

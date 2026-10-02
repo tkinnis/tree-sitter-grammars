@@ -131,7 +131,7 @@ dart run tool/write_notices.dart
 
 `THIRD_PARTY_NOTICES.md` names every patch and the files it modifies under its grammar, and the source bundle a release attaches stays the upstream tree at the pin, so a release is rebuilt from its bundles and the patches its tag carries. A patch belongs here only until a commit upstream carries the fix: pin that commit and remove the patch.
 
-The scanners of markdown, yaml, kotlin, python and perl are patched so that the state each one serializes fits the 1024 bytes tree-sitter gives it. Unpatched, deep enough nesting (a line of 255 `>` in Markdown) writes past that buffer, which the runtime, with its assertions on, stops by aborting the whole process.
+The scanners of markdown, yaml, kotlin, python and perl are patched so that the state each one serializes fits the 1024 bytes tree-sitter gives it. Unpatched, deep enough nesting (a line of 255 `>` in Markdown) writes past that buffer, which the runtime, with its assertions on, stops by aborting the whole process. ruby needs no patch for the same fault in its heredoc state: it is pinned at the upstream commit that fixes it.
 
 ### Moving the Runtime
 
