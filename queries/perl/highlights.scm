@@ -151,6 +151,32 @@
   [ "[" "]" "{" "}" "(" ")" ] @punctuation.bracket
 )
 
+; A bracket inside a string, a regular expression or a variable is part of
+; what holds it — `"$h{key}"`, `qr{a+}`, `${\ $obj->method}`, `@{[ 1, 2 ]}`
+; — so it is captured again as that, a variable after the string it can
+; sit in. Ahead of the punctuation the patterns below give the braces
+; around a variable's name.
+(([ "[" "]" "{" "}" "(" ")" ] @string
+  (#has-ancestor? @string
+    string_literal interpolated_string_literal quoted_word_list
+    command_string heredoc_content replacement transliteration_content)))
+
+(([ "[" "]" "{" "}" "(" ")" ] @string.regex
+  (#has-ancestor? @string.regex quoted_regexp match_regexp)))
+
+(([ "[" "]" "{" "}" "(" ")" ] @variable.builtin
+  (#has-ancestor? @variable.builtin glob)))
+
+(([ "[" "]" "{" "}" "(" ")" ] @variable.array
+  (#has-ancestor? @variable.array
+    array arraylen array_deref_expression arraylen_deref_expression)))
+
+(([ "[" "]" "{" "}" "(" ")" ] @variable.hash
+  (#has-ancestor? @variable.hash hash hash_deref_expression)))
+
+(([ "[" "]" "{" "}" "(" ")" ] @variable.scalar
+  (#has-ancestor? @variable.scalar scalar scalar_deref_expression)))
+
 (_
   "{" @punctuation.special
   (varname)

@@ -3,18 +3,10 @@
 
 (comment) @comment @spell
 
-([
-  ".."
-  "+"
-  "++"
-  "+++"
-  "++++"
-  "-"
-  "--"
-  "---"
-  "----"
-] @punctuation.special
-)
+; A line's leading `+` or `-`, and a file header's `+++` or `---`, belong
+; to the line the addition, deletion or header captures; only an index
+; line's `..` is punctuation of its own.
+".." @punctuation.special
 
 [
   (addition)

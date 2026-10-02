@@ -58,27 +58,15 @@
 (quote
   (_ (_ (_ _* @constant))))
 
-;; sexp comment ;;
-
-;; hardcoded highlight four levels of nested structure
-
-; #;atom
-(comment
-  _ @comment)
-
-; #;(list)
-(comment
-  (_ _* @comment))
-
-; #;(list (list))
-(comment
-  (_ (_ _* @comment)))
-
-; #;(list (list (list)))
-(comment
-  (_ (_ (_ _ @comment))))
-
 [(comment)
  (block_comment)
  (directive)] @comment
 
+;; sexp comment ;;
+
+; Every node a datum comment holds, named or not and however deep its
+; lists nest, is captured as the comment, so no capture of the code it
+; comments out is drawn over it. Last, so it is the latest capture of
+; each such node.
+([_] @comment
+  (#has-ancestor? @comment comment directive))

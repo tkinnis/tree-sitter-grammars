@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.3] - Unreleased
+
+### Added
+
+- Highlight tests for Lua, Perl and Scheme, and further ones for JavaScript, Kotlin, Mermaid, Pascal and TypeScript, each holding a capture inside a wider one of its query
+
+### Fixed
+
+A capture inside a wider one is drawn over it, so a pattern over a whole node colours only what no capture inside it reaches. Each of these captured a node whole for the captures inside it to be hidden, captured a part only by capturing the whole, or held a pattern that only a capture of the whole kept from being drawn:
+
+- Kotlin: `"return"` and `"return@"` are `@keyword.return`, and `"continue"`, `"continue@"`, `"break"` and `"break@"` `@repeat`, in place of `(jump_expression) @keyword.return`, which drew `break` and `continue` as a return, and whatever a returned expression leaves uncaptured in the return's colour
+- Scheme: every node a datum comment holds is `@comment`, through `#has-ancestor?`, in place of four patterns reaching four levels of lists, past which the commented-out code drew as code
+- Diff: only an index line's `..` is `@punctuation.special`; a changed line's `+` or `-` and a header's `+++` or `---` draw in the line's `@diff.plus` or `@diff.minus`
+- Perl: a bracket inside a string, a regular expression or a variable is captured as what holds it, so `${\ $obj->method}`, `@{[ 1, 2 ]}` and `"$h{key}"` draw their brackets in the variable's or the string's colour
+- Mermaid: a sequence diagram's `alt`, `loop`, `opt` and `rect` blocks, a composite state's body, a subgraph's statements and an entity's attributes are not captured whole, which drew the whitespace and anything uncaptured inside them as a keyword or a namespace; a composite state's name and a subgraph's id are `@namespace`
+- Lua: a label's name is `@label` where it is written and where a `goto` names it, and `::` is `@punctuation.delimiter`, in place of `(label_statement) @label`, under which the name drew as a variable
+- Pascal: an identifier inside a type reference is `@type`, and one inside a case label or a statement label `@constant`, through `#has-ancestor?`, so a generic type's name and arguments and a case label's names do not draw as the identifiers no other pattern names
+- JavaScript and TypeScript: `/` is left to ecma's `(regex "/" @punctuation.bracket)` and `(binary_expression "/" @operator)`, in place of a bare `"/"` in their operator lists, which overrode the first and drew a regular expression's delimiters as operators
+
 ## [1.2.2] - 2026-10-02
 
 ### Added

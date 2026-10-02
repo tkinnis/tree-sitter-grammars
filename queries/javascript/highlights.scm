@@ -143,6 +143,8 @@
   ","
 ] @punctuation.delimiter
 
+; `/` is left to ecma, which captures it as an operator in a division
+; and as a delimiter around a regular expression.
 [
   "-"
   "--"
@@ -154,7 +156,6 @@
   "*="
   "**"
   "**="
-  "/"
   "/="
   "%"
   "%="

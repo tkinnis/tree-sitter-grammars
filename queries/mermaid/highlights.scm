@@ -276,10 +276,12 @@
 ; C4 names
 (c4_title) @string
 
-; Architecture
+; Architecture: the grammar gives a service's name no node of its own, and
+; its keyword, braces and body are captured apart, so the service's capture
+; colours the name
 (architecture_service) @type
 
-; Requirement diagram
+; Requirement diagram: a requirement's name, the same way
 (requirement_block) @type
 
 ; ============================================================================
@@ -557,21 +559,19 @@
 ; Special Constructs
 ; ============================================================================
 
-; Sequence diagram blocks
-(sequence_stmt_alt_branch) @keyword
-(sequence_stmt_loop_inner) @keyword.control
-(sequence_stmt_opt_inner) @keyword.control
-(sequence_stmt_rect_inner) @keyword
+; A sequence diagram's blocks, a composite state's body, a subgraph's
+; statements and an entity's attributes are not captured whole: a capture
+; over a node colours whatever inside it no other capture does, and their
+; keywords, names and statements are captured where they are written.
 
-; State diagram composite states
-(state_composite_body) @namespace
+; State diagram composite states: the composite state's name
+(state_stmt_composite
+  (state_name) @namespace)
 (state_division) @punctuation.delimiter
 
-; Flow subgraph inner content
-(flow_stmt_subgraph_inner) @namespace
-
-; ER entity block
-(er_stmt_entity_block_inner) @namespace
+; Flow subgraph: the subgraph's name
+(flow_stmt_subgraph
+  (flow_vertex_id) @namespace)
 
 ; Requirement block body
 (requirement_block_body) @namespace

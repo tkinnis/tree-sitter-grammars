@@ -2,6 +2,18 @@
 ; overrides it.
 (identifier)      @identifier
 
+; -- An identifier inside a type reference, a case label or a statement
+; label is captured as the pattern over that whole node below captures
+; the node, since that pattern colours only what no capture inside the
+; node reaches and the one above reaches every identifier. Ahead of
+; every pattern naming an identifier more narrowly, so each of them
+; overrides it.
+((identifier) @type
+  (#has-ancestor? @type typeref))
+
+((identifier) @constant
+  (#has-ancestor? @constant caseLabel label))
+
 ; -- Keywords
 [
 	(kProgram)

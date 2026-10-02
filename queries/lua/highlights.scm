@@ -1,6 +1,6 @@
 ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, queries/lua/highlights.scm @ 107e61afb7129d637ea6c3c68b97a22194b0bf16, Apache-2.0.
 ; Taken from https://github.com/tree-sitter-grammars/tree-sitter-lua, queries/highlights.scm @ d76023017f7485eae629cb60d406c7a1ca0f40c9, MIT.
-; Unchanged.
+; Modified in tree-sitter-grammars.
 
 ;; Keywords
 
@@ -11,8 +11,6 @@
  "in"
  "local"
 ] @keyword
-
-(label_statement) @label
 
 (break_statement) @keyword
 
@@ -93,6 +91,7 @@
 [
   ";"
   ":"
+  "::"
   ","
   "."
 ] @punctuation.delimiter
@@ -127,6 +126,16 @@
  (#match? @constant "^[A-Z][A-Z_0-9]*$"))
 
 (vararg_expression) @constant
+
+;; Labels
+
+; A label's name where it is written and where a goto names it, after
+; the identifier patterns it overrides.
+(label_statement
+  (identifier) @label)
+
+(goto_statement
+  (identifier) @label)
 
 (nil) @constant.builtin
 

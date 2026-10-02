@@ -278,7 +278,10 @@
 
 ("fun") @keyword.function
 
-(jump_expression) @keyword.return
+[
+	"return"
+	"return@"
+] @keyword.return
 
 [
 	"if"
@@ -290,6 +293,10 @@
 	"for"
 	"do"
 	"while"
+	"continue"
+	"continue@"
+	"break"
+	"break@"
 ] @repeat
 
 [
