@@ -1,0 +1,8 @@
+syntax = "proto3";
+
+/**
+ * A counted thing.
+ */
+message Item {
+  int32 count = 1;
+}

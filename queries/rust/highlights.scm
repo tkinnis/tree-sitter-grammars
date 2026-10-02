@@ -10,10 +10,6 @@
 ((identifier) @constant
  (#match? @constant "^[A-Z][A-Z\\d_]+$'"))
 
-; Assume uppercase names are enum constructors
-((identifier) @constructor
- (#match? @constructor "^[A-Z]"))
-
 ; Assume that uppercase names in paths are types
 ((scoped_identifier
   path: (identifier) @type)
@@ -57,6 +53,10 @@
 (generic_function
   function: (field_expression
     field: (field_identifier) @function.method))
+
+; Assume uppercase names are enum constructors
+((identifier) @constructor
+ (#match? @constructor "^[A-Z]"))
 
 (macro_invocation
   macro: (identifier) @function.macro

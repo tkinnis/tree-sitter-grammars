@@ -1,0 +1,5 @@
+comment.documentation "/**\n * Names a count of items.\n */"
+keyword.type "type"
+type.definition "Count"
+operator "="
+type "Int"

@@ -1,0 +1,7 @@
+button::before {
+  color: red;
+}
+
+a:hover {
+  margin: 0;
+}

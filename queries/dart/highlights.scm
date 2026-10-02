@@ -89,17 +89,6 @@
 
 ; Operators and Tokens
 ; --------------------
-(template_substitution
-  "$" @punctuation.special
-  "{" @punctuation.special
-  "}" @punctuation.special
-) @none
-
-(template_substitution
-  "$" @punctuation.special
-  (identifier_dollar_escaped) @variable
-) @none
-
 (escape_sequence) @string.escape
 
 [
@@ -120,11 +109,13 @@
  "||"
  "~/"
  (increment_operator)
- (is_operator)
  (prefix_operator)
  (equality_operator)
  (additive_operator)
 ] @operator
+
+(is_operator
+  "!" @operator)
 
 (type_arguments
   "<" @punctuation.bracket
@@ -142,6 +133,17 @@
   "{"
   "}"
 ]  @punctuation.bracket
+
+(template_substitution
+  "$" @punctuation.special
+  "{" @punctuation.special
+  "}" @punctuation.special
+) @none
+
+(template_substitution
+  "$" @punctuation.special
+  (identifier_dollar_escaped) @variable
+) @none
 
 ; Delimiters
 ; --------------------

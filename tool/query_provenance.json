@@ -324,7 +324,7 @@
   },
   "queries/css/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-css",
       "commit": "5c89b88a37a2e1e36c031469462d6ee85ff2c13c",
@@ -711,7 +711,7 @@
   },
   "queries/idl/highlights.scm": {
     "origin": "both",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/nvim-treesitter/nvim-treesitter",
       "commit": "692b051b09935653befdb8f7ba8afdb640adf17b",
@@ -906,7 +906,7 @@
   },
   "queries/json/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-json",
       "commit": "368736a6137770f785e1e7479a6be29417eb13aa",
@@ -1217,7 +1217,7 @@
   },
   "queries/mermaid/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/mikkihugo/tree-sitter-mermaid",
       "commit": "d1a99ef2c2907e33cd5d4c7ee62b75e4459dadbc",
@@ -1589,7 +1589,7 @@
   },
   "queries/python/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-python",
       "commit": "1124c1872b6cc499b1a8848c366e07da156b505a",
@@ -1648,7 +1648,7 @@
   },
   "queries/ruby/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-ruby",
       "commit": "d60f2a5a68e1b41ba51caa6d3d21593a810c01d6",
@@ -1702,7 +1702,7 @@
   },
   "queries/rust/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-rust",
       "commit": "5274df6aa92d9016edf566aeff4d77206184dfaa",
@@ -1890,7 +1890,7 @@
   },
   "queries/swift/highlights.scm": {
     "origin": "both",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/alex-pinkus/tree-sitter-swift",
       "commit": "c79af47572af041d5df15e9d805cf575bb0265e0",

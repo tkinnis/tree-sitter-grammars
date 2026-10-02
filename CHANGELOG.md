@@ -9,7 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Highlight tests: `tool/check_release.dart` parses every source under `test/highlights/<grammar>/` and requires what the grammar's composed `highlights.scm` draws in it, the latest pattern's capture over each span, to be the `.highlights` file beside it
+- Highlight tests: `tool/check_release.dart` parses every source under `test/highlights/<grammar>/` and requires what the grammar's composed `highlights.scm` draws in it, the latest pattern's capture over each span, to be the `.highlights` file beside it; the first are one source for each language below whose highlights change, each holding the spans where two patterns meet
+
+### Fixed
+
+Of two patterns that capture the same node, the later one is drawn. Patterns written for the opposite order, and patterns whose order overrode the one their author wrote for that node, are reordered or narrowed:
+
+- JSON: a key is `@string.special.key`; its pattern came ahead of `(string) @string`, which drew every key as a string
+- IDL: the base types, `wstring`, `wchar`, `long` and the rest, are `@type.builtin`, as the grammar's own highlight test expects, and not `@type`
+- CSS: `(pseudo_element_selector "::" (tag_name) @attribute)` takes the name after `::` alone, so `button` in `button::before` is a tag and `before` an attribute
+- Diff: an empty added or removed line is `@diff.plus` or `@diff.minus`, like every other added or removed line, and not the `@punctuation.special` of its `+` or `-`
+- Mermaid: `"v" @keyword`, filed under packet diagrams, is removed; the grammar's only `"v"` is a flowchart's direction, which is `@keyword.directive`
+- LaTeX: every delimiter of `\left` and `\right` is `@punctuation.delimiter`; a bracket was `@punctuation.bracket` and a parenthesis `@punctuation.delimiter`
+- Rust: a capitalised name called like a function, `Ok(x)`, `Err(e)` or a tuple struct's `Wrapper(n)`, is `@constructor`, as the comment over its pattern says, and a macro's name `@function.macro`
+- Swift: both the `?` and the `:` of a ternary are `@keyword.conditional.ternary`; the operator list drew the `?` as `@operator`
+- Kotlin: the `@`, `file` and `:` of `@file:` are one `@attribute`; the delimiter list drew the `:` as `@punctuation.delimiter`
+- Dart: `is` is `@keyword`, as tree-sitter-dart's own highlight test expects, and the `!` of `is!` is `@operator`; the `$`, `{` and `}` of an interpolation are `@punctuation.special`
+- Scala: the name a `type` definition declares is `@type.definition`
+- JavaScript, TypeScript and TSX: a keyword takes the name ecma gives it, `@keyword.conditional`, `@keyword.repeat`, `@keyword.import`, `@keyword.operator` and the rest; JavaScript and TypeScript each listed the same 41 keywords as `@keyword` after it. TypeScript draws the `as` of `x as T` as `@keyword`, and `import` and `export` are `@keyword.import`. A `/**` comment is `@comment.documentation`, which JavaScript's and TypeScript's own `(comment) @comment` overrode
+- TSX: a JSX element's `<`, `>`, `</` and `/>` are `@tag.delimiter`, as in JavaScript
+- Python: a call of a capitalised name, `Person(name)`, is `@constructor`
+- Ruby: the `}` that closes `#{` is `@punctuation.special`, like the `#{`
+
+A `#match?` regular expression taken from nvim-treesitter's `#lua-match?` is rewritten as a regular expression:
+
+- JavaScript, TypeScript, TSX, Scala, Swift, Thrift and Protobuf: a `/**` comment over several lines is `@comment.documentation`; the `.` of its regular expression matched no line break
+- SQL: an integer is `@number` and a decimal `@number.float`; their patterns kept Lua's `%d`, so every number was `@string`
+- Java: the two patterns over documentation comments in `injections.scm` match `\s` in place of Lua's `%s`; neither names a language, so neither injects anything
 
 ## [1.2.0] - 2026-09-25
 

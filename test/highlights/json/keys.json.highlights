@@ -1,0 +1,6 @@
+string.special.key "\"name\""
+string "\"finch\""
+string.special.key "\"tags\""
+string "\"editor\""
+string.special.key "\"count\""
+number "1"

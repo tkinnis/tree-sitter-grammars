@@ -193,9 +193,6 @@
 "block" @keyword
 "columns" @keyword
 
-; Packet diagram keywords
-"v" @keyword
-
 ; Kanban keywords
 "service" @keyword
 

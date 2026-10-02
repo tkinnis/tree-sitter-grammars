@@ -8,12 +8,12 @@
   (#set! injection.language "comment"))
 
 ((block_comment) @injection.content
-  (#match? @injection.content "/[*][*][%s]")
+  (#match? @injection.content "/[*][*]\\s")
 )
 
 ; markdown-style javadocs https://openjdk.org/jeps/467
 ((line_comment) @injection.content
-  (#match? @injection.content "^///%s")
+  (#match? @injection.content "^///\\s")
 )
 
 ((method_invocation

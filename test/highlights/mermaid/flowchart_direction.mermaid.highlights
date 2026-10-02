@@ -1,0 +1,5 @@
+keyword "flowchart"
+keyword.directive "v"
+variable "A"
+operator "-->"
+variable "B"

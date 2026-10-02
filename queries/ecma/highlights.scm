@@ -191,7 +191,7 @@
 ] @comment @spell
 
 ((comment) @comment.documentation
-  (#match? @comment.documentation "^/\\*\\*[^*].*\\*/$"))
+  (#match? @comment.documentation "^/\\*\\*[^*][\\s\\S]*\\*/$"))
 
 (hash_bang_line) @keyword.directive
 

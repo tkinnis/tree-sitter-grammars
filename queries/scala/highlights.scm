@@ -34,10 +34,10 @@
   (block) @none)
 
 ; types
+(type_identifier) @type
+
 (type_definition
   name: (type_identifier) @type.definition)
-
-(type_identifier) @type
 
 ; val/var definitions/declarations
 (val_definition
@@ -286,7 +286,7 @@
 ] @comment @spell
 
 ((block_comment) @comment.documentation
-  (#match? @comment.documentation "^/[*][*][^*].*[*]/$"))
+  (#match? @comment.documentation "^/[*][*][^*][\\s\\S]*[*]/$"))
 
 ; `case` is a conditional keyword in case_block
 (case_block

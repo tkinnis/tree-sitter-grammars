@@ -122,10 +122,6 @@
   (false)
 ] @constant.builtin
 
-(interpolation
-  "#{" @punctuation.special
-  "}" @punctuation.special) @embedded
-
 (comment) @comment
 
 ; Operators
@@ -152,3 +148,7 @@
   "%w("
   "%i("
 ] @punctuation.bracket
+
+(interpolation
+  "#{" @punctuation.special
+  "}" @punctuation.special) @embedded

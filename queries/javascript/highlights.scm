@@ -81,8 +81,6 @@
   (undefined)
 ] @constant.builtin
 
-(comment) @comment
-
 [
   (string)
   (template_string)
@@ -160,47 +158,3 @@
 (template_substitution
   "${" @punctuation.special
   "}" @punctuation.special) @embedded
-
-[
-  "as"
-  "async"
-  "await"
-  "break"
-  "case"
-  "catch"
-  "class"
-  "const"
-  "continue"
-  "debugger"
-  "default"
-  "delete"
-  "do"
-  "else"
-  "export"
-  "extends"
-  "finally"
-  "for"
-  "from"
-  "function"
-  "get"
-  "if"
-  "import"
-  "in"
-  "instanceof"
-  "let"
-  "new"
-  "of"
-  "return"
-  "set"
-  "static"
-  "switch"
-  "target"
-  "throw"
-  "try"
-  "typeof"
-  "var"
-  "void"
-  "while"
-  "with"
-  "yield"
-] @keyword

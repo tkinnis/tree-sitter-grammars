@@ -1,5 +1,5 @@
 ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/idl/highlights.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
-; Unchanged.
+; Modified in tree-sitter-grammars.
 
 ; https://neovim.io/doc/user/treesitter.html#treesitter-highlight-groups
 (comment) @comment @spell
@@ -57,32 +57,6 @@
   "case"
   "default"
 ] @keyword.conditional
-
-[
-  "void"
-  (signed_short_int)
-  (signed_long_int)
-  (signed_longlong_int)
-  (unsigned_tiny_int)
-  (boolean_type)
-  (fixed_pt_const_type)
-  (octet_type)
-  (signed_tiny_int)
-  (unsigned_short_int)
-  (unsigned_long_int)
-  (unsigned_longlong_int)
-  (floating_pt_type)
-  (char_type)
-  (string_type)
-  (any_type)
-  (fixed_pt_type)
-  (sequence_type)
-  (map_type)
-  (object_type)
-  (value_base_type)
-  (wide_string_type)
-  (wide_char_type)
-] @type.builtin
 
 (escape_sequence) @string.escape
 
@@ -380,3 +354,29 @@
 (anno_name) @attribute.builtin
 
 (range_kind) @attribute.builtin
+
+[
+  "void"
+  (signed_short_int)
+  (signed_long_int)
+  (signed_longlong_int)
+  (unsigned_tiny_int)
+  (boolean_type)
+  (fixed_pt_const_type)
+  (octet_type)
+  (signed_tiny_int)
+  (unsigned_short_int)
+  (unsigned_long_int)
+  (unsigned_longlong_int)
+  (floating_pt_type)
+  (char_type)
+  (string_type)
+  (any_type)
+  (fixed_pt_type)
+  (sequence_type)
+  (map_type)
+  (object_type)
+  (value_base_type)
+  (wide_string_type)
+  (wide_char_type)
+] @type.builtin

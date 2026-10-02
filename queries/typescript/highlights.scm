@@ -81,8 +81,6 @@
   (undefined)
 ] @constant.builtin
 
-(comment) @comment
-
 [
   (string)
   (template_string)
@@ -161,49 +159,8 @@
   "${" @punctuation.special
   "}" @punctuation.special) @embedded
 
-[
-  "as"
-  "async"
-  "await"
-  "break"
-  "case"
-  "catch"
-  "class"
-  "const"
-  "continue"
-  "debugger"
-  "default"
-  "delete"
-  "do"
-  "else"
-  "export"
-  "extends"
-  "finally"
-  "for"
-  "from"
-  "function"
-  "get"
-  "if"
-  "import"
-  "in"
-  "instanceof"
-  "let"
-  "new"
-  "of"
-  "return"
-  "set"
-  "static"
-  "switch"
-  "target"
-  "throw"
-  "try"
-  "typeof"
-  "var"
-  "void"
-  "while"
-  "with"
-  "yield"
-] @keyword
+(as_expression "as" @keyword)
+
 ; Types
 
 (type_identifier) @type
@@ -226,7 +183,6 @@
 [ "abstract"
   "declare"
   "enum"
-  "export"
   "implements"
   "interface"
   "keyof"

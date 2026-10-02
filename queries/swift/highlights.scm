@@ -1,6 +1,6 @@
 ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/swift/highlights.scm @ 13ddd4d7522ce3e5a1abc0ea34e10ec4e445908a, Apache-2.0.
 ; Taken from https://github.com/alex-pinkus/tree-sitter-swift, queries/highlights.scm @ c79af47572af041d5df15e9d805cf575bb0265e0, MIT.
-; Unchanged.
+; Modified in tree-sitter-grammars.
 
 [
   "."
@@ -205,12 +205,6 @@
 
 "return" @keyword.return
 
-(ternary_expression
-  [
-    "?"
-    ":"
-  ] @keyword.conditional.ternary)
-
 [
   (try_operator)
   "do"
@@ -233,7 +227,7 @@
   (#match? @comment.documentation "^///$"))
 
 ((multiline_comment) @comment.documentation
-  (#match? @comment.documentation "^/[*][*][^*].*[*]/$"))
+  (#match? @comment.documentation "^/[*][*][^*][\\s\\S]*[*]/$"))
 
 ; String literals
 (line_str_text) @string
@@ -332,6 +326,12 @@
   "..."
   (bang)
 ] @operator
+
+(ternary_expression
+  [
+    "?"
+    ":"
+  ] @keyword.conditional.ternary)
 
 (type_arguments
   [

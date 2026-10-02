@@ -311,8 +311,6 @@
 			(type_identifier) @attribute)))
 
 (file_annotation
-	"@" @attribute "file" @attribute ":" @attribute)
-(file_annotation
 	(user_type
 		(type_identifier) @attribute))
 (file_annotation
@@ -373,6 +371,9 @@
 	":"
 	"::"
 ] @punctuation.delimiter
+
+(file_annotation
+	"@" @attribute "file" @attribute ":" @attribute)
 
 ; NOTE: `interpolated_identifier`s can be highlighted in any way
 (string_literal

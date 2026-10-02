@@ -1,0 +1,7 @@
+const wstring greeting = L"hello";
+const wchar letter = L'A';
+const long count = 1;
+
+interface Ping {
+  void ping(in unsigned short times);
+};

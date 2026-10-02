@@ -19,6 +19,10 @@
 (call
   function: (identifier) @function)
 
+((call
+  function: (identifier) @constructor)
+ (#match? @constructor "^[A-Z]"))
+
 ; Builtin functions
 
 ((call
