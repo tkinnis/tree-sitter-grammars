@@ -148,6 +148,14 @@ final class TreeSitterRuntime {
           .lookupFunction<Bool Function(TSNode), bool Function(TSNode)>(
             'ts_node_is_missing',
           ),
+      _nodeIsNull = library
+          .lookupFunction<Bool Function(TSNode), bool Function(TSNode)>(
+            'ts_node_is_null',
+          ),
+      _nodeParent = library
+          .lookupFunction<TSNode Function(TSNode), TSNode Function(TSNode)>(
+            'ts_node_parent',
+          ),
       _cursorNew = library
           .lookupFunction<
             TSTreeCursor Function(TSNode),
@@ -284,6 +292,8 @@ final class TreeSitterRuntime {
   final Pointer<Utf8> Function(TSNode) _nodeType;
   final bool Function(TSNode) _nodeIsNamed;
   final bool Function(TSNode) _nodeIsMissing;
+  final bool Function(TSNode) _nodeIsNull;
+  final TSNode Function(TSNode) _nodeParent;
   final TSTreeCursor Function(TSNode) _cursorNew;
   final void Function(Pointer<TSTreeCursor>) _cursorDelete;
   final TSNode Function(Pointer<TSTreeCursor>) _cursorNode;
@@ -377,8 +387,8 @@ final class TreeSitterRuntime {
   /// Parses [text] with [language], returning the tree as an S-expression,
   /// every node of it (anonymous ones too) as [dumpTree] lists them, and
   /// every capture of each of [queries] over it, keyed by name: the
-  /// captures of every match that satisfies its pattern's text predicates,
-  /// as [Query.predicates] reads them.
+  /// captures of every match that satisfies its pattern's text and
+  /// ancestry predicates, as [Query.predicates] reads them.
   ///
   /// Throws a [StateError] when the parser refuses the language or returns
   /// no tree.
@@ -403,7 +413,7 @@ final class TreeSitterRuntime {
 
   /// Parses [text] with [language], returning the tree as an S-expression
   /// and every match of [query] over it that satisfies its pattern's text
-  /// predicates, in the order the query cursor reports them.
+  /// and ancestry predicates, in the order the query cursor reports them.
   ///
   /// Throws a [StateError] when the parser refuses the language or returns
   /// no tree.
@@ -487,7 +497,7 @@ final class TreeSitterRuntime {
   }
 
   /// Every match of [query] under [root] that satisfies its pattern's text
-  /// predicates.
+  /// and ancestry predicates.
   List<QueryMatch> _matches(Query query, TSNode root, List<int> source) {
     final cursor = _queryCursorNew();
     final match = malloc<TSQueryMatch>();
@@ -511,7 +521,14 @@ final class TreeSitterRuntime {
               utf8.decode(source.sublist(start, end), allowMalformed: true),
             );
           }
-          if (!pattern.accepts(texts)) continue;
+          final ancestors = <int, List<List<String>>>{};
+          if (pattern.readsAncestors) {
+            for (var i = 0; i < match.ref.captureCount; i++) {
+              final capture = match.ref.captures[i];
+              (ancestors[capture.index] ??= []).add(_typesAbove(capture.node));
+            }
+          }
+          if (!pattern.accepts(texts, ancestors: ancestors)) continue;
         }
         matches.add((
           pattern: match.ref.patternIndex,
@@ -532,6 +549,17 @@ final class TreeSitterRuntime {
       _queryCursorDelete(cursor);
     }
   }
+
+  /// The types of the nodes above [node], its parent first and the root
+  /// last.
+  List<String> _typesAbove(TSNode node) => [
+    for (
+      var above = _nodeParent(node);
+      !_nodeIsNull(above);
+      above = _nodeParent(above)
+    )
+      _nodeType(above).toDartString(),
+  ];
 
   /// The predicates and directives of every pattern of [query], in order.
   List<PatternPredicates> _readPredicates(Query query) {

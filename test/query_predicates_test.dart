@@ -198,6 +198,180 @@ void main() {
     ).isFalse();
   });
 
+  group('has-ancestor? and has-parent?', () {
+    final inStruct = _one('has-ancestor?', [
+      _capture(0, 'property'),
+      _string('struct_declaration'),
+      _string('union_declaration'),
+    ]);
+    final notInStruct = _one('not-has-ancestor?', [
+      _capture(0, 'property'),
+      _string('struct_declaration'),
+    ]);
+    final underIf = _one('has-parent?', [
+      _capture(0, 'x'),
+      _string('if_statement'),
+    ]);
+    final notUnderIf = _one('not-has-parent?', [
+      _capture(0, 'x'),
+      _string('if_statement'),
+    ]);
+
+    test('reads the types above the capture, not its text', () {
+      check(inStruct.evaluated).equals(1);
+      check(inStruct.readsAncestors).isTrue();
+      check(inStruct.properties).equals('');
+      check(
+        inStruct.accepts(
+          {
+            0: ['x'],
+          },
+          ancestors: {
+            0: [
+              ['field_declaration', 'union_declaration', 'translation_unit'],
+            ],
+          },
+        ),
+      ).isTrue();
+      check(
+        inStruct.accepts(
+          {
+            0: ['x'],
+          },
+          ancestors: {
+            0: [
+              ['parameter_declaration', 'function_definition'],
+            ],
+          },
+        ),
+      ).isFalse();
+    });
+
+    test('has-parent? looks at the parent alone', () {
+      check(
+        underIf.accepts(
+          {},
+          ancestors: {
+            0: [
+              ['if_statement', 'block'],
+            ],
+          },
+        ),
+      ).isTrue();
+      check(
+        underIf.accepts(
+          {},
+          ancestors: {
+            0: [
+              ['parenthesized_expression', 'if_statement'],
+            ],
+          },
+        ),
+      ).isFalse();
+      check(
+        underIf.accepts(
+          {},
+          ancestors: {
+            0: [<String>[]],
+          },
+        ),
+      ).isFalse();
+    });
+
+    test('negates with not-', () {
+      final above = {
+        0: [
+          ['field_declaration', 'struct_declaration'],
+        ],
+      };
+      final elsewhere = {
+        0: [
+          ['if_statement', 'block'],
+        ],
+      };
+      check(notInStruct.accepts({}, ancestors: above)).isFalse();
+      check(notInStruct.accepts({}, ancestors: elsewhere)).isTrue();
+      check(notUnderIf.accepts({}, ancestors: elsewhere)).isFalse();
+      check(notUnderIf.accepts({}, ancestors: above)).isTrue();
+    });
+
+    test('holds where any node of a quantified capture does', () {
+      final nodes = {
+        0: [
+          ['parameter_declaration'],
+          ['field_declaration', 'struct_declaration'],
+        ],
+      };
+      check(inStruct.accepts({}, ancestors: nodes)).isTrue();
+      check(notInStruct.accepts({}, ancestors: nodes)).isFalse();
+    });
+
+    test('holds for a capture the match did not make, in either form', () {
+      check(inStruct.accepts({})).isTrue();
+      check(notInStruct.accepts({})).isTrue();
+      check(
+        underIf.accepts(
+          {},
+          ancestors: {
+            1: [
+              ['block'],
+            ],
+          },
+        ),
+      ).isTrue();
+    });
+
+    test('carries one naming a capture as a type, or no type, as text', () {
+      final malformed = PatternPredicates([
+        _predicate('has-ancestor?', [_capture(0, 'x'), _capture(1, 'y')]),
+        _predicate('has-parent?', [_capture(0, 'x')]),
+        _predicate('not-has-parent?', [_string('block'), _capture(0, 'x')]),
+      ]);
+
+      check(malformed.evaluated).equals(0);
+      check(malformed.readsAncestors).isFalse();
+      check(malformed.properties).equals(
+        '#has-ancestor? @x @y #has-parent? @x #not-has-parent? "block" @x',
+      );
+    });
+
+    test('is evaluated beside a text predicate on the same pattern', () {
+      final both = PatternPredicates([
+        _predicate('match?', [_capture(0, 'x'), _string('^[A-Z]')]),
+        _predicate('has-ancestor?', [_capture(0, 'x'), _string('class_body')]),
+      ]);
+      final inClass = {
+        0: [
+          ['class_body'],
+        ],
+      };
+
+      check(both.evaluated).equals(2);
+      check(
+        both.accepts({
+          0: ['Name'],
+        }, ancestors: inClass),
+      ).isTrue();
+      check(
+        both.accepts({
+          0: ['name'],
+        }, ancestors: inClass),
+      ).isFalse();
+      check(
+        both.accepts(
+          {
+            0: ['Name'],
+          },
+          ancestors: {
+            0: [
+              ['block'],
+            ],
+          },
+        ),
+      ).isFalse();
+    });
+  });
+
   test('carries every directive and unknown predicate as text', () {
     final pattern = PatternPredicates([
       _predicate('set!', [_string('injection.language'), _string('comment')]),

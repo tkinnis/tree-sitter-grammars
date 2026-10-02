@@ -72,7 +72,10 @@
 /// counts only when its pattern's text predicates hold: `#eq?`, `#match?`
 /// and `#any-of?` with their `not-` and `any-` forms, evaluated as
 /// tree-sitter documents them, a `#match?` pattern read as a Dart regular
-/// expression. Every capture carries its pattern's other predicates and
+/// expression; and its ancestry predicates, `#has-ancestor?` and
+/// `#has-parent?` with their `not-` forms, read off the tree as the editor
+/// reads them. The same predicates decide the matches of every outline,
+/// injection and highlight test. Every capture carries its pattern's other predicates and
 /// directives, `#set!` among them, as text, so a changed regular
 /// expression, `#set!` value or other directive is a difference wherever
 /// the inputs reach it. Every grammar with no inputs is listed, since the
@@ -1058,7 +1061,7 @@ Future<void> _compare(
     '$theirPatterns there',
   );
   print(
-    'text predicates evaluated on each match: ${ourPredicates.evaluated} '
+    'predicates evaluated on each match: ${ourPredicates.evaluated} '
     'here, ${theirPredicates.evaluated} there; patterns whose captures carry '
     'their other predicates and directives as text: '
     '${ourPredicates.carried} here, ${theirPredicates.carried} there',
