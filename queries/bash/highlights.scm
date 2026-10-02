@@ -5,6 +5,17 @@
   (heredoc_start)
 ] @string
 
+[
+  (command_substitution)
+  (process_substitution)
+  (expansion)
+]@embedded
+
+(
+  (command (_) @constant)
+  (#match? @constant "^-")
+)
+
 (command_name) @function
 
 (variable_name) @property
@@ -36,12 +47,6 @@
 (file_descriptor) @number
 
 [
-  (command_substitution)
-  (process_substitution)
-  (expansion)
-]@embedded
-
-[
   "$"
   "&&"
   ">"
@@ -49,8 +54,3 @@
   "<"
   "|"
 ] @operator
-
-(
-  (command (_) @constant)
-  (#match? @constant "^-")
-)

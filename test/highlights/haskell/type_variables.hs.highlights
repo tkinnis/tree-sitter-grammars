@@ -1,7 +1,6 @@
 keyword.import "module"
 module "Pick"
 keyword "where"
-function "pick :: a -> [a] -> a"
 function "pick"
 operator "::"
 type "a"

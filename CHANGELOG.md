@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Highlight tests for Go, Haskell, Objective-C and Pascal, and further ones for Dart, JavaScript, Python, Scala, SQL, Thrift, TypeScript and TSX, each holding the spans where a pattern moved below meets the one it now follows or precedes
+- Highlight tests for Bash, Go, Haskell, Objective-C and Pascal, and further ones for Dart, JavaScript, Python, Scala, SQL, Thrift, TypeScript and TSX, each holding the spans where a pattern moved below meets the one it now follows or precedes
 
 ### Changed
 
@@ -21,7 +21,7 @@ Of two patterns that capture the same node, the later one is drawn, so a general
 
 - Go: `(type_identifier) @type`, `(field_identifier) @property` and `(identifier) @variable` come first, so a function's name is `@function`, a builtin call `@function.builtin` and a method `@function.method`
 - Pascal: `(identifier) @identifier` comes first, so a type, a procedure, a parameter and the rest draw their own captures; the parts of a dotted name come before the procedure declarations, so the `Greet` of `procedure TGreeter.Greet` is `@function`
-- Haskell: `(type/variable) @type` makes a type variable alone `@type`; `(variable) @type` drew every function, parameter and value as a type
+- Haskell: `(type/variable) @type` makes a type variable alone `@type`; `(variable) @type` drew every function, parameter and value as a type. The signature ahead of a function's equations captures its name as `@function`, not the whole signature, which the editor draws as one token over every type and operator inside it
 - Objective-C: `"@" @punctuation.special` comes first, so the `@` of `@class` is `@keyword`; `<` and `>` are `@punctuation.bracket` only in a protocol list, a type's arguments, a generic specifier and an argument list, so a comparison's are `@operator`
 - SQL: `(object_reference name: (identifier) @type)` comes before the invocation pattern, so the `COUNT` of `COUNT(*)` is `@function.call`
 - Python: `(attribute attribute: (identifier) @property)` comes before the naming conventions and the call patterns, so a called method is `@function.method`, the `TestCase` of `unittest.TestCase` `@constructor` and the `ASCII` of `re.ASCII` `@constant`
@@ -29,7 +29,10 @@ Of two patterns that capture the same node, the later one is drawn, so a general
 - Thrift: a capitalised identifier's `@type` follows `(identifier) @variable` and comes before the rest, so the name of `void Greet()` is `@function`
 - Dart: a capitalised identifier's `@type` comes among the type patterns, ahead of a function's name, so the name of `double Area()` is `@function`
 - JavaScript, TypeScript and TSX: their own `(identifier) @variable`, which drew over every identifier ecma names, is removed, ecma's standing first. A call of `eval`, `isFinite`, `isNaN`, `parseFloat`, `parseInt`, `decodeURI`, `decodeURIComponent`, `encodeURI` or `encodeURIComponent` is `@function.builtin`, following the call pattern that makes it `@function`. JavaScript draws a JSX tag's name as `@tag` or `@tag.builtin`
-- TypeScript and TSX: the patterns making a capitalised identifier `@constructor` and `@type` are removed, so ecma's readings draw: a capitalised name is `@type` (`import React`), the `Set` of `new Set()` `@constructor`, `Math` and `Promise` `@type.builtin`, `Intl` `@module.builtin`, and a capitalised function's name and call `@function`
+- JavaScript, TypeScript and TSX: the pattern making a capitalised identifier `@constructor`, and TypeScript's making it `@type`, are removed, so ecma's readings draw: a capitalised name is `@type` (`import React`), the `Set` of `new Set()` `@constructor`, `Math` and `Promise` `@type.builtin`, `Intl` `@module.builtin`, a capitalised function's name and call `@function`, and in JavaScript a capitalised JSX tag `@tag`
+- JavaScript, TypeScript and TSX: an all-capitals name's `@constant` comes ahead of the function definitions and calls, so the `LIMIT` of `LIMIT()` is `@function`. Each language's own file states ecma's readings again after its own patterns that would draw over them: the name `new` constructs is `@constructor` (`new URL()`), a method named `constructor` `@constructor`, and a decorator's name `@attribute` where it is called or read through a member (`@Input()`, `@action.bound`, `@HostListener.of('click')`)
+- JavaScript: a JSX attribute is `@tag.attribute` and the name after the dot of a member tag (`<Layout.Row>`) `@tag`, as in TSX, after JavaScript's own `(property_identifier) @property`
+- Bash: `@embedded` and the pattern making a command's word starting with `-` `@constant` come before `(command_name) @function`, so a command named by `$(…)` or `${…}`, or one starting with `-`, is `@function`, as the grammar's query, written for the earlier pattern to win, draws it
 - JavaScript: `<` and `>` leave its own operator list, which drew a JSX tag's `<` and `>` as `@operator`; they are `@tag.delimiter` in a tag and ecma's `@operator` in an expression
 
 ## [1.2.1] - 2026-10-01

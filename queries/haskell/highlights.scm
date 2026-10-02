@@ -189,7 +189,8 @@
     ])
   (#eq? @_name @function))
 
-((decl/signature) @function
+((decl/signature
+  name: (variable) @function)
   .
   (decl/function
     name: (variable) @function))

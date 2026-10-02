@@ -5,6 +5,16 @@
 
 (property_identifier) @property
 
+; Constants
+;----------
+
+([
+    (identifier)
+    (shorthand_property_identifier)
+    (shorthand_property_identifier_pattern)
+ ] @constant
+ (#match? @constant "^[A-Z_][A-Z\\d_]+$"))
+
 ; Function and method definitions
 ;--------------------------------
 
@@ -14,6 +24,9 @@
   name: (identifier) @function)
 (method_definition
   name: (property_identifier) @function.method)
+(method_definition
+  name: (property_identifier) @constructor
+  (#eq? @constructor "constructor"))
 
 (pair
   key: (property_identifier) @function.method
@@ -48,15 +61,11 @@
     "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI"
     "decodeURIComponent" "encodeURI" "encodeURIComponent"))
 
+(new_expression
+  constructor: (identifier) @constructor)
+
 ; Special identifiers
 ;--------------------
-
-([
-    (identifier)
-    (shorthand_property_identifier)
-    (shorthand_property_identifier_pattern)
- ] @constant
- (#match? @constant "^[A-Z_][A-Z\\d_]+$"))
 
 ((identifier) @variable.builtin
  (#match? @variable.builtin "^(arguments|module|console|window|document)$")
@@ -65,6 +74,22 @@
 ((identifier) @function.builtin
  (#eq? @function.builtin "require")
  (#is-not? local))
+
+; Decorators
+;-----------
+
+(decorator
+  (call_expression
+    function: (identifier) @attribute))
+
+(decorator
+  (member_expression
+    property: (property_identifier) @attribute))
+
+(decorator
+  (call_expression
+    function: (member_expression
+      property: (property_identifier) @attribute)))
 
 ; Literals
 ;---------

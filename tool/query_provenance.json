@@ -65,7 +65,7 @@
   },
   "queries/bash/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-bash",
       "commit": "422a07cb221b92c6b117e854efa8945a506b5214",
