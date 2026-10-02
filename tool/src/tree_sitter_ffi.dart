@@ -26,6 +26,27 @@ final class TSTreeCursor extends Struct {
   external Array<Uint32> context;
 }
 
+/// `TSPoint`.
+final class TSPoint extends Struct {
+  @Uint32()
+  external int row;
+  @Uint32()
+  external int column;
+}
+
+/// `TSInputEdit`, passed by pointer.
+final class TSInputEdit extends Struct {
+  @Uint32()
+  external int startByte;
+  @Uint32()
+  external int oldEndByte;
+  @Uint32()
+  external int newEndByte;
+  external TSPoint startPoint;
+  external TSPoint oldEndPoint;
+  external TSPoint newEndPoint;
+}
+
 /// `TSQueryCapture`.
 final class TSQueryCapture extends Struct {
   external TSNode node;
@@ -130,6 +151,11 @@ final class TreeSitterRuntime {
             Void Function(Pointer<Void>),
             void Function(Pointer<Void>)
           >('ts_tree_delete'),
+      _treeEdit = library
+          .lookupFunction<
+            Void Function(Pointer<Void>, Pointer<TSInputEdit>),
+            void Function(Pointer<Void>, Pointer<TSInputEdit>)
+          >('ts_tree_edit'),
       _treeRootNode = library
           .lookupFunction<
             TSNode Function(Pointer<Void>),
@@ -288,6 +314,7 @@ final class TreeSitterRuntime {
   final Pointer<Void> Function(Pointer<Void>, Pointer<Void>, Pointer<Utf8>, int)
   _parserParseString;
   final void Function(Pointer<Void>) _treeDelete;
+  final void Function(Pointer<Void>, Pointer<TSInputEdit>) _treeEdit;
   final TSNode Function(Pointer<Void>) _treeRootNode;
   final Pointer<Utf8> Function(TSNode) _nodeType;
   final bool Function(TSNode) _nodeIsNamed;
@@ -426,6 +453,71 @@ final class TreeSitterRuntime {
     text,
     (root, bytes) => (tree: _sexp(root), matches: _matches(query, root, bytes)),
   );
+
+  /// Parses [text] with [language], then edits the tree to append
+  /// [appended] and parses the longer text again with the edited tree, as
+  /// an editor reparses after a keystroke, so the scanner's state is both
+  /// serialized and restored from what it serialized.
+  ///
+  /// Throws a [StateError] when the parser refuses the language or returns
+  /// no tree.
+  void parseAndReparse(Pointer<Void> language, String text, String appended) {
+    final parser = _parserNew();
+    final bytes = utf8.encode('$text$appended');
+    final length = utf8.encode(text).length;
+    final input = malloc<Uint8>(bytes.isEmpty ? 1 : bytes.length);
+    final edit = malloc<TSInputEdit>();
+    var tree = nullptr.cast<Void>();
+    var reparsed = nullptr.cast<Void>();
+    try {
+      if (!_parserSetLanguage(parser, language)) {
+        throw StateError('ts_parser_set_language refused the language');
+      }
+      input.asTypedList(bytes.length).setAll(0, bytes);
+      tree = _parserParseString(parser, nullptr, input.cast(), length);
+      if (tree == nullptr) throw StateError('ts_parser_parse_string: NULL');
+      final start = _pointAt(bytes, length);
+      edit.ref
+        ..startByte = length
+        ..oldEndByte = length
+        ..newEndByte = bytes.length;
+      edit.ref.startPoint
+        ..row = start.row
+        ..column = start.column;
+      edit.ref.oldEndPoint
+        ..row = start.row
+        ..column = start.column;
+      final end = _pointAt(bytes, bytes.length);
+      edit.ref.newEndPoint
+        ..row = end.row
+        ..column = end.column;
+      _treeEdit(tree, edit);
+      reparsed = _parserParseString(parser, tree, input.cast(), bytes.length);
+      if (reparsed == nullptr) {
+        throw StateError('ts_parser_parse_string: NULL on the reparse');
+      }
+    } finally {
+      if (reparsed != nullptr) _treeDelete(reparsed);
+      if (tree != nullptr) _treeDelete(tree);
+      malloc
+        ..free(edit)
+        ..free(input);
+      _parserDelete(parser);
+    }
+  }
+
+  /// The row and the byte column at byte [offset] of [bytes].
+  static ({int row, int column}) _pointAt(List<int> bytes, int offset) {
+    var row = 0;
+    var lineStart = 0;
+    for (var index = 0; index < offset; index++) {
+      if (bytes[index] == 0x0a) {
+        row++;
+        lineStart = index + 1;
+      }
+    }
+    return (row: row, column: offset - lineStart);
+  }
 
   /// What [read] makes of the root of [text] parsed with [language] and of
   /// [text]'s UTF-8 bytes, read before the tree is deleted.

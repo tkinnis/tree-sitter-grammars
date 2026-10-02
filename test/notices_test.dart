@@ -51,7 +51,8 @@ void main() {
 
   /// A runtime and one grammar, `tree-sitter-x`, whose scanner includes a
   /// header carrying [helperComment]; the runtime's `lib.c` includes a
-  /// `parser.c` holding [runtimeParser].
+  /// `parser.c` holding [runtimeParser]. The grammar's entry lists
+  /// [patches], paths under `repository/`.
   (NoticesInput, Map<String, Object?>) fixture({
     String helperComment = '// helpers',
     String parser = 'int parse(void);\n',
@@ -59,6 +60,7 @@ void main() {
     bool license = true,
     String runtimeParser = '#include <stdio.h>\n',
     List<String>? runtimeExtraNotices,
+    List<String>? patches,
   }) {
     write('src/tree-sitter/LICENSE', 'runtime licence\n');
     write('src/tree-sitter/lib/src/unicode/LICENSE', 'Unicode, Inc\n');
@@ -83,6 +85,7 @@ void main() {
       'url': 'https://github.com/example/tree-sitter-x',
       'commit': _pin,
       'license': 'MIT',
+      'patches': ?patches,
       'extraNotices': ?extraNotices,
       'name': 'x',
     };
@@ -105,6 +108,7 @@ void main() {
       ),
       apacheLicense: 'Apache License text\n',
       ownLicense: 'own licence\n',
+      patchRoot: path('repository'),
     );
     return (input, entry);
   }
@@ -300,9 +304,53 @@ void main() {
           ),
           apacheLicense: input.apacheLicense,
           ownLicense: input.ownLicense,
+          patchRoot: input.patchRoot,
         ),
       ),
     ).throws<NoticesException>();
+  });
+
+  test('names each patch and the files it modifies, in order', () {
+    for (final (name, file) in [
+      ('first', 'src/scanner.c'),
+      ('second', 'src/parser.c'),
+    ]) {
+      write(
+        'repository/patches/tree-sitter-x/$name.patch',
+        'Why it changes.\n\n'
+            'diff --git a/$file b/$file\n--- a/$file\n+++ b/$file\n',
+      );
+    }
+    final (input, _) = fixture(
+      patches: [
+        'patches/tree-sitter-x/first.patch',
+        'patches/tree-sitter-x/second.patch',
+      ],
+    );
+
+    check(thirdPartyNotices(input)).contains(
+      'tree-sitter-grammars applies these patches, in order, to the tree '
+      'before compiling it. The files they modify stay under the grammar\'s '
+      'licence, and the changes are also covered by the licence of '
+      'tree-sitter-grammars.\n\n'
+      '- `patches/tree-sitter-x/first.patch`, modifying `src/scanner.c`\n'
+      '- `patches/tree-sitter-x/second.patch`, modifying `src/parser.c`\n',
+    );
+  });
+
+  test('refuses a listed patch that does not exist', () {
+    final (input, _) = fixture(patches: ['patches/tree-sitter-x/gone.patch']);
+
+    check(() => thirdPartyNotices(input))
+        .throws<NoticesException>()
+        .has((e) => e.problems, 'problems')
+        .contains('tree-sitter-x: no patches/tree-sitter-x/gone.patch');
+  });
+
+  test('an entry with no patches names none', () {
+    final (input, _) = fixture();
+
+    check(thirdPartyNotices(input)).not((it) => it.contains('applies th'));
   });
 
   group('citedLicenseProblems', () {

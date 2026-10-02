@@ -1,0 +1,32 @@
+tree-sitter-yaml: serialize an indentation pair only when it fits
+
+serialize writes ten bytes of state and then four bytes for each open
+indentation level, for as long as fewer than 1024 bytes are written. The
+last pair can start at byte 1022 and end at byte 1026, past the 1024 bytes
+tree-sitter gives a scanner's state: 254 nested block mappings do it.
+With its assertions on, tree-sitter's parser aborts the process on the
+length the scanner returns; without them, the bytes past the buffer are
+overwritten.
+
+A pair is written only when all four of its bytes fit, so the state holds
+253 levels and deeper nesting parses as an error.
+
+Applies to src/scanner.c of tree-sitter-yaml at commit
+7708026449bed86239b1cd5bce6e3c34dbca6415.
+
+diff --git a/src/scanner.c b/src/scanner.c
+index 7168d5380dccf7a6559f5aea3991edb58385e805..8d2bd34a242a3c624718e61f62e1645d33880ffd 100644
+--- a/src/scanner.c
++++ b/src/scanner.c
+@@ -177,7 +177,10 @@ static unsigned serialize(Scanner *scanner, char *buffer) {
+     int16_t *typ_itr = scanner->ind_typ_stk.contents + 1;
+     int16_t *typ_end = scanner->ind_typ_stk.contents + scanner->ind_typ_stk.size;
+     int16_t *len_itr = scanner->ind_len_stk.contents + 1;
+-    for (; typ_itr != typ_end && size < TREE_SITTER_SERIALIZATION_BUFFER_SIZE; ++typ_itr, ++len_itr) {
++    // Each pair takes four bytes; one that would end past the buffer is left
++    // out, with every pair after it.
++    for (; typ_itr != typ_end && size + 2 * sizeof(int16_t) <= TREE_SITTER_SERIALIZATION_BUFFER_SIZE;
++         ++typ_itr, ++len_itr) {
+         *(int16_t *)&buffer[size] = *typ_itr;
+         size += sizeof(int16_t);
+         *(int16_t *)&buffer[size] = *len_itr;

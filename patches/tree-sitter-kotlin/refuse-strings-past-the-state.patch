@@ -1,0 +1,62 @@
+tree-sitter-kotlin: refuse a string nested past the state buffer
+
+The scanner keeps a stack holding one byte for each open string and
+serializes the stack whole. Pushing a string onto a stack of 1024, the
+size of the buffer tree-sitter gives a scanner's state, calls abort(), so
+1025 strings nested through templates, "${"${"${ and so on, end the
+process.
+
+A string start is not scanned while the stack is full, so a string nested
+deeper parses as an error, stack_push pushes nothing onto a full stack,
+and serialize writes no more bytes than the buffer holds.
+
+Applies to src/scanner.c of tree-sitter-kotlin at commit
+57fb4560ba8641865bc0baa6b3f413b236112c4c.
+
+diff --git a/src/scanner.c b/src/scanner.c
+index 65539a53c11a928c8193ddc23c1b5fce08f34ab5..ce0ed76b5f951aef23a2fa3189cebeed0b8b3f89 100644
+--- a/src/scanner.c
++++ b/src/scanner.c
+@@ -45,8 +45,14 @@ typedef char Delimiter;
+ // We use a stack to keep track of the string delimiters.
+ typedef Array(Delimiter) Stack;
+ 
++// The state is serialized one byte per delimiter, so the stack holds no more
++// delimiters than the serialization buffer has bytes.
++static inline bool stack_full(Stack *stack) {
++  return stack->size >= TREE_SITTER_SERIALIZATION_BUFFER_SIZE;
++}
++
+ static inline void stack_push(Stack *stack, char chr, bool triple) {
+-  if (stack->size >= TREE_SITTER_SERIALIZATION_BUFFER_SIZE) abort();
++  if (stack_full(stack)) return;
+   array_push(stack, (Delimiter)(triple ? (chr + 1) : chr));
+ }
+ 
+@@ -62,7 +68,8 @@ static inline void advance(TSLexer *lexer) { lexer->advance(lexer, false); }
+ // Scanner functions
+ 
+ static bool scan_string_start(TSLexer *lexer, Stack *stack) {
+-  if (lexer->lookahead != '"') return false;
++  // A string nested deeper than the stack holds is not scanned as one.
++  if (lexer->lookahead != '"' || stack_full(stack)) return false;
+   advance(lexer);
+   lexer->mark_end(lexer);
+   for (unsigned count = 1; count < DELIMITER_LENGTH; ++count) {
+@@ -524,11 +531,13 @@ void tree_sitter_kotlin_external_scanner_destroy(void *payload) {
+ 
+ unsigned tree_sitter_kotlin_external_scanner_serialize(void *payload, char *buffer) {
+   Stack *stack = (Stack *)payload;
+-  if (stack->size > 0) {
++  unsigned size = stack_full(stack) ? TREE_SITTER_SERIALIZATION_BUFFER_SIZE
++                                    : stack->size;
++  if (size > 0) {
+     // it's an undefined behavior to memcpy 0 bytes
+-    memcpy(buffer, stack->contents, stack->size);
++    memcpy(buffer, stack->contents, size);
+   }
+-  return stack->size;
++  return size;
+ }
+ 
+ void tree_sitter_kotlin_external_scanner_deserialize(void *payload, const char *buffer, unsigned length) {

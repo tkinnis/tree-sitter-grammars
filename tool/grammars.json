@@ -103,7 +103,11 @@
     "url": "https://github.com/tree-sitter/tree-sitter-python",
     "commit": "26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64",
     "filesSha256": "ee2bc67958510899676295c0478102fbe1b2707d1195884090eddde11e9a5c14",
-    "license": "MIT"
+    "license": "MIT",
+    "patches": [
+      "patches/tree-sitter-python/serialize-indents-that-fit.patch"
+    ],
+    "patchedSha256": "27c44130d94af3ca13d2d651c54e8042a2562b3385e65faf752af196427b5b7d"
   },
   {
     "url": "https://github.com/tree-sitter/tree-sitter-regex",
@@ -185,7 +189,11 @@
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-yaml",
     "commit": "7708026449bed86239b1cd5bce6e3c34dbca6415",
     "filesSha256": "9684d1aebce4191b551575896720e6693a3306ae3286a308e3e117041398f2e2",
-    "license": "MIT"
+    "license": "MIT",
+    "patches": [
+      "patches/tree-sitter-yaml/serialize-indents-that-fit.patch"
+    ],
+    "patchedSha256": "8c38bae67fec1fd4e594f4ddd61145c135726e00c6890a953996ed11665b45f9"
   },
   {
     "url": "https://github.com/tree-sitter-grammars/tree-sitter-toml",
@@ -267,6 +275,10 @@
     "commit": "57fb4560ba8641865bc0baa6b3f413b236112c4c",
     "filesSha256": "1027cd66f748a18ed351bcf783c7b0c09a0e5184a5c4cc53076d7f0c24206676",
     "license": "MIT",
+    "patches": [
+      "patches/tree-sitter-kotlin/refuse-strings-past-the-state.patch"
+    ],
+    "patchedSha256": "26961589d56a4258c255dea5085b8e8b0a98a44ca97bdf32eff9ca1314c0bfda",
     "highlights": "queries/highlights.scm"
   },
   {
@@ -309,6 +321,10 @@
     "filesSha256": "0c16764d5ea570e617b595db17e0f684be6f67b7a6eb5124d0cb9d020e44008e",
     "sourceCommit": "ad74e6db234c35d537de9358799a8e0cc4f5dee0",
     "license": "MIT",
+    "patches": [
+      "patches/tree-sitter-perl/serialize-quotes-that-fit.patch"
+    ],
+    "patchedSha256": "f796e1811b02cdc263399106d5f8efa8fb7c5e86c2bc8667adf6378f7244e02e",
     "extraNotices": [
       "src/bsearch.h"
     ],
@@ -378,6 +394,10 @@
     "commit": "2dfd57f547f06ca5631a80f601e129d73fc8e9f0",
     "filesSha256": "e0ea6666e3e5e85d861b0e071b4d2cbca3e0632941f4adc5e135b8fca78b846c",
     "license": "MIT",
+    "patches": [
+      "patches/tree-sitter-markdown/serialize-blocks-that-fit.patch"
+    ],
+    "patchedSha256": "1e5e14db76f5e5709fb6c5523b15f2e4af5083d54817c3f64fe68214449321ee",
     "grammars": [
       "markdown",
       "markdown_inline"

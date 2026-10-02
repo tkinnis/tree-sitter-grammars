@@ -95,6 +95,50 @@ void main() {
     ]);
   });
 
+  test('an entry with patches, and only one, records patchedSha256', () {
+    Map<String, Object?> entry(String name, Map<String, Object?> fields) => {
+      'url': 'https://github.com/a/$name',
+      'commit': _sha,
+      'filesSha256': _files,
+      'license': 'MIT',
+      ...fields,
+    };
+    final problems = pinProblems([
+      entry('tree-sitter-a', {
+        'patches': ['patches/tree-sitter-a/fix.patch'],
+      }),
+      entry('tree-sitter-b', {'patchedSha256': _files}),
+      entry('tree-sitter-c', {
+        'patches': ['patches/tree-sitter-other/fix.patch'],
+        'patchedSha256': _files,
+      }),
+      entry('tree-sitter-d', {
+        'patches': [
+          'patches/tree-sitter-d/fix.patch',
+          'patches/tree-sitter-d/fix.patch',
+        ],
+        'patchedSha256': _files,
+      }),
+      entry('tree-sitter-e', {'patches': const [], 'patchedSha256': _files}),
+      entry('tree-sitter-f', {
+        'patches': ['patches/tree-sitter-f/fix.patch'],
+        'patchedSha256': _files,
+      }),
+    ]);
+
+    check(problems).deepEquals([
+      'tree-sitter-a: an entry with patches records the patchedSha256 of '
+          'the tree they leave, 64 lowercase hex digits',
+      'tree-sitter-b: patchedSha256 belongs only to an entry that lists '
+          'patches',
+      'tree-sitter-c: patches must be a list of paths '
+          'patches/tree-sitter-c/<name>.patch',
+      'tree-sitter-d: patches lists one patch twice',
+      'tree-sitter-e: patches must be a list of paths '
+          'patches/tree-sitter-e/<name>.patch',
+    ]);
+  });
+
   test('two spellings of one repository are listed more than once', () {
     final problems = pinProblems([
       {
@@ -163,6 +207,31 @@ void main() {
     check(
       withPin({...entry, 'generatedSha256': _files}, _sha, filesSha256: _files),
     ).not((it) => it.containsKey('generatedSha256'));
+  });
+
+  test('withPin keeps the patches and records only the patchedSha256 '
+      'given', () {
+    final entry = <String, Object?>{
+      'url': 'https://github.com/a/tree-sitter-a',
+      'commit': _other,
+      'filesSha256': _files,
+      'license': 'MIT',
+      'patches': ['patches/tree-sitter-a/fix.patch'],
+      'patchedSha256': _files,
+    };
+    const patched =
+        'fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210';
+
+    final moved = withPin(entry, _sha, filesSha256: _files);
+    check(moved['patches']).equals(entry['patches']);
+    check(moved).not((it) => it.containsKey('patchedSha256'));
+    check(pinProblems([moved])).isNotEmpty();
+    check(
+      withPin(entry, _sha, filesSha256: _files, patchedSha256: patched),
+    ).has((it) => it['patchedSha256'], 'patchedSha256').equals(patched);
+    check(
+      () => withPin(entry, _sha, filesSha256: _files, patchedSha256: 'short'),
+    ).throws<PinException>();
   });
 
   group('pinFromCheckout', () {

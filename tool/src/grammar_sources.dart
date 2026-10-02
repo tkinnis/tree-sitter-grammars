@@ -12,6 +12,7 @@ import 'git.dart';
 import 'grammar_pins.dart';
 import 'pool.dart';
 import 'source_bundles.dart';
+import 'source_patches.dart';
 import 'toolchain.dart';
 
 /// Thrown when a grammar's object store cannot supply its pinned source.
@@ -241,15 +242,21 @@ Future<void> _requireFiles(
 /// pin records in `tool/grammars.json` or `tool/toolchain.json`: in the
 /// object store the commit's listing is read, and a bundle's unpacked files
 /// are hashed, so a bundle is held to the value committed at the tag, not
-/// to the `build_info.json` downloaded beside it. Throws a
-/// [GrammarSourceException] listing every repository that could not be
-/// supplied.
+/// to the `build_info.json` downloaded beside it.
+///
+/// A grammar whose entry lists `patches` then has them applied, read from
+/// under [patchRoot], this repository's own files, by [patchSource], and
+/// its patched files must have the `patchedSha256` the entry records; the
+/// bundle stays the tree at the pin, and its record carries the
+/// [patchRecord] beside it. Throws a [GrammarSourceException] listing every
+/// repository that could not be supplied.
 Future<Map<String, Map<String, Object?>>> supplySources({
   required String root,
   required Toolchain toolchain,
   required List<Map<String, Object?>> entries,
   required String sourceRoot,
   required String bundleDirectory,
+  required String patchRoot,
   String? recordedBundles,
 }) async {
   final Map<String, Object?>? recorded;
@@ -288,7 +295,14 @@ Future<Map<String, Map<String, Object?>>> supplySources({
           await unpackedFiles(destination),
           'the bundle is not the source the pin names',
         );
-        return (record: bundleRecord(source, digest), problem: null);
+        await patchSource(source, patchRoot, destination);
+        return (
+          record: {
+            ...bundleRecord(source, digest),
+            ...await patchRecord(source, patchRoot),
+          },
+          problem: null,
+        );
       }
       final String store;
       if (source.url == runtimeRepositoryUrl) {
@@ -305,8 +319,12 @@ Future<Map<String, Map<String, Object?>>> supplySources({
         'if the pin is right, record its digest with '
         'dart run tool/pin_grammars.dart --record-files',
       );
+      await patchSource(source, patchRoot, destination);
       return (
-        record: bundleRecord(source, await fileSha256(bundle)),
+        record: {
+          ...bundleRecord(source, await fileSha256(bundle)),
+          ...await patchRecord(source, patchRoot),
+        },
         problem: null,
       );
     } on Exception catch (error) {

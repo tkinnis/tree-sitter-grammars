@@ -33,6 +33,10 @@
 /// pin and for the runtime at `tool/toolchain.json`'s commit, from their
 /// object stores, changing no commit.
 ///
+/// Every mode that records a grammar's `filesSha256` also records, for an
+/// entry that lists `patches`, the `patchedSha256` of its tree once they
+/// are applied, and refuses a pin they do not apply to.
+///
 /// `--check` exits 1 unless every entry with a `url` has a 40-hex `commit`,
 /// a 64-hex `filesSha256` and a `license`, and its optional pin fields are
 /// well formed. Every other mode writes only a result that passes the same
@@ -50,6 +54,7 @@ import 'src/grammar_pins.dart';
 import 'src/generated_sources.dart';
 import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
+import 'src/source_patches.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
 
@@ -166,6 +171,7 @@ Future<List<Map<String, Object?>>> _fromCheckouts(
                   moveTo,
                 )
               : null,
+          patchedSha256: await _patchedDigest(root, entry, directory, moveTo),
         ),
       );
       moved.add('$name: ${entry['commit']} -> $moveTo');
@@ -242,6 +248,12 @@ Future<List<Map<String, Object?>>> _set(
               commit,
             )
           : null,
+      patchedSha256: await _patchedDigest(
+        root,
+        entries[index],
+        directory,
+        commit,
+      ),
     );
   } on GitException catch (error) {
     throw PinException('$name: $error');
@@ -307,6 +319,7 @@ _recordFiles(String root, List<Map<String, Object?>> entries) async {
             generatedSha256: entry['generate'] == true
                 ? await _generatedDigest(root, toolchain, entry, store, commit)
                 : null,
+            patchedSha256: await _patchedDigest(root, entry, store, commit),
           ),
         );
       } on Exception catch (error) {
@@ -370,6 +383,38 @@ Future<String> _generatedDigest(
     );
     print('${builds.single.name}: generatedSha256 $digest');
     return digest;
+  } finally {
+    scratch.deleteSync(recursive: true);
+  }
+}
+
+/// The digest of the files of [commit]'s tree in the object store [store]
+/// once the patches [entry] lists, read from under [root], are applied; null
+/// when it lists none.
+///
+/// Throws a [PinException] when a patch does not apply at [commit].
+Future<String?> _patchedDigest(
+  String root,
+  Map<String, Object?> entry,
+  String store,
+  String commit,
+) async {
+  final patches = entryPatches(entry);
+  if (patches.isEmpty) return null;
+  final name = repositoryName(entry['url']! as String);
+  final scratch = Directory.systemTemp.createTempSync('pin_patch');
+  try {
+    final tree = p.join(scratch.path, name);
+    await extractCommit(store, commit, tree);
+    await applyPatches(root, patches, tree);
+    final digest = await filesDigest(await unpackedFiles(tree));
+    print('$name: patchedSha256 $digest');
+    return digest;
+  } on SourcePatchException catch (error) {
+    throw PinException(
+      '$name: $error at $commit; update the patch, or remove it from the '
+      'entry\'s patches',
+    );
   } finally {
     scratch.deleteSync(recursive: true);
   }

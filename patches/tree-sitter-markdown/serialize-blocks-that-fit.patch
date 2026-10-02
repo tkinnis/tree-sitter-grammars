@@ -1,0 +1,37 @@
+tree-sitter-markdown: serialize only the open blocks that fit
+
+The block scanner serializes five bytes of state and then four bytes for
+every open block. A block quote, list item or other container nested 255
+deep takes 1025 of the 1024 bytes tree-sitter gives a scanner's state: a
+line of 255 '>' is enough. With its assertions on, tree-sitter's parser
+aborts the process on the length the scanner returns; without them, the
+bytes past the buffer are overwritten.
+
+serialize writes as many blocks as fit, 254, and leaves out those nested
+deeper, so the scanner restores 254 open blocks and deeper nesting parses
+as an error, as the bash, Ruby and HTML scanners do with state that does
+not fit. Within 254 blocks, the one-byte count of the blocks a line has
+matched stays in range.
+
+Applies to tree-sitter-markdown/src/scanner.c of tree-sitter-markdown at
+commit 2dfd57f547f06ca5631a80f601e129d73fc8e9f0.
+
+diff --git a/tree-sitter-markdown/src/scanner.c b/tree-sitter-markdown/src/scanner.c
+index c7103cba256f615476dd95e216b69c0b21a7b542..c34c150a8582d8c38f8bf9292471ad6443ff9a25 100644
+--- a/tree-sitter-markdown/src/scanner.c
++++ b/tree-sitter-markdown/src/scanner.c
+@@ -244,6 +244,14 @@ static unsigned serialize(Scanner *s, char *buffer) {
+     buffer[size++] = (char)s->column;
+     buffer[size++] = (char)s->fenced_code_block_delimiter_length;
+     size_t blocks_count = s->open_blocks.size;
++    // The state has TREE_SITTER_SERIALIZATION_BUFFER_SIZE bytes. Blocks
++    // nested deeper than fit are left out, so the parse of absurdly deep
++    // nesting degrades instead of writing past the end of the buffer.
++    size_t max_blocks =
++        (TREE_SITTER_SERIALIZATION_BUFFER_SIZE - size) / sizeof(Block);
++    if (blocks_count > max_blocks) {
++        blocks_count = max_blocks;
++    }
+     if (blocks_count > 0) {
+         memcpy(&buffer[size], s->open_blocks.items,
+                blocks_count * sizeof(Block));

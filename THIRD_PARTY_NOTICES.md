@@ -864,6 +864,10 @@ SOFTWARE.
 
 `libpython.dylib` is compiled from https://github.com/tree-sitter/tree-sitter-python at 26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64. Licence: MIT.
 
+tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
+
+- `patches/tree-sitter-python/serialize-indents-that-fit.patch`, modifying `src/scanner.c`
+
 #### LICENSE
 
 ```text
@@ -1163,6 +1167,10 @@ SOFTWARE.
 ### tree-sitter-yaml
 
 `libyaml.dylib` is compiled from https://github.com/tree-sitter-grammars/tree-sitter-yaml at 7708026449bed86239b1cd5bce6e3c34dbca6415. Licence: MIT.
+
+tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
+
+- `patches/tree-sitter-yaml/serialize-indents-that-fit.patch`, modifying `src/scanner.c`
 
 #### LICENSE
 
@@ -1613,6 +1621,10 @@ SOFTWARE.
 
 `libkotlin.dylib` is compiled from https://github.com/fwcd/tree-sitter-kotlin at 57fb4560ba8641865bc0baa6b3f413b236112c4c. Licence: MIT.
 
+tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
+
+- `patches/tree-sitter-kotlin/refuse-strings-past-the-state.patch`, modifying `src/scanner.c`
+
 #### LICENSE
 
 ```text
@@ -1720,6 +1732,10 @@ SOFTWARE.
 ### tree-sitter-perl
 
 `libperl.dylib` is compiled from https://github.com/tree-sitter-perl/tree-sitter-perl at 0c24d001dd1921e418fb933d208a7bd7dd3f923a, deployed from ad74e6db234c35d537de9358799a8e0cc4f5dee0. Licence: MIT.
+
+tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
+
+- `patches/tree-sitter-perl/serialize-quotes-that-fit.patch`, modifying `src/scanner.c`
 
 #### LICENSE
 
@@ -1921,6 +1937,10 @@ SOFTWARE.
 ### tree-sitter-markdown
 
 `libmarkdown.dylib` and `libmarkdown_inline.dylib` are compiled from https://github.com/tree-sitter-grammars/tree-sitter-markdown at 2dfd57f547f06ca5631a80f601e129d73fc8e9f0. Licence: MIT.
+
+tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
+
+- `patches/tree-sitter-markdown/serialize-blocks-that-fit.patch`, modifying `tree-sitter-markdown/src/scanner.c`
 
 #### LICENSE
 
@@ -2348,7 +2368,7 @@ These files are covered by the licence of tree-sitter-grammars, reproduced below
 
 ## tree-sitter-grammars
 
-The query files written in tree-sitter-grammars, and the changes it made to the others, are covered by its own licence.
+The query files written in tree-sitter-grammars, the changes it made to the others, and the patches it applies to the sources of the grammars named under "Grammars" are covered by its own licence.
 
 ### LICENSE
 

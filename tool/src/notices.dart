@@ -6,7 +6,8 @@
 /// licence and NOTICE files, every licence comment the runtime's or a
 /// grammar's compiled sources carry beyond those, the Apache License 2.0 of
 /// the query files derived from nvim-treesitter, and this repository's own
-/// licence, and it lists where every query file came from.
+/// licence, and it lists where every query file came from and every patch
+/// applied to a grammar's sources.
 library;
 
 import 'dart:convert';
@@ -19,6 +20,7 @@ import 'grammar_pins.dart';
 import 'grammar_plan.dart';
 import 'query_headers.dart';
 import 'query_provenance.dart';
+import 'source_patches.dart';
 import 'toolchain.dart';
 
 /// The generated file's name, at the repository root and in the archive.
@@ -83,6 +85,7 @@ final class NoticesInput {
     required this.provenance,
     required this.apacheLicense,
     required this.ownLicense,
+    required this.patchRoot,
   });
 
   final Toolchain toolchain;
@@ -109,6 +112,10 @@ final class NoticesInput {
 
   /// This repository's `LICENSE`.
   final String ownLicense;
+
+  /// The directory the `patches` of [entries] are paths under: this
+  /// repository's root, or the tree of the commit a release builds.
+  final String patchRoot;
 }
 
 /// The contents of `THIRD_PARTY_NOTICES.md`.
@@ -181,8 +188,10 @@ String thirdPartyNotices(NoticesInput input) {
     ..write(queries)
     ..write('## tree-sitter-grammars\n\n')
     ..write(
-      'The query files written in tree-sitter-grammars, and the changes '
-      'it made to the others, are covered by its own licence.\n\n',
+      'The query files written in tree-sitter-grammars, the changes it '
+      'made to the others, and the patches it applies to the sources of '
+      'the grammars named under "Grammars" are covered by its own '
+      'licence.\n\n',
     )
     ..write(_fenced('LICENSE', input.ownLicense))
     ..write('## Apache License 2.0\n\n')
@@ -419,7 +428,8 @@ String _grammarNotice(
     ..write(
       '${_libraryList(builds)} from $url at ${entry['commit']}'
       '$deployedFrom. Licence: $license.\n\n',
-    );
+    )
+    ..write(_patchList(input.patchRoot, entry, repository, problems));
   for (final (file, text) in licenses) {
     buffer.write(_fenced(file, text, level: 4));
   }
@@ -427,6 +437,38 @@ String _grammarNotice(
         _extraNoticeBlocks(noticed, extraNotices, 'the library', level: 4),
       ))
       .toString();
+}
+
+/// The paragraph naming each patch [entry] lists, read from under
+/// [patchRoot], with the files it modifies; empty for an entry with none.
+/// Records in [problems], under [repository], a patch that cannot be read.
+String _patchList(
+  String patchRoot,
+  Map<String, Object?> entry,
+  String repository,
+  List<String> problems,
+) {
+  final patches = entryPatches(entry);
+  if (patches.isEmpty) return '';
+  final lines = <String>[];
+  for (final patch in patches) {
+    final file = File(p.join(patchRoot, patch));
+    if (!file.existsSync()) {
+      problems.add('$repository: no $patch');
+      continue;
+    }
+    final paths = [
+      for (final path in patchedPaths(file.readAsStringSync())) '`$path`',
+    ];
+    lines.add('- `$patch`, modifying ${paths.join(', ')}');
+  }
+  final one = patches.length == 1;
+  return 'tree-sitter-grammars applies '
+      '${one ? 'this patch' : 'these patches, in order,'} to the tree before '
+      'compiling it. The files ${one ? 'it modifies' : 'they modify'} stay '
+      'under the grammar\'s licence, and the changes are also covered by the '
+      'licence of tree-sitter-grammars.\n\n'
+      '${lines.join('\n')}\n\n';
 }
 
 /// The licence comments of every one of [sources], relative to

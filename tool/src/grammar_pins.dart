@@ -16,6 +16,12 @@
 ///   computes it, of the files the pinned CLI generates for the pin at the
 ///   runtime's language ABI, which the generated sources are checked
 ///   against whether generated or taken from a release's bundle.
+/// - `patches` (optional): this repository's patches to the tree at
+///   `commit`, each `patches/<repository>/<name>.patch`, applied in order
+///   before anything compiles it (see `source_patches.dart`).
+/// - `patchedSha256` (with `patches`): the digest, as `files_digest.dart`
+///   computes it, of the files the tree holds once they are applied, which
+///   every patched tree is checked against.
 /// - `extraNotices` (optional): compiled source files carrying a licence
 ///   comment of their own, beyond the grammar's licence file, which the
 ///   notices reproduce.
@@ -24,6 +30,7 @@ library;
 import 'dart:convert';
 
 import 'git.dart';
+import 'source_patches.dart';
 
 final _commitPattern = RegExp(r'^[0-9a-f]{40}$');
 final _digestPattern = RegExp(r'^[0-9a-f]{64}$');
@@ -36,6 +43,8 @@ const pinFields = [
   'license',
   'generate',
   'generatedSha256',
+  'patches',
+  'patchedSha256',
   'extraNotices',
 ];
 
@@ -128,6 +137,7 @@ List<String> pinProblems(List<Map<String, Object?>> entries) {
         '$name: generatedSha256 belongs only to a generated grammar',
       );
     }
+    problems.addAll(patchFieldProblems(name, entry));
     final extraNotices = entry['extraNotices'];
     if (extraNotices != null &&
         (extraNotices is! List ||
@@ -252,15 +262,18 @@ Future<void> requireOnOrigin(
 /// Returns [entry] pinned at [commit], whose files have the digest
 /// [filesSha256], replacing any earlier pin.
 ///
-/// A [sourceCommit] and a [generatedSha256] are recorded when given;
-/// otherwise any earlier one is dropped, because it described the earlier
-/// pin.
+/// A [sourceCommit], a [generatedSha256] and a [patchedSha256] are recorded
+/// when given; otherwise any earlier one is dropped, because it described
+/// the earlier pin. The entry's `patches` are kept: they are this
+/// repository's, and an entry that lists them without a [patchedSha256]
+/// fails [pinProblems].
 Map<String, Object?> withPin(
   Map<String, Object?> entry,
   String commit, {
   required String filesSha256,
   String? sourceCommit,
   String? generatedSha256,
+  String? patchedSha256,
 }) {
   if (!_commitPattern.hasMatch(commit)) {
     throw PinException('$commit is not a 40-hex commit');
@@ -271,10 +284,15 @@ Map<String, Object?> withPin(
   if (sourceCommit != null && !_commitPattern.hasMatch(sourceCommit)) {
     throw PinException('$sourceCommit is not a 40-hex commit');
   }
+  if (patchedSha256 != null && !_digestPattern.hasMatch(patchedSha256)) {
+    throw PinException('$patchedSha256 is not a 64-hex digest');
+  }
   final pinned = {...entry, 'commit': commit, 'filesSha256': filesSha256}
     ..remove('sourceCommit')
-    ..remove('generatedSha256');
+    ..remove('generatedSha256')
+    ..remove('patchedSha256');
   if (sourceCommit != null) pinned['sourceCommit'] = sourceCommit;
   if (generatedSha256 != null) pinned['generatedSha256'] = generatedSha256;
+  if (patchedSha256 != null) pinned['patchedSha256'] = patchedSha256;
   return pinned;
 }

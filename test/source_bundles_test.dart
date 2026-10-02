@@ -174,6 +174,7 @@ void main() {
         entries: const [],
         sourceRoot: path('src'),
         bundleDirectory: path('out'),
+        patchRoot: path('root'),
         recordedBundles: path('downloads'),
       ),
     ).throws<GrammarSourceException>(
@@ -218,6 +219,7 @@ void main() {
       entries: const [],
       sourceRoot: path('src'),
       bundleDirectory: path('out'),
+      patchRoot: path('root'),
       recordedBundles: recordedBundles,
     );
 

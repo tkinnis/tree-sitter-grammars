@@ -17,6 +17,10 @@
 ///   of generated sources has its recorded sha256, and `sources/` holds
 ///   exactly the bundles of the runtime and the grammars
 ///   `tool/grammars.json` pins, and of the grammars it generates.
+/// - `build_info.json` records beside each bundle exactly the patches
+///   `tool/grammars.json` lists for it, in order, each with the sha256 of
+///   the committed patch under `patches/`, and the `patchedSha256` the
+///   entry records.
 /// - `libtree-sitter.dylib` exports every function the runtime's `api.h`
 ///   declares, apart from the three it defines only with its wasm feature.
 /// - `manifest.json` holds exactly the entries `tool/grammars.json` plans,
@@ -57,6 +61,10 @@
 ///   draws in it, the latest pattern's capture over each span, is the
 ///   `.highlights` file beside it, line for line: each span's capture and
 ///   its text, JSON-encoded.
+/// - Every source under `test/crashes/<grammar>/` parses with the grammar,
+///   and parses again after an edit, in a process of its own running
+///   `tool/parse_input.dart`, which exits 0 within `crashTestTimeout`: no
+///   scanner aborts the process or crashes it on input it cannot hold.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -83,6 +91,7 @@
 /// other archive's manifest pins one of those at another commit.
 library;
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:ffi';
 import 'dart:io';
@@ -97,8 +106,10 @@ import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/notices.dart';
+import 'src/pool.dart';
 import 'src/release_check.dart';
 import 'src/source_bundles.dart';
+import 'src/source_patches.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
 import 'src/tree_sitter_ffi.dart';
@@ -204,6 +215,7 @@ _check(
 
   final sourceRoot = p.join(scratch, 'src');
   await _checkSources(
+    root,
     output,
     toolchain,
     entries,
@@ -240,15 +252,19 @@ _check(
   );
   _checkQueries(runtime, output, grammars, languages, problems);
   _checkQueryTests(root, runtime, grammars, languages, problems);
+  await _checkCrashTests(root, runtimePath, grammars, languages, problems);
   _checkNotices(root, output, info, problems);
   return (runtime: runtime, grammars: grammars, sources: sourceRoot);
 }
 
-/// Checks every bundle against `build_info.json` and the pins, and unpacks
-/// the runtime's into [sourceRoot], with every grammar's when
-/// [unpackGrammars]; of a grammar bundle not unpacked, only its
-/// `tree-sitter.json`, which plans its grammars, is written there.
+/// Checks every bundle against `build_info.json` and the pins, and the
+/// patches it records beside each against those `tool/grammars.json` lists
+/// and the committed patches under [root], and unpacks the runtime's into
+/// [sourceRoot], with every grammar's when [unpackGrammars]; of a grammar
+/// bundle not unpacked, only its `tree-sitter.json`, which plans its
+/// grammars, is written there.
 Future<void> _checkSources(
+  String root,
   String output,
   Toolchain toolchain,
   List<Map<String, Object?>> entries,
@@ -268,6 +284,14 @@ Future<void> _checkSources(
   for (final source in pinned) {
     try {
       await checkRecordedBundle(bundles, source, recorded);
+      problems.addAll([
+        for (final problem in await patchRecordProblems(
+          source,
+          recorded[source.name]! as Map<String, Object?>,
+          root,
+        ))
+          '${source.name}: $problem',
+      ]);
       if (!unpackGrammars && source.url != runtimeRepositoryUrl) {
         final plan = await bundleFile(
           p.join(bundles, source.bundleName),
@@ -858,6 +882,75 @@ String? _queryTestProblem(
     }
   }
   return null;
+}
+
+/// Parses every source under `test/crashes/<grammar>/` in [root] with its
+/// grammar, each in a process of its own running `tool/parse_input.dart`
+/// against the runtime at [runtimePath], and requires every one to exit 0
+/// within [crashTestTimeout], as [crashTestProblem] reads its run.
+///
+/// A scanner that aborts, or writes past the state it is given and
+/// crashes, ends only the process parsing that source, so each failure is
+/// listed by its source.
+Future<void> _checkCrashTests(
+  String root,
+  String runtimePath,
+  List<_Grammar> grammars,
+  Map<String, Pointer<Void>> languages,
+  List<String> problems,
+) async {
+  final tests = Directory(p.join(root, 'test', 'crashes'));
+  final runs = <(String, _Grammar)>[];
+  if (tests.existsSync()) {
+    final directories = tests.listSync().whereType<Directory>().toList()
+      ..sort((a, b) => a.path.compareTo(b.path));
+    for (final directory in directories) {
+      final name = p.basename(directory.path);
+      final grammar = grammars.where((g) => g.name == name).firstOrNull;
+      if (grammar == null || !languages.containsKey(name)) {
+        problems.add('test/crashes/$name names no grammar the runtime opens');
+        continue;
+      }
+      final sources = [
+        for (final file in directory.listSync().whereType<File>())
+          if (!p.basename(file.path).startsWith('.')) file.path,
+      ]..sort();
+      for (final source in sources) {
+        runs.add((source, grammar));
+      }
+    }
+  }
+  final results = await pooled(runs, (run) async {
+    final (source, grammar) = run;
+    final process = await Process.start(Platform.resolvedExecutable, [
+      'run',
+      p.join('tool', 'parse_input.dart'),
+      runtimePath,
+      p.join(grammar.directory, 'lib${grammar.name}.dylib'),
+      grammar.symbol,
+      source,
+    ], workingDirectory: root);
+    final errors = process.stderr.transform(utf8.decoder).join();
+    final output = process.stdout.drain<void>();
+    int? exitCode;
+    try {
+      exitCode = await process.exitCode.timeout(crashTestTimeout);
+    } on TimeoutException {
+      process.kill(ProcessSignal.sigkill);
+      await process.exitCode;
+    }
+    await output;
+    return crashTestProblem(exitCode, await errors);
+  }, limit: 4);
+  for (final (index, (source, _)) in runs.indexed) {
+    if (results[index] case final problem?) {
+      problems.add('${p.relative(source, from: root)}: $problem');
+    }
+  }
+  print(
+    'crash tests: ${results.where((problem) => problem == null).length}/'
+    '${runs.length} sources under test/crashes parse and reparse',
+  );
 }
 
 int _lineAt(String source, int byteOffset) {

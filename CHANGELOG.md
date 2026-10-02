@@ -10,8 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Highlight tests for Lua, Perl and Scheme, and further ones for JavaScript, Kotlin, Mermaid, Pascal and TypeScript, each holding a capture inside a wider one of its query
+- Patches to grammar sources: a grammar's entry in `tool/grammars.json` lists patches under `patches/<repository>/`, which the build applies to its tree at the pin before compiling it, and records `patchedSha256`, the digest of the patched files, which the build, `--sources` rebuilds and `tool/pin_grammars.dart` hold the tree to. `build_info.json` records each patch's sha256 beside its grammar's source bundle, which stays the upstream tree at the pin, `tool/check_release.dart` requires those records to be the patches the entry lists, and `THIRD_PARTY_NOTICES.md` names every patch and the files it modifies
+- Crash tests: `tool/check_release.dart` parses every source under `test/crashes/<grammar>/`, then reparses it after an edit, each in a process of its own running `tool/parse_input.dart`, and requires the process to exit 0 within 60 seconds, naming the signal of one a scanner aborts or crashes; the first are inputs nested past the state of the five scanners fixed below, each of which ends the process with v1.2.2's libraries
 
 ### Fixed
+
+The state a grammar's scanner serializes must fit the 1024 bytes tree-sitter gives it. Five scanners wrote past them on deeply nested input, which the runtime, built with its assertions on, stopped by aborting the whole process; each is patched to write only what fits, so such input parses with an error instead:
+
+- Markdown: a block quote, list item or other block nested 255 deep, as a line of 255 `>` is, took 1025 bytes; the block scanner writes the 254 outermost blocks, which fit, and leaves out the ones nested deeper (`patches/tree-sitter-markdown/serialize-blocks-that-fit.patch`)
+- YAML: 254 nested block mappings took 1026 bytes; an indentation level is written only when all four of its bytes fit (`patches/tree-sitter-yaml/serialize-indents-that-fit.patch`)
+- Python: a string inside 511 nested blocks took 1025 bytes; an indent is written only when both of its bytes fit (`patches/tree-sitter-python/serialize-indents-that-fit.patch`)
+- Perl: 83 strings nested through interpolation, `"@{[ "@{[ … ]}" ]}"`, took 1036 bytes; the quotes written are capped by the bytes they take, 82, not by their count (`patches/tree-sitter-perl/serialize-quotes-that-fit.patch`)
+- Kotlin: the 1025th string nested through templates, `"${"${…`, called `abort()`; a string start is not scanned while the stack of 1024 is full, so it parses as an error (`patches/tree-sitter-kotlin/refuse-strings-past-the-state.patch`)
 
 A capture inside a wider one is drawn over it, so a pattern over a whole node colours only what no capture inside it reaches. Each of these captured a node whole for the captures inside it to be hidden, captured a part only by capturing the whole, or held a pattern that only a capture of the whole kept from being drawn:
 

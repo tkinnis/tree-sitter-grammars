@@ -1,0 +1,32 @@
+tree-sitter-python: serialize an indent only when both of its bytes fit
+
+serialize writes two bytes of state, one byte for each open string
+delimiter, and then two bytes for each indentation level, for as long as
+fewer than 1024 bytes are written. With an odd number of bytes ahead of
+the indents, the last one can start at byte 1023 and end at byte 1025,
+past the 1024 bytes tree-sitter gives a scanner's state: a string inside
+511 nested blocks does it. With its assertions on, tree-sitter's parser
+aborts the process on the length the scanner returns; without them, the
+byte past the buffer is overwritten.
+
+An indent is written only when both of its bytes fit; deeper levels are
+left out, and the parse of their lines degrades to an error.
+
+Applies to src/scanner.c of tree-sitter-python at commit
+26855eabccb19c6abf499fbc5b8dc7cc9ab8bc64.
+
+diff --git a/src/scanner.c b/src/scanner.c
+index 1fc77cdbdee6c7d33c183dc8c2bc3b64c9b0a410..f50fc5d296239499db36a70895f90f6af6fef07e 100644
+--- a/src/scanner.c
++++ b/src/scanner.c
+@@ -380,7 +380,9 @@ unsigned tree_sitter_python_external_scanner_serialize(void *payload, char *buff
+     size += delimiter_count;
+ 
+     uint32_t iter = 1;
+-    for (; iter < scanner->indents.size && size < TREE_SITTER_SERIALIZATION_BUFFER_SIZE; ++iter) {
++    // Each indent takes two bytes; one that would end past the buffer is
++    // left out, with every indent after it.
++    for (; iter < scanner->indents.size && size + 2 <= TREE_SITTER_SERIALIZATION_BUFFER_SIZE; ++iter) {
+         uint16_t indent_value = *array_get(&scanner->indents, iter);
+         buffer[size++] = (char)(indent_value & 0xFF);
+         buffer[size++] = (char)((indent_value >> 8) & 0xFF);

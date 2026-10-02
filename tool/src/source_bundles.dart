@@ -14,6 +14,7 @@ import 'package:path/path.dart' as p;
 
 import 'git.dart';
 import 'grammar_pins.dart';
+import 'source_patches.dart';
 import 'toolchain.dart';
 
 /// The directory of `output/` holding the bundles.
@@ -40,6 +41,8 @@ final class PinnedSource {
     required this.url,
     required this.commit,
     required this.filesSha256,
+    this.patches = const [],
+    this.patchedSha256,
   });
 
   /// The repository's name, which names its directory under `build/src/`.
@@ -49,6 +52,14 @@ final class PinnedSource {
 
   /// The digest of the files [commit]'s tree holds, which the pin records.
   final String filesSha256;
+
+  /// The patches applied to the tree before it compiles, each a path
+  /// relative to this repository's root, in the order they apply.
+  final List<String> patches;
+
+  /// The digest of the files the tree holds once [patches] are applied,
+  /// which the pin records beside them; null when there are none.
+  final String? patchedSha256;
 
   /// The bundle's file name, which is also its top-level directory with
   /// `.tar.gz` removed.
@@ -73,6 +84,8 @@ List<PinnedSource> pinnedSources(
         url: url,
         commit: entry['commit']! as String,
         filesSha256: entry['filesSha256']! as String,
+        patches: entryPatches(entry),
+        patchedSha256: entry['patchedSha256'] as String?,
       ),
 ];
 

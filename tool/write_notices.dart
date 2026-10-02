@@ -86,6 +86,7 @@ Future<String> generateNotices(String root, String scratch) async {
     entries: entries,
     sourceRoot: sourceRoot,
     bundleDirectory: p.join(scratch, 'sources'),
+    patchRoot: root,
   );
   final provenance = readRepositoryProvenance(root);
   final apacheLicense = File(p.join(root, 'LICENSES', 'Apache-2.0.txt'));
@@ -99,6 +100,7 @@ Future<String> generateNotices(String root, String scratch) async {
       provenance: provenance,
       apacheLicense: apacheLicense.readAsStringSync(),
       ownLicense: File(p.join(root, 'LICENSE')).readAsStringSync(),
+      patchRoot: root,
     ),
   );
   final problems = await citedLicenseProblems(provenance.entries, {
