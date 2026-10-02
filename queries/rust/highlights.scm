@@ -10,6 +10,10 @@
 ((identifier) @constant
  (#match? @constant "^[A-Z][A-Z\\d_]+$'"))
 
+; Assume uppercase names are enum constructors
+((identifier) @constructor
+ (#match? @constructor "^[A-Z]"))
+
 ; Assume that uppercase names in paths are types
 ((scoped_identifier
   path: (identifier) @type)
@@ -54,8 +58,21 @@
   function: (field_expression
     field: (field_identifier) @function.method))
 
-; Assume uppercase names are enum constructors
-((identifier) @constructor
+; Assume uppercase names called like functions are enum or tuple struct
+; constructors
+((call_expression
+  function: [
+    (identifier) @constructor
+    (scoped_identifier
+      name: (identifier) @constructor)
+  ])
+ (#match? @constructor "^[A-Z]"))
+((generic_function
+  function: [
+    (identifier) @constructor
+    (scoped_identifier
+      name: (identifier) @constructor)
+  ])
  (#match? @constructor "^[A-Z]"))
 
 (macro_invocation

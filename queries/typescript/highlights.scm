@@ -160,6 +160,7 @@
   "}" @punctuation.special) @embedded
 
 (as_expression "as" @keyword)
+(mapped_type_clause "as" @keyword)
 
 ; Types
 

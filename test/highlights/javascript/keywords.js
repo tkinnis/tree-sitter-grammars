@@ -1,3 +1,7 @@
+import { default as read } from './read';
+export { default as parse } from './parse';
+export * as default from './all';
+
 /**
  * Counts what is left.
  */

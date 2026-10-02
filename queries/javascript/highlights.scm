@@ -158,3 +158,7 @@
 (template_substitution
   "${" @punctuation.special
   "}" @punctuation.special) @embedded
+
+(import_specifier "default" @keyword)
+(export_specifier "default" @keyword)
+(namespace_export "default" @keyword)
