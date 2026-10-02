@@ -1,0 +1,104 @@
+tree-sitter-perl: refuse a quote nested past the state buffer
+
+serialize writes each open quote whole, twelve bytes, and caps the quotes
+it writes only at 255, the most their one-byte count can name, while 40
+bytes of count and heredoc state go with them. 83 strings nested through
+interpolation, as in "@{[ "@{[ 1 ]}" ]}", take 1036 of the 1024 bytes
+tree-sitter gives a scanner's state. With its assertions on, tree-sitter's
+parser aborts the process on the length the scanner returns; without
+them, the bytes past the buffer are overwritten.
+
+A string, quote-like operator, search or fileglob is not scanned as one
+while the 82 quotes that fit are open, so one nested deeper parses as an
+error, and the quotes that stay open are the ones the closers after it
+pair with: the code after the nesting parses as it does on its own.
+serialize writes no more quotes than fit.
+
+Applies to src/scanner.c of tree-sitter-perl at commit
+0c24d001dd1921e418fb933d208a7bd7dd3f923a, on its release branch.
+
+diff --git a/src/scanner.c b/src/scanner.c
+index 7020950d42bf99126f2068947cad3285b7a01013..be8f7389fa459c8c0e548f3c20cc26cb130667e9 100644
+--- a/src/scanner.c
++++ b/src/scanner.c
+@@ -129,6 +129,20 @@ typedef struct {
+   TSPString heredoc_delim;
+ } LexerState;
+ 
++// The state is serialized with every open quote whole, after a byte counting
++// them and before the heredoc state, so no more quotes are open than fit the
++// buffer tree-sitter gives it beside those, 82, and that byte can count.
++static size_t lexerstate_max_quotes(void) {
++  size_t max_quotes = (TREE_SITTER_SERIALIZATION_BUFFER_SIZE - 1 - 3 - sizeof(TSPString)) / sizeof(TSPQuote);
++  return max_quotes < UINT8_MAX ? max_quotes : UINT8_MAX;
++}
++
++// A quote opened while this holds is not scanned as one, so it parses as an
++// error and the quotes open stay the ones the closers after it pair with.
++static bool lexerstate_quotes_full(LexerState *state) {
++  return state->quotes.size >= lexerstate_max_quotes();
++}
++
+ static void lexerstate_push_quote(LexerState *state, int32_t opener) {
+   TSPQuote q = tspquote_new();
+   // if it's not a paired delim, we get a 0 here
+@@ -310,10 +324,11 @@ unsigned int tree_sitter_perl_external_scanner_serialize(void *payload, char *bu
+   LexerState *state = payload;
+   size_t size = 0;
+ 
+-  // Serialize the quotes array
++  // Serialize the quotes array, no more of them than fit beside their count
++  // and the heredoc state after them
+   size_t quote_count = state->quotes.size;
+-  if (quote_count > UINT8_MAX) {
+-    quote_count = UINT8_MAX;
++  if (quote_count > lexerstate_max_quotes()) {
++    quote_count = lexerstate_max_quotes();
+   }
+   buffer[size++] = (char)quote_count;
+ 
+@@ -530,6 +545,7 @@ bool tree_sitter_perl_external_scanner_scan(void *payload, TSLexer *lexer,
+           // if ident chars took us until the closing `>` then we're readline FILEHANDLE
+           if (c == '>') TOKEN(TOKEN_OPEN_READLINE_BRACKET);
+           // otherwise we're a fileglob operator, and we set up our string parse + be excellent
++          if (lexerstate_quotes_full(state)) return false;
+           lexerstate_push_quote(state, '<');
+           TOKEN(TOKEN_OPEN_FILEGLOB_BRACKET);
+       }
+@@ -560,7 +576,7 @@ bool tree_sitter_perl_external_scanner_scan(void *payload, TSLexer *lexer,
+     ADVANCE_C;
+     MARK_END;
+ 
+-    if (c != '/') {
++    if (c != '/' && !lexerstate_quotes_full(state)) {
+       lexerstate_push_quote(state, '/');
+       TOKEN(TOKEN_SEARCH_SLASH);
+     }
+@@ -568,16 +584,19 @@ bool tree_sitter_perl_external_scanner_scan(void *payload, TSLexer *lexer,
+     return false;
+   }
+   if (valid_symbols[TOKEN_APOSTROPHE] && c == '\'') {
++    if (lexerstate_quotes_full(state)) return false;
+     ADVANCE_C;
+     lexerstate_push_quote(state, '\'');
+     TOKEN(TOKEN_APOSTROPHE);
+   }
+   if (valid_symbols[TOKEN_DOUBLE_QUOTE] && c == '"') {
++    if (lexerstate_quotes_full(state)) return false;
+     ADVANCE_C;
+     lexerstate_push_quote(state, '"');
+     TOKEN(TOKEN_DOUBLE_QUOTE);
+   }
+   if (valid_symbols[TOKEN_BACKTICK] && c == '`') {
++    if (lexerstate_quotes_full(state)) return false;
+     ADVANCE_C;
+     lexerstate_push_quote(state, '`');
+     TOKEN(TOKEN_BACKTICK);
+@@ -724,6 +743,7 @@ bool tree_sitter_perl_external_scanner_scan(void *payload, TSLexer *lexer,
+     }
+     MARK_END;
+ 
++    if (lexerstate_quotes_full(state)) return false;
+     lexerstate_push_quote(state, delim);
+     // TODO - fill in this debug print here?
+     // DEBUG("Generic QSTRING open='%c' close='%c'\n", state->delim_open,

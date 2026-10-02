@@ -1735,7 +1735,7 @@ SOFTWARE.
 
 tree-sitter-grammars applies this patch to the tree before compiling it. The files it modifies stay under the grammar's licence, and the changes are also covered by the licence of tree-sitter-grammars.
 
-- `patches/tree-sitter-perl/serialize-quotes-that-fit.patch`, modifying `src/scanner.c`
+- `patches/tree-sitter-perl/refuse-quotes-past-the-state.patch`, modifying `src/scanner.c`
 
 #### LICENSE
 

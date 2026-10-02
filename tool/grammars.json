@@ -322,9 +322,9 @@
     "sourceCommit": "ad74e6db234c35d537de9358799a8e0cc4f5dee0",
     "license": "MIT",
     "patches": [
-      "patches/tree-sitter-perl/serialize-quotes-that-fit.patch"
+      "patches/tree-sitter-perl/refuse-quotes-past-the-state.patch"
     ],
-    "patchedSha256": "f796e1811b02cdc263399106d5f8efa8fb7c5e86c2bc8667adf6378f7244e02e",
+    "patchedSha256": "45d6b18205a1b04d93026f55ee03f75e8fbe7526f6927c3718bb44a378d89980",
     "extraNotices": [
       "src/bsearch.h"
     ],
