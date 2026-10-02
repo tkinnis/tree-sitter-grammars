@@ -7,7 +7,7 @@ import 'package:test/test.dart';
 
 import '../tool/src/grammar_pins.dart';
 import '../tool/src/release_check.dart';
-import '../tool/src/tree_sitter_ffi.dart' show Capture;
+import '../tool/src/tree_sitter_ffi.dart' show Capture, QueryMatch;
 
 void main() {
   group('apiFunctions', () {
@@ -512,6 +512,70 @@ _ @any
         'asm combined "(1)"',
         'c "(1)"',
         'c combined "(1)"',
+      ]);
+    });
+  });
+
+  group('highlightLines', () {
+    const text = '{"key": "é"}';
+    QueryMatch match(int pattern, List<(String, int, int)> captures) => (
+      pattern: pattern,
+      captures: [
+        for (final (name, start, end) in captures)
+          (name: name, start: start, end: end, properties: ''),
+      ],
+    );
+
+    test('draws the latest pattern\'s capture over a span, in whatever '
+        'order the matches arrive', () {
+      final lines = highlightLines([
+        match(3, [('string', 1, 6)]),
+        match(1, [('string.special.key', 1, 6)]),
+        match(1, [('string.special.key', 8, 12)]),
+        match(0, [('string', 8, 12)]),
+      ], utf8.encode(text));
+
+      check(
+        lines,
+      ).deepEquals([r'string "\"key\""', r'string.special.key "\"é\""']);
+    });
+
+    test('draws the later of two captures one pattern makes over a span', () {
+      final lines = highlightLines([
+        match(2, [('punctuation.bracket', 0, 1), ('keyword', 0, 1)]),
+      ], utf8.encode(text));
+
+      check(lines).deepEquals(['keyword "{"']);
+    });
+
+    test('leaves out a capture that names no colour, so it overrides '
+        'nothing', () {
+      final lines = highlightLines([
+        match(0, [('comment', 1, 6)]),
+        match(1, [('spell', 1, 6), ('nospell', 1, 6)]),
+        match(2, [('none', 1, 6), ('_key', 1, 6)]),
+        match(3, [('none', 8, 12)]),
+      ], utf8.encode(text));
+
+      check(lines).deepEquals([r'comment "\"key\""']);
+    });
+
+    test('lines each span by start, the wider first, and keeps a span '
+        'inside another', () {
+      final lines = highlightLines([
+        match(0, [('punctuation.bracket', 12, 13)]),
+        match(0, [('string', 8, 12)]),
+        match(0, [('punctuation.delimiter', 6, 7)]),
+        match(0, [('punctuation.bracket', 0, 1)]),
+        match(0, [('object', 0, 13)]),
+      ], utf8.encode(text));
+
+      check(lines).deepEquals([
+        r'object "{\"key\": \"é\"}"',
+        'punctuation.bracket "{"',
+        'punctuation.delimiter ":"',
+        r'string "\"é\""',
+        'punctuation.bracket "}"',
       ]);
     });
   });

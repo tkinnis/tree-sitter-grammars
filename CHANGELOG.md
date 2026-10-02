@@ -5,7 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.2.0] - Unreleased
+## [1.2.1] - Unreleased
+
+### Added
+
+- Highlight tests: `tool/check_release.dart` parses every source under `test/highlights/<grammar>/` and requires what the grammar's composed `highlights.scm` draws in it, the latest pattern's capture over each span, to be the `.highlights` file beside it
+
+## [1.2.0] - 2026-09-25
 
 ### Added
 

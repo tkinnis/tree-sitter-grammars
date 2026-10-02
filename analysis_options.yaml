@@ -7,6 +7,7 @@ analyzer:
     - build/**
     - output/**
     - .cache/**
+    - test/highlights/**
 
 linter:
   rules:

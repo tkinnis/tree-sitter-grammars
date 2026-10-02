@@ -52,6 +52,11 @@
 ///   beside it, line for line: each injection's language, ` combined`
 ///   when its pattern sets `injection.combined`, and the whole text of the
 ///   node it captures as `@injection.content`, JSON-encoded.
+/// - Every source under `test/highlights/<grammar>/` parses with no error
+///   or missing node, and what the grammar's composed `highlights.scm`
+///   draws in it, the latest pattern's capture over each span, is the
+///   `.highlights` file beside it, line for line: each span's capture and
+///   its text, JSON-encoded.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
@@ -698,27 +703,42 @@ typedef _QueryTest = ({
   String directory,
   String queryFile,
   String suffix,
-  List<String> Function(List<List<Capture>> matches, List<int> text) lines,
+  List<String> Function(List<QueryMatch> matches, List<int> text) lines,
 });
 
+/// The captures of each of [matches], one list per match.
+List<List<Capture>> _capturesOf(List<QueryMatch> matches) => [
+  for (final match in matches) match.captures,
+];
+
 /// The outline tests, whose `.outline` file is the [outline] of the
-/// definitions `tags.scm` finds, and the injection tests, whose
-/// `.injections` file is the [injectionLines] of what `injections.scm`
-/// injects.
+/// definitions `tags.scm` finds, the injection tests, whose `.injections`
+/// file is the [injectionLines] of what `injections.scm` injects, and the
+/// highlight tests, whose `.highlights` file is the [highlightLines] of
+/// what `highlights.scm` draws.
 final _queryTests = <_QueryTest>[
   (
     kind: 'outline',
     directory: 'test/outline',
     queryFile: 'tags.scm',
     suffix: '.outline',
-    lines: (matches, text) => outline(tagDefinitions(matches, text)),
+    lines: (matches, text) =>
+        outline(tagDefinitions(_capturesOf(matches), text)),
   ),
   (
     kind: 'injection',
     directory: 'test/injections',
     queryFile: 'injections.scm',
     suffix: '.injections',
-    lines: (matches, text) => injectionLines(injections(matches, text), text),
+    lines: (matches, text) =>
+        injectionLines(injections(_capturesOf(matches), text), text),
+  ),
+  (
+    kind: 'highlight',
+    directory: 'test/highlights',
+    queryFile: 'highlights.scm',
+    suffix: '.highlights',
+    lines: highlightLines,
   ),
 ];
 

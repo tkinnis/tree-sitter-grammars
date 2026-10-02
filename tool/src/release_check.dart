@@ -1,7 +1,8 @@
 /// The parts of `tool/check_release.dart` that read files and text: query
 /// composition, the patterns of a query's text, the outline a tags query's
-/// matches make, the injections an injections query's matches make,
-/// `api.h`'s function list, and the inputs of each grammar's test corpus.
+/// matches make, the injections an injections query's matches make, the
+/// captures a highlights query's matches draw, `api.h`'s function list,
+/// and the inputs of each grammar's test corpus.
 library;
 
 import 'dart:convert';
@@ -9,7 +10,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
-import 'tree_sitter_ffi.dart' show Capture;
+import 'tree_sitter_ffi.dart' show Capture, QueryMatch;
 
 /// The `api.h` functions the runtime defines only when compiled with its
 /// wasm feature, which the build does not enable.
@@ -449,6 +450,47 @@ List<String> injectionLines(List<Injection> found, List<int> text) {
     for (final (:language, :combined, :start, :end) in sorted)
       '$language${combined ? ' combined' : ''} '
           '${jsonEncode(textOf(start, end))}',
+  ];
+}
+
+/// The captures a highlights query writes that name no colour: `@none`,
+/// `@spell` and `@nospell`, which a pattern sets beside a real capture of
+/// the same node, and a capture whose name starts with `_`, which a
+/// pattern writes for a predicate to read.
+bool _drawsNothing(String capture) =>
+    capture.startsWith('_') ||
+    const {'none', 'spell', 'nospell'}.contains(capture);
+
+/// One line per span a capture of [matches], a highlights query's matches
+/// over the UTF-8 [text], is drawn over: the capture drawn, a space and the
+/// span's text JSON-encoded, ordered by start, the wider of two that start
+/// together first.
+///
+/// Of the captures over one span, the latest pattern's is drawn, the
+/// convention the queries are written to: a language's own patterns
+/// follow the ones its `; inherits:` line names, and a narrower pattern
+/// follows the general one it refines, so each overrides the pattern
+/// before it where both match. Of two captures one pattern makes over one
+/// span, the later one is drawn. A capture that names no colour is left
+/// out, so it neither draws nor overrides.
+List<String> highlightLines(List<QueryMatch> matches, List<int> text) {
+  final drawn = <(int, int), ({int pattern, String name})>{};
+  for (final (:pattern, :captures) in matches) {
+    for (final (:name, :start, :end, properties: _) in captures) {
+      if (_drawsNothing(name)) continue;
+      if (drawn[(start, end)] case final held? when held.pattern > pattern) {
+        continue;
+      }
+      drawn[(start, end)] = (pattern: pattern, name: name);
+    }
+  }
+  final spans = drawn.keys.toList()
+    ..sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : b.$2 - a.$2);
+  String textOf((int, int) span) =>
+      utf8.decode(text.sublist(span.$1, span.$2), allowMalformed: true);
+  return [
+    for (final span in spans)
+      '${drawn[span]!.name} ${jsonEncode(textOf(span))}',
   ];
 }
 

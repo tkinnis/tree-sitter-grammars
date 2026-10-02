@@ -85,6 +85,11 @@ final class QueryException implements Exception {
 /// the [PatternPredicates.properties] of the pattern that made it.
 typedef Capture = ({String name, int start, int end, String properties});
 
+/// One match of a query: the index of the pattern that made it, which is
+/// its place among the query's patterns, and the captures it made, in the
+/// order the query cursor reports them.
+typedef QueryMatch = ({int pattern, List<Capture> captures});
+
 /// A tree-sitter runtime library.
 final class TreeSitterRuntime {
   /// Opens the runtime at [path] and binds the functions this file uses.
@@ -389,19 +394,20 @@ final class TreeSitterRuntime {
       nodes: dumpTree(root),
       captures: {
         for (final MapEntry(key: name, value: query) in queries.entries)
-          name: [for (final match in _matches(query, root, bytes)) ...match],
+          name: [
+            for (final match in _matches(query, root, bytes)) ...match.captures,
+          ],
       },
     ),
   );
 
   /// Parses [text] with [language], returning the tree as an S-expression
-  /// and the captures of every match of [query] over it that satisfies its
-  /// pattern's text predicates, one list per match, in the order the
-  /// query cursor reports them.
+  /// and every match of [query] over it that satisfies its pattern's text
+  /// predicates, in the order the query cursor reports them.
   ///
   /// Throws a [StateError] when the parser refuses the language or returns
   /// no tree.
-  ({String tree, List<List<Capture>> matches}) parseMatches(
+  ({String tree, List<QueryMatch> matches}) parseMatches(
     Pointer<Void> language,
     String text,
     Query query,
@@ -480,14 +486,14 @@ final class TreeSitterRuntime {
     }
   }
 
-  /// The captures of every match of [query] under [root] that satisfies
-  /// its pattern's text predicates, one list per match.
-  List<List<Capture>> _matches(Query query, TSNode root, List<int> source) {
+  /// Every match of [query] under [root] that satisfies its pattern's text
+  /// predicates.
+  List<QueryMatch> _matches(Query query, TSNode root, List<int> source) {
     final cursor = _queryCursorNew();
     final match = malloc<TSQueryMatch>();
     try {
       _queryCursorExec(cursor, query._pointer, root);
-      final matches = <List<Capture>>[];
+      final matches = <QueryMatch>[];
       while (_queryCursorNextMatch(cursor, match)) {
         final pattern = query.predicates[match.ref.patternIndex];
         final matched = [
@@ -507,15 +513,18 @@ final class TreeSitterRuntime {
           }
           if (!pattern.accepts(texts)) continue;
         }
-        matches.add([
-          for (final (:id, :start, :end) in matched)
-            (
-              name: query.captureName(id),
-              start: start,
-              end: end,
-              properties: pattern.properties,
-            ),
-        ]);
+        matches.add((
+          pattern: match.ref.patternIndex,
+          captures: [
+            for (final (:id, :start, :end) in matched)
+              (
+                name: query.captureName(id),
+                start: start,
+                end: end,
+                properties: pattern.properties,
+              ),
+          ],
+        ));
       }
       return matches;
     } finally {
