@@ -1,3 +1,7 @@
+; -- Every identifier no pattern below names. First, so each of them
+; overrides it.
+(identifier)      @identifier
+
 ; -- Keywords
 [
 	(kProgram)
@@ -219,6 +223,10 @@
 (declType name: (identifier) @type)
 (declType name: (genericTpl entity: (identifier) @type))
 
+; -- The parts of a dotted name
+(genericDot (identifier) @type)
+(genericDot (genericTpl entity: (identifier) @type))
+
 ; -- Procedure & function declarations
 
 ; foobar
@@ -242,9 +250,6 @@
 
 (genericArg	name: (identifier) @type.parameter)
 (genericArg	type: (typeref) @type)
-
-(genericDot (identifier) @type)
-(genericDot (genericTpl entity: (identifier) @type))
 
 ; -- Exception parameters
 (exceptionHandler variable: (identifier) @variable.parameter)
@@ -332,14 +337,3 @@
 ; (#match? @constant "^[A-Z][A-Z0-9_]+$|^[a-z]{1,2}[A-Z].+$")))
 ;(defaultValue ((identifier) @constant
 ; (#match? @constant "^[A-Z][A-Z0-9_]+$|^[a-z]{1,2}[A-Z].+$")))
-
-; -- Use scoping information for additional highlighting. THIS NEED TO BE LAST.
-; FIXME: Right now this is buggy, because in case of something like this:
-;   procedure (x: integer);
-;   begin
-;     a.x;
-;   end;
-; The x in a.x would be highlighted as a parameter. Not what we want! We have to
-; come up with a more specific rule. Only the left-most identifier should be
-; matched.
-(identifier)      @identifier

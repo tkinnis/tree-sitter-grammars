@@ -7,9 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.2.2] - Unreleased
 
+### Added
+
+- Highlight tests for Go, Haskell, Objective-C and Pascal, and further ones for Dart, JavaScript, Python, Scala, SQL, Thrift, TypeScript and TSX, each holding the spans where a pattern moved below meets the one it now follows or precedes
+
 ### Changed
 
 - `tool/check_release.dart` evaluates `#has-ancestor?` and `#has-parent?`, with their `not-` forms, as the editor reads them: a node of a type the predicate names sits anywhere above the capture's node, or is its parent. The outline, injection and highlight tests and `--against` count a match only where they hold, so Objective-C's `((identifier) @property (#has-ancestor? @property struct_declaration))` draws a struct's fields alone, not every identifier
+
+### Fixed
+
+Of two patterns that capture the same node, the later one is drawn, so a general pattern written after the specific ones it covers draws over all of them. Each of these moves ahead of the patterns that refine it, or is narrowed or removed:
+
+- Go: `(type_identifier) @type`, `(field_identifier) @property` and `(identifier) @variable` come first, so a function's name is `@function`, a builtin call `@function.builtin` and a method `@function.method`
+- Pascal: `(identifier) @identifier` comes first, so a type, a procedure, a parameter and the rest draw their own captures; the parts of a dotted name come before the procedure declarations, so the `Greet` of `procedure TGreeter.Greet` is `@function`
+- Haskell: `(type/variable) @type` makes a type variable alone `@type`; `(variable) @type` drew every function, parameter and value as a type
+- Objective-C: `"@" @punctuation.special` comes first, so the `@` of `@class` is `@keyword`; `<` and `>` are `@punctuation.bracket` only in a protocol list, a type's arguments, a generic specifier and an argument list, so a comparison's are `@operator`
+- SQL: `(object_reference name: (identifier) @type)` comes before the invocation pattern, so the `COUNT` of `COUNT(*)` is `@function.call`
+- Python: `(attribute attribute: (identifier) @property)` comes before the naming conventions and the call patterns, so a called method is `@function.method`, the `TestCase` of `unittest.TestCase` `@constructor` and the `ASCII` of `re.ASCII` `@constant`
+- Scala: `(operator_identifier) @operator`, the field patterns and then a capitalised identifier's `@type` come before method invocation, so a called method is `@function.method.call`, `Some(1)` a `@constructor`, the `::` of `::(1, Nil)` `@function.call`, and the `Inner` of `Outer.Inner` `@type`
+- Thrift: a capitalised identifier's `@type` follows `(identifier) @variable` and comes before the rest, so the name of `void Greet()` is `@function`
+- Dart: a capitalised identifier's `@type` comes among the type patterns, ahead of a function's name, so the name of `double Area()` is `@function`
+- JavaScript, TypeScript and TSX: their own `(identifier) @variable`, which drew over every identifier ecma names, is removed, ecma's standing first. A call of `eval`, `isFinite`, `isNaN`, `parseFloat`, `parseInt`, `decodeURI`, `decodeURIComponent`, `encodeURI` or `encodeURIComponent` is `@function.builtin`, following the call pattern that makes it `@function`. JavaScript draws a JSX tag's name as `@tag` or `@tag.builtin`
+- TypeScript and TSX: the patterns making a capitalised identifier `@constructor` and `@type` are removed, so ecma's readings draw: a capitalised name is `@type` (`import React`), the `Set` of `new Set()` `@constructor`, `Math` and `Promise` `@type.builtin`, `Intl` `@module.builtin`, and a capitalised function's name and call `@function`
+- JavaScript: `<` and `>` leave its own operator list, which drew a JSX tag's `<` and `>` as `@operator`; they are `@tag.delimiter` in a tag and ecma's `@operator` in an expression
 
 ## [1.2.1] - 2026-10-01
 

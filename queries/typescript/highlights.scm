@@ -1,10 +1,5 @@
 ; inherits: ecma
 
-; Variables
-;----------
-
-(identifier) @variable
-
 ; Properties
 ;-----------
 
@@ -47,11 +42,14 @@
   function: (member_expression
     property: (property_identifier) @function.method))
 
+(call_expression
+  function: (identifier) @function.builtin
+  (#any-of? @function.builtin
+    "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI"
+    "decodeURIComponent" "encodeURI" "encodeURIComponent"))
+
 ; Special identifiers
 ;--------------------
-
-((identifier) @constructor
- (#match? @constructor "^[A-Z]"))
 
 ([
     (identifier)
@@ -166,9 +164,6 @@
 
 (type_identifier) @type
 (predefined_type) @type.builtin
-
-((identifier) @type
- (#match? @type "^[A-Z]"))
 
 (type_arguments
   "<" @punctuation.bracket

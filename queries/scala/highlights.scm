@@ -92,6 +92,19 @@
   (identifier) @type)
   (#match? @type "^[A-Z]"))
 
+(operator_identifier) @operator
+
+; expressions
+(field_expression
+  field: (identifier) @variable.member)
+
+(field_expression
+  value: (identifier) @type
+  (#match? @type "^[A-Z]"))
+
+((identifier) @type
+  (#match? @type "^[A-Z]"))
+
 ; method invocation
 (call_expression
   function: (identifier) @function.call)
@@ -125,14 +138,6 @@
 
 (lambda_expression
   parameters: (identifier) @variable.parameter)
-
-; expressions
-(field_expression
-  field: (identifier) @variable.member)
-
-(field_expression
-  value: (identifier) @type
-  (#match? @type "^[A-Z]"))
 
 (infix_expression
   operator: (identifier) @operator)
@@ -296,11 +301,6 @@
 (case_block
   (case_clause
     "=>" @punctuation.delimiter))
-
-(operator_identifier) @operator
-
-((identifier) @type
-  (#match? @type "^[A-Z]"))
 
 ((identifier) @variable.builtin
   (#match? @variable.builtin "^this$"))

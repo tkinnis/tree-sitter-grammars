@@ -1,6 +1,9 @@
 ; Derived from nvim-treesitter https://github.com/nvim-treesitter/nvim-treesitter, runtime/queries/sql/highlights.scm @ 692b051b09935653befdb8f7ba8afdb640adf17b, Apache-2.0.
 ; Modified in tree-sitter-grammars.
 
+(object_reference
+  name: (identifier) @type)
+
 (invocation
   (object_reference
     name: (identifier) @function.call))
@@ -14,9 +17,6 @@
   (keyword_brin)
   (keyword_array)
 ] @function.call
-
-(object_reference
-  name: (identifier) @type)
 
 (relation
   alias: (identifier) @variable)

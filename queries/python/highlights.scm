@@ -2,6 +2,8 @@
 
 (identifier) @variable
 
+(attribute attribute: (identifier) @property)
+
 ((identifier) @constructor
  (#match? @constructor "^[A-Z]"))
 
@@ -36,7 +38,6 @@
 (function_definition
   name: (identifier) @function)
 
-(attribute attribute: (identifier) @property)
 (type (identifier) @type)
 
 ; Literals

@@ -158,6 +158,8 @@
 (type_identifier) @type
 ((type_identifier) @type.builtin
   (#match? @type.builtin "^(int|double|String|bool|List|Set|Map|Runes|Symbol)$"))
+((identifier) @type
+ (#match? @type "^_?[A-Z].*[a-z]"))
 (class_definition
   name: (identifier) @type)
 (constructor_signature
@@ -187,9 +189,6 @@
 ; --------------------
 ; var keyword
 (inferred_type) @keyword
-
-((identifier) @type
- (#match? @type "^_?[A-Z].*[a-z]"))
 
 ("Function" @type)
 

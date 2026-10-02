@@ -537,7 +537,7 @@
   },
   "queries/go/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-go",
       "commit": "174bc4405b312fde1c5d78468fccf0ad27e41617",
@@ -1254,7 +1254,7 @@
   },
   "queries/objc/highlights.scm": {
     "origin": "both",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter-grammars/tree-sitter-objc",
       "commit": "a360943e0f108b7d0935924a4eb772ce1a6aaec7",
@@ -1373,7 +1373,7 @@
   },
   "queries/pascal/highlights.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/Isopod/tree-sitter-pascal",
       "commit": "d0ebabefaea9ac3f6fc3004cf08cd121b66da9e4",

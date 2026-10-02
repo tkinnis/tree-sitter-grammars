@@ -1,10 +1,5 @@
 ; inherits: ecma,jsx
 
-; Variables
-;----------
-
-(identifier) @variable
-
 ; Properties
 ;-----------
 
@@ -46,6 +41,12 @@
 (call_expression
   function: (member_expression
     property: (property_identifier) @function.method))
+
+(call_expression
+  function: (identifier) @function.builtin
+  (#any-of? @function.builtin
+    "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI"
+    "decodeURIComponent" "encodeURI" "encodeURIComponent"))
 
 ; Special identifiers
 ;--------------------
@@ -114,7 +115,6 @@
   "/="
   "%"
   "%="
-  "<"
   "<="
   "<<"
   "<<="
@@ -125,7 +125,6 @@
   "!="
   "!=="
   "=>"
-  ">"
   ">="
   ">>"
   ">>="

@@ -5,6 +5,9 @@
 ((identifier) @variable
 )
 
+((identifier) @type
+  (#match? @type "^[_]*[A-Z]"))
+
 ; Includes
 [
   "include"
@@ -58,9 +61,6 @@
 
 (definition_type
   type: (identifier) @type)
-
-((identifier) @type
-  (#match? @type "^[_]*[A-Z]"))
 
 ; Constants
 (const_definition

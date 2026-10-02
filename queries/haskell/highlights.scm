@@ -386,7 +386,7 @@
 
 (type/star) @type
 
-(variable) @type
+(type/variable) @type
 
 (constructor) @constructor
 
