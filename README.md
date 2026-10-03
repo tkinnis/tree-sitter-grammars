@@ -170,6 +170,8 @@ method Inventory.StockTests.CountsWhatWasReceived
 
 A file-scoped namespace (`namespace Contoso.Ledger.Tests;`) holds the declarations after it, which the grammar parses as its siblings, so C#'s `tags.scm` defines it over the whole compilation unit, and they nest under it. A struct and a record are defined too, so a method nests under the one that declares it; a record struct is defined as a class, since the grammar marks it only by its `struct` keyword.
 
+A Java package declaration (`package com.example.ledger;`) and a Kotlin package header (`package com.example.ledger`) hold the declarations after them the same way, so Java's and Kotlin's `tags.scm` define the package over the whole program or source file, as a `package`, and a class and its methods nest under it — `method com.example.ledger.LedgerTest.balancesAfterPosting`. A file declaring no package outlines its classes at the top.
+
 It runs every injection test under `test/injections/<grammar>/` the same way, a source beside a `<source>.injections` file that lists what the grammar's composed `injections.scm` injects in it as the editor injects it, one line per injection in the order they start (the wider of two that start together first): the language, ` combined` when the pattern sets `injection.combined`, a space, and the whole text of the node the pattern captures as `@injection.content`, JSON-encoded. The editor reads no `#offset!` directive, so the text is the node's own:
 
 ```

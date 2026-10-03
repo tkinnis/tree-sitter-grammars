@@ -27,3 +27,10 @@
 
 (anonymous_initializer
   "init" @name) @definition.method
+
+; A package header names the package of every declaration after it in
+; the file, which the grammar parses as the header's siblings, so its
+; definition is the source file, whose range holds them.
+(source_file
+  (package_header
+    (identifier) @name)) @definition.package

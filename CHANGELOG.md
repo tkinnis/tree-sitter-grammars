@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - Unreleased
+
+### Added
+
+- Java's and Kotlin's `tags.scm` define a package: a Java `package` declaration and a Kotlin `package` header name the package of every declaration after them, which the grammars parse as their siblings, so the definition is the program or source file whose range holds them, captured as `@definition.package`, and a class and its methods nest under it in the outline; a file declaring no package outlines as it did
+- Outline tests for Java (a qualified package with a nested class, an interface and a constructor; a one-word package under a comment and an annotation; the default package) and Kotlin (a qualified package with an inner class, an object and a top-level function; no package), and highlight tests holding a Java package declaration and a Kotlin package header, which the change leaves drawn as they were
+
 ## [1.2.3] - 2026-10-02
 
 ### Added

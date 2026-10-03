@@ -21,3 +21,10 @@
   type: (type_identifier) @name) @reference.class
 
 (superclass (type_identifier) @name) @reference.class
+
+; A package declaration names the package of every declaration after it
+; in the file, which the grammar parses as the declaration's siblings, so
+; its definition is the program, whose range holds them.
+(program
+  (package_declaration
+    [(identifier) (scoped_identifier)] @name)) @definition.package

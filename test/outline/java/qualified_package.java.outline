@@ -1,0 +1,11 @@
+package com.example.ledger
+class com.example.ledger.LedgerTest
+method com.example.ledger.LedgerTest.balancesAfterPosting
+class com.example.ledger.LedgerTest.WhenEmpty
+method com.example.ledger.LedgerTest.WhenEmpty.hasNoBalance
+interface com.example.ledger.Posting
+method com.example.ledger.Posting.amount
+class com.example.ledger.Ledger
+constructor com.example.ledger.Ledger.Ledger
+method com.example.ledger.Ledger.post
+method com.example.ledger.Ledger.balance
