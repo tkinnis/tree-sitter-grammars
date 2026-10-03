@@ -171,6 +171,7 @@ void main(List<String> args) {
             'injections',
             'locals',
             'tags',
+            'tests',
             'folds',
             'indents',
             'textobjects',

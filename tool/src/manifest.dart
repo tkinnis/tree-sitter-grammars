@@ -14,6 +14,7 @@ const queryKinds = [
   'injections',
   'locals',
   'tags',
+  'tests',
   'folds',
   'indents',
   'textobjects',

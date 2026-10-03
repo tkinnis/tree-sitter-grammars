@@ -453,6 +453,100 @@ _ @any
     });
   });
 
+  group('testStructureLines', () {
+    // Ten lines of ten bytes, so line n starts at byte (n - 1) * 10.
+    final text = utf8.encode('.........\n' * 10);
+    Capture capture(String name, int start, int end) =>
+        (name: name, start: start, end: end, properties: '');
+    List<Capture> named(String group, int bodyStart, int bodyEnd) => [
+      capture('group', bodyStart - 5, bodyEnd),
+      capture('group.name', bodyStart - 4, bodyStart - 1),
+      capture('group.body', bodyStart, bodyEnd),
+    ];
+    List<Capture> testAt(int start, int end) => [capture('test', start, end)];
+
+    test('names each group by its name capture, outermost first', () {
+      final source = utf8.encode('a(o,{b(i,{t()})}) t()\n');
+      check(
+        testStructureLines([
+          [
+            capture('group', 0, 17),
+            capture('group.name', 2, 3),
+            capture('group.body', 4, 16),
+          ],
+          [
+            capture('group', 5, 15),
+            capture('group.name', 7, 8),
+            capture('group.body', 9, 14),
+          ],
+          [capture('test', 10, 13)],
+        ], source),
+      ).deepEquals(['1 ["o","i"]']);
+    });
+
+    test('a test outside every group is enclosed by none', () {
+      check(
+        testStructureLines([
+          named('outer', 5, 45),
+          testAt(20, 25),
+          testAt(60, 65),
+        ], text),
+      ).deepEquals(['3 ["..."]', '7 []']);
+    });
+
+    test('withholds a test for the innermost level that is no named '
+        'group', () {
+      check(
+        testStructureLines([
+          [capture('table', 0, 95), capture('group.body', 5, 95)],
+          [capture('opaque', 15, 45)],
+          testAt(20, 25),
+          testAt(50, 55),
+          [capture('unnamed', 60, 90), capture('group.body', 61, 90)],
+          testAt(70, 75),
+        ], text),
+      ).deepEquals([
+        '3 withheld opaque',
+        '6 withheld table',
+        '8 withheld unnamed',
+      ]);
+    });
+
+    test("an opaque body that is a group's body is that group", () {
+      check(
+        testStructureLines([
+          [capture('opaque', 5, 95)],
+          named('outer', 5, 95),
+          [capture('opaque', 20, 25)],
+          named('inner', 20, 25),
+          testAt(20, 25),
+        ], text),
+      ).deepEquals(['3 ["...","..."]']);
+    });
+
+    test('two tests starting together are one, and two on a line are '
+        'withheld', () {
+      check(
+        testStructureLines([
+          [capture('test', 20, 30), capture('test', 20, 24)],
+          testAt(40, 42),
+          testAt(44, 46),
+        ], text),
+      ).deepEquals(['3 []', '5 withheld sharedLine', '5 withheld sharedLine']);
+    });
+
+    test('a rebinding withholds every test in the file', () {
+      check(
+        testStructureLines([
+          [capture('rebinding', 0, 3)],
+          named('outer', 15, 55),
+          testAt(20, 25),
+          testAt(60, 65),
+        ], text),
+      ).deepEquals(['3 withheld rebinding', '7 withheld rebinding']);
+    });
+  });
+
   group('injections', () {
     const text = 'R"sql(select)sql" /* é */ #define A (1)';
     Capture capture(String name, int start, int end, [String set = '']) =>

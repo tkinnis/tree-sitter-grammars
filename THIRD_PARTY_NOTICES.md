@@ -2327,11 +2327,13 @@ These files are covered by the licence of tree-sitter-grammars, reproduced below
 - `css/tags.scm`
 - `dtd/indents.scm`
 - `dtd/tags.scm`
+- `ecma/tests.scm`
 - `haskell/folds.scm`
 - `haskell/indents.scm`
 - `haskell/tags.scm`
 - `html/tags.scm`
 - `idl/tags.scm`
+- `javascript/tests.scm`
 - `json/indents.scm`
 - `kotlin/indents.scm`
 - `kotlin/tags.scm`
@@ -2362,6 +2364,8 @@ These files are covered by the licence of tree-sitter-grammars, reproduced below
 - `thrift/tags.scm`
 - `toml/indents.scm`
 - `toml/tags.scm`
+- `tsx/tests.scm`
+- `typescript/tests.scm`
 - `xml/tags.scm`
 - `yaml/tags.scm`
 - `zig/tags.scm`

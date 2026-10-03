@@ -50,6 +50,11 @@
 ///   missing node, and the outline of the definitions the grammar's
 ///   composed `tags.scm` finds in it, nested by range as the editor nests
 ///   its outline, is the `.outline` file beside it, line for line.
+/// - Every source under `test/tests/<grammar>/` parses with no error or
+///   missing node, and what the grammar's composed `tests.scm` says
+///   encloses each test in it, as the editor reads it, is the `.tests`
+///   file beside it, line for line: each test's line and the names of the
+///   groups around it, or why they are withheld.
 /// - Every source under `test/injections/<grammar>/` parses with no error
 ///   or missing node, and what the grammar's composed `injections.scm`
 ///   injects in it, as the editor injects it, is the `.injections` file
@@ -739,10 +744,12 @@ List<List<Capture>> _capturesOf(List<QueryMatch> matches) => [
 ];
 
 /// The outline tests, whose `.outline` file is the [outline] of the
-/// definitions `tags.scm` finds, the injection tests, whose `.injections`
-/// file is the [injectionLines] of what `injections.scm` injects, and the
-/// highlight tests, whose `.highlights` file is the [highlightLines] of
-/// what `highlights.scm` draws.
+/// definitions `tags.scm` finds, the test-structure tests, whose `.tests`
+/// file is the [testStructureLines] of what `tests.scm` puts around each
+/// test, the injection tests, whose `.injections` file is the
+/// [injectionLines] of what `injections.scm` injects, and the highlight
+/// tests, whose `.highlights` file is the [highlightLines] of what
+/// `highlights.scm` draws.
 final _queryTests = <_QueryTest>[
   (
     kind: 'outline',
@@ -751,6 +758,13 @@ final _queryTests = <_QueryTest>[
     suffix: '.outline',
     lines: (matches, text) =>
         outline(tagDefinitions(_capturesOf(matches), text)),
+  ),
+  (
+    kind: 'test-structure',
+    directory: 'test/tests',
+    queryFile: 'tests.scm',
+    suffix: '.tests',
+    lines: (matches, text) => testStructureLines(_capturesOf(matches), text),
   ),
   (
     kind: 'injection',

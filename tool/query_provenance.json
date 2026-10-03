@@ -526,6 +526,11 @@
       "path": "runtime/queries/ecma/injections.scm"
     }
   },
+  "queries/ecma/tests.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
   "queries/go/folds.scm": {
     "origin": "nvim",
     "changed": true,
@@ -885,6 +890,11 @@
       "commit": "f85369d14306244a62c1e1f11c26a3fdb972daad",
       "path": "queries/tags.scm"
     }
+  },
+  "queries/javascript/tests.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
   },
   "queries/jsdoc/highlights.scm": {
     "origin": "nvim",
@@ -2093,6 +2103,11 @@
       "path": "queries/tags.scm"
     }
   },
+  "queries/tsx/tests.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
   "queries/typescript/folds.scm": {
     "origin": "nvim",
     "changed": false,
@@ -2151,6 +2166,11 @@
       "commit": "f85369d14306244a62c1e1f11c26a3fdb972daad",
       "path": "queries/tags.scm"
     }
+  },
+  "queries/typescript/tests.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
   },
   "queries/xml/folds.scm": {
     "origin": "nvim",

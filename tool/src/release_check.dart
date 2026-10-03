@@ -1,6 +1,7 @@
 /// The parts of `tool/check_release.dart` that read files and text: query
 /// composition, the patterns of a query's text, the outline a tags query's
-/// matches make, the injections an injections query's matches make, the
+/// matches make, the groups a tests query's matches put around each test,
+/// the injections an injections query's matches make, the
 /// captures a highlights query's matches draw, `api.h`'s function list,
 /// the inputs of each grammar's test corpus, and what a crash test's run
 /// says.
@@ -381,6 +382,124 @@ bool _contains(TagDefinition outer, TagDefinition inner) =>
     outer.start <= inner.start &&
     inner.end <= outer.end &&
     (outer.start, outer.end) != (inner.start, inner.end);
+
+/// What a tests query says encloses each test it finds, one line per
+/// test as the editor reads it: the test's one-based line, a space, and
+/// either the names of the groups around it, outermost first, as a JSON
+/// array, or `withheld` and the reason the names cannot be read.
+///
+/// [matches] are a tests query's captures one list per match over the
+/// UTF-8 [text]. A test is a node captured `@test`, and two captured at
+/// one start are one test: a test registered per row of a table is a call
+/// of what a call returns, and both start where the test does. A group is
+/// a match captured `@group`, named by its `@group.name`; `@unnamed` and
+/// `@table` matches are groups whose names the source does not write; each
+/// encloses what its `@group.body` holds. An `@opaque` body that is no
+/// group's `@group.body` is a function's, whose tests are registered under
+/// whatever calls it.
+///
+/// A test is withheld, in this order, where another test starts on its
+/// line (`sharedLine`), where the file binds a group function's name
+/// (`rebinding`), and otherwise where anything but a named group encloses
+/// it, for the innermost such level: `opaque`, `unnamed` or `table`. A
+/// body holds the test where its range holds the test's, the same range
+/// included, as an arrow function's body that is the test's own call does.
+List<String> testStructureLines(List<List<Capture>> matches, List<int> text) {
+  final tests = <int, Capture>{};
+  final levels = <_TestLevel>[];
+  final groupBodies = <(int, int)>{};
+  final bodies = <(int, int)>{};
+  var rebinding = false;
+  for (final captures in matches) {
+    Capture? named(String name) =>
+        captures.where((c) => c.name == name).firstOrNull;
+    for (final capture in captures) {
+      switch (capture.name) {
+        case 'test':
+          tests.putIfAbsent(capture.start, () => capture);
+        case 'opaque':
+          bodies.add((capture.start, capture.end));
+        case 'rebinding':
+          rebinding = true;
+      }
+    }
+    final body = named('group.body');
+    if (body == null) continue;
+    final written = named('group.name');
+    final level = switch ((named('group'), written)) {
+      (_?, final name?) => (
+        start: body.start,
+        end: body.end,
+        name: utf8.decode(
+          text.sublist(name.start, name.end),
+          allowMalformed: true,
+        ),
+        withheld: null,
+      ),
+      _ when named('unnamed') != null => (
+        start: body.start,
+        end: body.end,
+        name: null,
+        withheld: 'unnamed',
+      ),
+      _ when named('table') != null => (
+        start: body.start,
+        end: body.end,
+        name: null,
+        withheld: 'table',
+      ),
+      _ => null,
+    };
+    if (level == null) continue;
+    groupBodies.add((body.start, body.end));
+    levels.add(level);
+  }
+  for (final (start, end) in bodies) {
+    if (groupBodies.contains((start, end))) continue;
+    levels.add((start: start, end: end, name: null, withheld: 'opaque'));
+  }
+  levels.sort(
+    (a, b) => a.start != b.start ? a.start.compareTo(b.start) : b.end - a.end,
+  );
+  int lineOf(int offset) =>
+      text.sublist(0, offset).where((byte) => byte == 0x0A).length + 1;
+  final ordered = tests.values.toList()
+    ..sort((a, b) => a.start.compareTo(b.start));
+  final testsOnLine = <int, int>{};
+  for (final test in ordered) {
+    testsOnLine.update(lineOf(test.start), (n) => n + 1, ifAbsent: () => 1);
+  }
+  return [
+    for (final test in ordered)
+      '${lineOf(test.start)} '
+          '${_enclosureOf(test, levels, sharesItsLine: testsOnLine[lineOf(test.start)]! > 1, rebinding: rebinding)}',
+  ];
+}
+
+/// A level a tests query puts around what its body holds: a group named
+/// [name], or a level whose name cannot be read, for the reason
+/// [withheld].
+typedef _TestLevel = ({int start, int end, String? name, String? withheld});
+
+/// The names of the groups in [levels] around [test], JSON-encoded, or
+/// `withheld` and why — see [testStructureLines].
+String _enclosureOf(
+  Capture test,
+  List<_TestLevel> levels, {
+  required bool sharesItsLine,
+  required bool rebinding,
+}) {
+  if (sharesItsLine) return 'withheld sharedLine';
+  if (rebinding) return 'withheld rebinding';
+  final around = [
+    for (final level in levels)
+      if (level.start <= test.start && test.end <= level.end) level,
+  ];
+  for (final level in around.reversed) {
+    if (level.withheld case final reason?) return 'withheld $reason';
+  }
+  return jsonEncode([for (final level in around) level.name]);
+}
 
 /// One injection a match of an injections query makes, as the editor
 /// makes it: the language, the byte range of the whole node the match
