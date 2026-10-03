@@ -111,6 +111,15 @@ typedef Capture = ({String name, int start, int end, String properties});
 /// order the query cursor reports them.
 typedef QueryMatch = ({int pattern, List<Capture> captures});
 
+/// What [TreeSitterRuntime.parse] reads off one parse: the tree as an
+/// S-expression, every node of it as [TreeSitterRuntime.dumpTree] lists
+/// them, and the captures of each query, keyed by its name.
+typedef Parsed = ({
+  String tree,
+  String nodes,
+  Map<String, List<Capture>> captures,
+});
+
 /// A tree-sitter runtime library.
 final class TreeSitterRuntime {
   /// Opens the runtime at [path] and binds the functions this file uses.
@@ -419,7 +428,7 @@ final class TreeSitterRuntime {
   ///
   /// Throws a [StateError] when the parser refuses the language or returns
   /// no tree.
-  ({String tree, String nodes, Map<String, List<Capture>> captures}) parse(
+  Parsed parse(
     Pointer<Void> language,
     String text,
     Map<String, Query> queries,

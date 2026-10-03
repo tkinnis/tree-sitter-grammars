@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `tool/check_release.dart --against` parses the other archive's grammars in processes of their own, running `tool/parse_compared.dart`, so an input an earlier release's scanner aborts or crashes on, such as the long heredoc word on which v1.2.2's Ruby scanner fails its assertion, is printed as one the old release crashes on, and the comparison goes on
+
 ## [1.2.3] - 2026-10-02
 
 ### Added

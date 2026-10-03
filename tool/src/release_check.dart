@@ -2,8 +2,7 @@
 /// composition, the patterns of a query's text, the outline a tags query's
 /// matches make, the injections an injections query's matches make, the
 /// captures a highlights query's matches draw, `api.h`'s function list,
-/// the inputs of each grammar's test corpus, and what a crash test's run
-/// says.
+/// and the inputs of each grammar's test corpus.
 library;
 
 import 'dart:convert';
@@ -663,44 +662,4 @@ CorpusExample? _example(
   if (input.endsWith('\n')) input = input.substring(0, input.length - 1);
   if (input.endsWith('\r')) input = input.substring(0, input.length - 1);
   return (name: header.name, input: input, languages: header.languages);
-}
-
-/// How long a crash test's process may run before it fails as a hang.
-const crashTestTimeout = Duration(seconds: 60);
-
-/// The names of the signals a crash test's process can end by, by number.
-const _signalNames = {
-  4: 'SIGILL',
-  5: 'SIGTRAP',
-  6: 'SIGABRT',
-  8: 'SIGFPE',
-  9: 'SIGKILL',
-  10: 'SIGBUS',
-  11: 'SIGSEGV',
-};
-
-/// What is wrong with one run of a crash test, or null when its process
-/// exited 0.
-///
-/// [exitCode] is the process's exit code as `dart:io` reports it, negative
-/// for a process ended by a signal, or null when it ran past
-/// [crashTestTimeout] and was killed. [stderr] is what it wrote there, of
-/// which the first non-empty line is quoted.
-String? crashTestProblem(int? exitCode, String stderr) {
-  final said = const LineSplitter()
-      .convert(stderr)
-      .map((line) => line.trim())
-      .where((line) => line.isNotEmpty)
-      .firstOrNull;
-  final saying = said == null ? '' : ': $said';
-  return switch (exitCode) {
-    0 => null,
-    null =>
-      'the parse ran past ${crashTestTimeout.inSeconds} seconds and was '
-          'killed',
-    < 0 =>
-      'the parse ended the process with '
-          '${_signalNames[-exitCode] ?? 'signal ${-exitCode}'}$saying',
-    _ => 'the parse exited $exitCode$saying',
-  };
 }
