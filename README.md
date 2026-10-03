@@ -172,6 +172,8 @@ A file-scoped namespace (`namespace Contoso.Ledger.Tests;`) holds the declaratio
 
 A Java package declaration (`package com.example.ledger;`) and a Kotlin package header (`package com.example.ledger`) hold the declarations after them the same way, so Java's and Kotlin's `tags.scm` define the package over the whole program or source file, as a `package`, and a class and its methods nest under it — `method com.example.ledger.LedgerTest.balancesAfterPosting`. A file declaring no package outlines its classes at the top.
 
+A Swift extension declares members of the type it names, so Swift's `tags.scm` defines it as a `class` over its body, named by the type as the extension writes it, and its members nest under it as they do under the type's own declaration — `function OuterSuite.alsoWorks` — whatever file declares the type. A type reached by a path or extended at arguments keeps the spelling: `class Outer.Inner`, `class Array<Int>`.
+
 It runs every injection test under `test/injections/<grammar>/` the same way, a source beside a `<source>.injections` file that lists what the grammar's composed `injections.scm` injects in it as the editor injects it, one line per injection in the order they start (the wider of two that start together first): the language, ` combined` when the pattern sets `injection.combined`, a space, and the whole text of the node the pattern captures as `@injection.content`, JSON-encoded. The editor reads no `#offset!` directive, so the text is the node's own:
 
 ```

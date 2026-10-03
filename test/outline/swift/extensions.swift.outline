@@ -1,0 +1,13 @@
+class OuterSuite
+function OuterSuite.works
+class OuterSuite
+function OuterSuite.alsoWorks
+class OuterSuite.InnerSuite
+function OuterSuite.InnerSuite.nested
+class Outer.Inner
+function Outer.Inner.reachedByAPath
+class Array<Int>
+function Array<Int>.total
+class Collection
+function Collection.allEqual
+function topLevel

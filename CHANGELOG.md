@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Java's and Kotlin's `tags.scm` define a package: a Java `package` declaration and a Kotlin `package` header name the package of every declaration after them, which the grammars parse as their siblings, so the definition is the program or source file whose range holds them, captured as `@definition.package`, and a class and its methods nest under it in the outline; a file declaring no package outlines as it did
 - Outline tests for Java (a qualified package with a nested class, an interface and a constructor; a one-word package under a comment and an annotation; the default package) and Kotlin (a qualified package with an inner class, an object and a top-level function; no package), and highlight tests holding a Java package declaration and a Kotlin package header, which the change leaves drawn as they were
+- Swift's `tags.scm` defines an extension as a `@definition.class` over its body, named by the type it extends as written — `OuterSuite`, `Outer.Inner`, `Array<Int>` — so the functions and types declared in it nest under that type in the outline as they do under its own declaration; before, an extension defined nothing, and a test declared in one read as declared at the top of its file
+- An outline test for Swift holding a struct, an extension of it declaring a test and a nested struct, an extension of a type reached by a path, one extended at arguments, one constrained by a `where` clause, and a test at the top of the file
 
 ## [1.2.3] - 2026-10-02
 
