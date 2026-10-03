@@ -77,11 +77,16 @@
 /// file both archives carry, is printed. A grammar pinned on a deploy
 /// branch is tested with the tests of its `sourceCommit`, read from its
 /// object store under `grammars/`. The other archive's grammars parse in
-/// processes of their own running `tool/parse_compared.dart`, so an input
-/// a scanner there aborts or crashes on, or parses for longer than
-/// `parseProcessTimeout`, ends only that process: it is printed as one the
-/// old release crashes on, with the signal and what the process wrote, and
-/// the comparison goes on from the input after it. A match counts only
+/// processes of their own running `tool/parse_compared.dart`, compiled to
+/// kernel once per run, so an input a scanner there aborts or crashes on,
+/// or parses for longer than `parseProcessTimeout`, ends only that
+/// process: it is printed as one the old release crashes on, with the
+/// signal and what the process wrote to stderr, and the comparison goes on
+/// from the input after it. Each process writes its parses to a file of
+/// its own, leaving stdout to the scanner, and first names the query files
+/// it compiled, which must be the files this process compiles of that
+/// grammar. Each grammar is compared once its processes are done, while
+/// those of the grammars after it run. A match counts only
 /// when its pattern's text predicates hold: `#eq?`, `#match?` and
 /// `#any-of?` with their `not-` and `any-` forms, evaluated as tree-sitter
 /// documents them, a `#match?` pattern read as a Dart regular expression;
@@ -93,9 +98,10 @@
 /// expression, `#set!` value or other directive is a difference wherever
 /// the inputs reach it. Every grammar with no inputs is listed, since the
 /// comparison cannot vouch for it; the comparison fails only when the
-/// other archive's manifest pins one of those at another commit, or when
-/// a process of the other archive's grammar ends before it is ready to
-/// parse.
+/// other archive's manifest pins one of those at another commit, when a
+/// process of the other archive's grammar fails to start or ends before
+/// it is ready to parse, or when it names other query files than this
+/// process compiles.
 library;
 
 import 'dart:async';
@@ -939,7 +945,7 @@ Future<void> _checkCrashTests(
       grammar.symbol,
       source,
     ], workingDirectory: root);
-    final errors = process.stderr.transform(utf8.decoder).join();
+    final errors = readOutput(process.stderr);
     final output = process.stdout.drain<void>();
     int? exitCode;
     try {
@@ -1040,15 +1046,18 @@ const _alsoParses = {
 ///
 /// This archive's grammars parse in this process, under the runtime at
 /// [runtimePath] that [runtime] opened. The other archive's parse under the
-/// same runtime in processes of their own, as [_parseThere] runs them, so
-/// a scanner of the other archive that aborts or crashes on an input ends
-/// only its process; the input is printed as one the old release crashes
-/// on and the comparison goes on.
+/// same runtime in processes of their own, four at a time, as [_parseThere]
+/// runs them, so a scanner of the other archive that aborts or crashes on
+/// an input ends only its process; the input is printed as one the old
+/// release crashes on and the comparison goes on. Each grammar is compared
+/// as soon as its processes are done, while those of the grammars after it
+/// run.
 ///
 /// Lists every grammar with no inputs, which the comparison cannot vouch
 /// for, and sets a failing exit code when the other archive's manifest
-/// pins one of those at another commit, or when a process of the other
-/// archive's grammar ends before it is ready to parse.
+/// pins one of those at another commit, when a process of the other
+/// archive's grammar ends before it is ready to parse, or when it compiles
+/// other query files than this process compiles of that grammar.
 Future<void> _compare(
   TreeSitterRuntime runtime,
   String runtimePath,
@@ -1079,16 +1088,25 @@ Future<void> _compare(
             ...inputsOf(other),
       ]),
   ];
-  final parsedThere = await pooled(
+  final parser = await _compileParseCompared(root, scratch);
+  final parsedThere = pooledEach(
     pairs,
     (pair) async => pair == null
         ? null
-        : await _parseThere(pair, runtimePath, root, p.join(scratch, 'parses')),
+        : await _parseThere(
+            pair,
+            runtimePath,
+            parser,
+            p.join(scratch, 'parses'),
+          ),
     limit: 4,
   );
   final totals = _Totals();
   for (final (index, grammar) in grammars.indexed) {
-    if ((pairs[index], parsedThere[index]) case (final pair?, final there?)) {
+    if ((pairs[index], await parsedThere[index]) case (
+      final pair?,
+      final there?,
+    )) {
       _compareGrammar(runtime, archive, pair, there, totals);
     } else {
       print('${grammar.name}: not in $archive');
@@ -1133,18 +1151,50 @@ _Pair? _pairWith(_Grammar grammar, String archive, List<_Input> inputs) {
   );
 }
 
+/// Compiles `tool/parse_compared.dart` in [root] to a kernel file in
+/// [scratch] and returns its path, so each process [_parseThere] starts
+/// runs it without compiling it again.
+///
+/// Throws a [ProcessException] when it does not compile.
+Future<String> _compileParseCompared(String root, String scratch) async {
+  final kernel = p.join(scratch, 'parse_compared.dill');
+  final arguments = [
+    'compile',
+    'kernel',
+    '--verbosity=error',
+    '--output=$kernel',
+    p.join('tool', 'parse_compared.dart'),
+  ];
+  final result = await Process.run(
+    Platform.resolvedExecutable,
+    arguments,
+    workingDirectory: root,
+  );
+  if (result.exitCode != 0) {
+    throw ProcessException(
+      Platform.resolvedExecutable,
+      arguments,
+      '${result.stdout}${result.stderr}'.trim(),
+      result.exitCode,
+    );
+  }
+  return kernel;
+}
+
 /// Parses the inputs of [pair] with the other archive's grammar under the
-/// runtime at [runtimePath], in processes running `tool/parse_compared.dart`
-/// in [root], as [parseInProcesses] runs them, which read the request it
-/// writes into [scratch].
+/// runtime at [runtimePath], in processes running [parser], the kernel of
+/// `tool/parse_compared.dart`, as [parseInProcesses] runs them, which read
+/// the request it writes into a directory of the grammar's own under
+/// [scratch] and write their results there.
 Future<ProcessParses> _parseThere(
   _Pair pair,
   String runtimePath,
-  String root,
+  String parser,
   String scratch,
 ) {
   final name = pair.grammar.name;
-  final request = File(p.join(scratch, '$name.json'))
+  final directory = p.join(scratch, name);
+  final request = File(p.join(directory, 'request.json'))
     ..parent.createSync(recursive: true)
     ..writeAsStringSync(
       jsonEncode({
@@ -1158,12 +1208,13 @@ Future<ProcessParses> _parseThere(
     );
   return parseInProcesses(
     pair.inputs.length,
-    (first) => Process.start(Platform.resolvedExecutable, [
-      'run',
-      p.join('tool', 'parse_compared.dart'),
+    (first, results) => Process.start(Platform.resolvedExecutable, [
+      parser,
       request.path,
       '$first',
-    ], workingDirectory: root),
+      results,
+    ]),
+    scratch: directory,
   );
 }
 
@@ -1172,6 +1223,11 @@ Future<ProcessParses> _parseThere(
 /// archives carry with what [there] read of the other's, extracted at
 /// [archive], prints each difference and each input the other's grammar
 /// crashed on, and adds them to [totals].
+///
+/// The other's query files are compiled here as well, for the summary's
+/// counts, and the comparison fails unless its processes compiled the
+/// same files, since a capture is compared only for a file both sides
+/// compiled.
 void _compareGrammar(
   TreeSitterRuntime runtime,
   String archive,
@@ -1197,6 +1253,7 @@ void _compareGrammar(
   }
   final ourQueries = _compileAll(runtime, ours, grammar.directory, shared);
   final theirQueries = _compileAll(runtime, their, theirs, shared);
+  final compiledHere = theirQueries.keys.join(', ');
   totals.addQueries(ourQueries, theirQueries);
   for (final query in theirQueries.values) {
     query.delete();
@@ -1206,6 +1263,18 @@ void _compareGrammar(
       stderr.writeln(
         '✗ ${grammar.name}: the old release\'s library parses nothing in a '
         'process of its own: $problem',
+      );
+      exitCode = 1;
+      return;
+    }
+    final compiledThere = there.queries?.join(', ');
+    if (inputs.isNotEmpty && compiledThere != compiledHere) {
+      String named(String? files) =>
+          files == null || files.isEmpty ? 'no query file' : files;
+      stderr.writeln(
+        '✗ ${grammar.name}: the old release\'s process compiles '
+        '${named(compiledThere)}, where this process compiles '
+        '${named(compiledHere)}',
       );
       exitCode = 1;
       return;

@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `tool/check_release.dart --against` parses the other archive's grammars in processes of their own, running `tool/parse_compared.dart`, so an input an earlier release's scanner aborts or crashes on, such as the long heredoc word on which v1.2.2's Ruby scanner fails its assertion, is printed as one the old release crashes on, and the comparison goes on
+- `tool/check_release.dart --against` parses the other archive's grammars in processes of their own, running `tool/parse_compared.dart`, so an input an earlier release's scanner aborts or crashes on, such as the long heredoc word on which v1.2.2's Ruby scanner fails its assertion, is printed as one the old release crashes on, and the comparison goes on. Each process writes its parses to a file of its own, so what a scanner prints to stdout is set aside, and names the query files it compiled, failing the comparison when they are not the files the check compiles itself
 
 ## [1.2.3] - 2026-10-02
 
