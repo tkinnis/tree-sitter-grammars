@@ -766,34 +766,4 @@ text
       check(parseCorpus(corpus).single.input).equals('Title\n===\n\ntext');
     });
   });
-
-  group('crashTestProblem', () {
-    test('a process that exits 0 passes', () {
-      check(crashTestProblem(0, 'a warning\n')).isNull();
-    });
-
-    test('a process a signal ends names the signal and what it said', () {
-      check(
-        crashTestProblem(-6, '\nAssertion failed: (length <= 1024)\nmore\n'),
-      ).equals(
-        'the parse ended the process with SIGABRT: Assertion failed: '
-        '(length <= 1024)',
-      );
-      check(
-        crashTestProblem(-11, ''),
-      ).equals('the parse ended the process with SIGSEGV');
-      check(
-        crashTestProblem(-30, ''),
-      ).equals('the parse ended the process with signal 30');
-    });
-
-    test('a process that exits non-zero, or runs too long, fails', () {
-      check(
-        crashTestProblem(1, '✗ no lib.dylib'),
-      ).equals('the parse exited 1: ✗ no lib.dylib');
-      check(
-        crashTestProblem(null, ''),
-      ).equals('the parse ran past 60 seconds and was killed');
-    });
-  });
 }

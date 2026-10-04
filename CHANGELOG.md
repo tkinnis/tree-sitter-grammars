@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `tool/check_release.dart --against` parses the other archive's grammars in processes of their own, running `tool/parse_compared.dart`, so an input an earlier release's scanner aborts or crashes on, such as the long heredoc word on which v1.2.2's Ruby scanner fails its assertion, is printed as one the old release crashes on, and the comparison goes on. Each process writes its parses to a file of its own, so what a scanner prints to stdout is set aside, and names the query files it compiled, failing the comparison when they are not the files the check compiles itself
 - ecma's builtin highlights (`arguments`, `module`, `console`, `window`, `document`, and `eval`, `require` and the other global functions) apply only to a name the file does not define locally (`#is-not? local`), so a parameter or a local named `module` or `require` draws as the variable it is.
 - Ruby's `locals.scm` opens a scope at a singleton method, a class, a singleton class and a module as well as a method, so a name defined in one is local to it and not to the scope around it.
 

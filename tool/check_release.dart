@@ -68,7 +68,7 @@
 ///   its text, JSON-encoded.
 /// - Every source under `test/crashes/<grammar>/` parses with the grammar,
 ///   and parses again after an edit, in a process of its own running
-///   `tool/parse_input.dart`, which exits 0 within `crashTestTimeout`: no
+///   `tool/parse_input.dart`, which exits 0 within `parseProcessTimeout`: no
 ///   scanner aborts the process or crashes it on input it cannot hold.
 /// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
@@ -79,21 +79,34 @@
 /// grammar's test corpus and every highlight test input from the pinned
 /// sources is parsed with both, tsx parsing TypeScript's and JavaScript's
 /// as well, and each difference in the tree, or in the captures of a query
-/// file both archives carry, is printed. A grammar
-/// pinned on a deploy branch is tested with the tests of its
-/// `sourceCommit`, read from its object store under `grammars/`. A match
-/// counts only when its pattern's text predicates hold: `#eq?`, `#match?`
-/// and `#any-of?` with their `not-` and `any-` forms, evaluated as
-/// tree-sitter documents them, a `#match?` pattern read as a Dart regular
-/// expression; and its ancestry predicates, `#has-ancestor?` and
-/// `#has-parent?` with their `not-` forms, read off the tree as the editor
-/// reads them. The same predicates decide the matches of every outline,
-/// injection and highlight test. Every capture carries its pattern's other predicates and
-/// directives, `#set!` among them, as text, so a changed regular
+/// file both archives carry, is printed. A grammar pinned on a deploy
+/// branch is tested with the tests of its `sourceCommit`, read from its
+/// object store under `grammars/`. The other archive's grammars parse in
+/// processes of their own running `tool/parse_compared.dart`, compiled to
+/// kernel once per run, so an input a scanner there aborts or crashes on,
+/// or parses for longer than `parseProcessTimeout`, ends only that
+/// process: it is printed as one the old release crashes on, with the
+/// signal and what the process wrote to stderr, and the comparison goes on
+/// from the input after it. Each process writes its parses to a file of
+/// its own, leaving stdout to the scanner, and first names the query files
+/// it compiled, which must be the files this process compiles of that
+/// grammar. Each grammar is compared once its processes are done, while
+/// those of the grammars after it run. A match counts only
+/// when its pattern's text predicates hold: `#eq?`, `#match?` and
+/// `#any-of?` with their `not-` and `any-` forms, evaluated as tree-sitter
+/// documents them, a `#match?` pattern read as a Dart regular expression;
+/// and its ancestry predicates, `#has-ancestor?` and `#has-parent?` with
+/// their `not-` forms, read off the tree as the editor reads them. The
+/// same predicates decide the matches of every outline, injection and
+/// highlight test. Every capture carries its pattern's other predicates
+/// and directives, `#set!` among them, as text, so a changed regular
 /// expression, `#set!` value or other directive is a difference wherever
 /// the inputs reach it. Every grammar with no inputs is listed, since the
 /// comparison cannot vouch for it; the comparison fails only when the
-/// other archive's manifest pins one of those at another commit.
+/// other archive's manifest pins one of those at another commit, when a
+/// process of the other archive's grammar fails to start or ends before
+/// it is ready to parse, or when it names other query files than this
+/// process compiles.
 library;
 
 import 'dart:async';
@@ -111,6 +124,7 @@ import 'src/grammar_plan.dart';
 import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/notices.dart';
+import 'src/parse_process.dart';
 import 'src/pool.dart';
 import 'src/release_check.dart';
 import 'src/source_bundles.dart';
@@ -172,11 +186,12 @@ Future<void> main(List<String> args) async {
     if (against != null) {
       await _compare(
         runtime!,
+        p.join(directory, 'libtree-sitter.dylib'),
         grammars,
         p.normalize(p.absolute(against)),
         sourceRoot: sources,
         root: root,
-        scratch: p.join(scratch.path, 'tests'),
+        scratch: scratch.path,
       );
     }
   } on Exception catch (error) {
@@ -901,7 +916,7 @@ String? _queryTestProblem(
 /// Parses every source under `test/crashes/<grammar>/` in [root] with its
 /// grammar, each in a process of its own running `tool/parse_input.dart`
 /// against the runtime at [runtimePath], and requires every one to exit 0
-/// within [crashTestTimeout], as [crashTestProblem] reads its run.
+/// within [parseProcessTimeout], as [parseProcessProblem] reads its run.
 ///
 /// A scanner that aborts, or writes past the state it is given and
 /// crashes, ends only the process parsing that source, so each failure is
@@ -944,17 +959,17 @@ Future<void> _checkCrashTests(
       grammar.symbol,
       source,
     ], workingDirectory: root);
-    final errors = process.stderr.transform(utf8.decoder).join();
+    final errors = readOutput(process.stderr);
     final output = process.stdout.drain<void>();
     int? exitCode;
     try {
-      exitCode = await process.exitCode.timeout(crashTestTimeout);
+      exitCode = await process.exitCode.timeout(parseProcessTimeout);
     } on TimeoutException {
       process.kill(ProcessSignal.sigkill);
       await process.exitCode;
     }
     await output;
-    return crashTestProblem(exitCode, await errors);
+    return parseProcessProblem(exitCode, await errors);
   }, limit: 4);
   for (final (index, (source, _)) in runs.indexed) {
     if (results[index] case final problem?) {
@@ -1039,15 +1054,27 @@ const _alsoParses = {
 
 /// Compares [grammars] with the same grammars in the archive extracted at
 /// [archive], parsing the inputs of the test trees [_testTrees] supplies
-/// from [sourceRoot], or from the object stores under [root] into
-/// [scratch]; a grammar in [_alsoParses] parses the inputs of the grammars
-/// it names too.
+/// from [sourceRoot], or from the object stores under [root] into a
+/// directory under [scratch]; a grammar in [_alsoParses] parses the inputs
+/// of the grammars it names too.
+///
+/// This archive's grammars parse in this process, under the runtime at
+/// [runtimePath] that [runtime] opened. The other archive's parse under the
+/// same runtime in processes of their own, four at a time, as [_parseThere]
+/// runs them, so a scanner of the other archive that aborts or crashes on
+/// an input ends only its process; the input is printed as one the old
+/// release crashes on and the comparison goes on. Each grammar is compared
+/// as soon as its processes are done, while those of the grammars after it
+/// run.
 ///
 /// Lists every grammar with no inputs, which the comparison cannot vouch
 /// for, and sets a failing exit code when the other archive's manifest
-/// pins one of those at another commit.
+/// pins one of those at another commit, when a process of the other
+/// archive's grammar ends before it is ready to parse, or when it compiles
+/// other query files than this process compiles of that grammar.
 Future<void> _compare(
   TreeSitterRuntime runtime,
+  String runtimePath,
   List<_Grammar> grammars,
   String archive, {
   required String sourceRoot,
@@ -1055,142 +1082,382 @@ Future<void> _compare(
   required String scratch,
 }) async {
   print('\n── Comparing with $archive under this runtime');
-  final testTrees = await _testTrees(root, grammars, sourceRoot, scratch);
-  final theirManifest = File(p.join(archive, 'manifest.json'));
-  final theirPins = <String, String>{
-    if (theirManifest.existsSync())
-      for (final MapEntry(:key, :value) in _json(theirManifest.path).entries)
-        if (value case {'source': {'commit': final String commit}}) key: commit,
-  };
-  final uncompared = <_Grammar>[];
-  var totalInputs = 0;
-  final treeDifferences = <String, int>{};
-  final queryDifferences = <String, int>{};
-  var ourPatterns = 0;
-  var theirPatterns = 0;
-  final ourPredicates = _PredicateTally();
-  final theirPredicates = _PredicateTally();
-  for (final grammar in grammars) {
-    final theirs = p.join(archive, 'dylibs', grammar.name);
-    final theirLibrary = p.join(theirs, 'lib${grammar.name}.dylib');
-    if (!File(theirLibrary).existsSync()) {
+  final testTrees = await _testTrees(
+    root,
+    grammars,
+    sourceRoot,
+    p.join(scratch, 'tests'),
+  );
+  List<_Input> inputsOf(_Grammar owner) =>
+      switch (testTrees[repositoryName(owner.url)]) {
+        final testTree? => _inputs(owner, grammars, testTree),
+        null => const [],
+      };
+  final pairs = [
+    for (final grammar in grammars)
+      _pairWith(grammar, archive, [
+        ...inputsOf(grammar),
+        for (final name in _alsoParses[grammar.name] ?? const <String>[])
+          for (final other in grammars.where((g) => g.name == name))
+            ...inputsOf(other),
+      ]),
+  ];
+  final parser = await _compileParseCompared(root, scratch);
+  final parsedThere = pooledEach(
+    pairs,
+    (pair) async => pair == null
+        ? null
+        : await _parseThere(
+            pair,
+            runtimePath,
+            parser,
+            p.join(scratch, 'parses'),
+          ),
+    limit: 4,
+  );
+  final totals = _Totals();
+  for (final (index, grammar) in grammars.indexed) {
+    if ((pairs[index], await parsedThere[index]) case (
+      final pair?,
+      final there?,
+    )) {
+      _compareGrammar(runtime, archive, pair, there, totals);
+    } else {
       print('${grammar.name}: not in $archive');
-      continue;
     }
-    final ours = openLanguage(
-      p.join(grammar.directory, 'lib${grammar.name}.dylib'),
-      grammar.symbol,
-    );
-    final symbol =
+  }
+  totals.report(archive);
+}
+
+/// A grammar of this archive beside the same grammar in the other: the
+/// other's directory and its grammar's symbol, the query files only one
+/// of them carries and those both carry, and the inputs both parse.
+typedef _Pair = ({
+  _Grammar grammar,
+  String theirs,
+  String symbol,
+  List<String> onlyOurs,
+  List<String> onlyTheirs,
+  List<String> shared,
+  List<_Input> inputs,
+});
+
+/// [grammar] beside the same grammar in the archive extracted at
+/// [archive], to parse [inputs] with both; null when that archive holds no
+/// library of it.
+_Pair? _pairWith(_Grammar grammar, String archive, List<_Input> inputs) {
+  final theirs = p.join(archive, 'dylibs', grammar.name);
+  if (!File(p.join(theirs, 'lib${grammar.name}.dylib')).existsSync()) {
+    return null;
+  }
+  final ourFiles = queryFiles(grammar.directory).toSet();
+  final theirFiles = queryFiles(theirs).toSet();
+  return (
+    grammar: grammar,
+    theirs: theirs,
+    symbol:
         _json(p.join(theirs, 'config.json'))['symbol'] as String? ??
-        grammar.symbol;
-    final their = openLanguage(theirLibrary, symbol);
-    final ourFiles = queryFiles(grammar.directory).toSet();
-    final theirFiles = queryFiles(theirs).toSet();
-    for (final file in ourFiles.difference(theirFiles)) {
-      print('${grammar.name}/$file: only in this archive');
-    }
-    for (final file in theirFiles.difference(ourFiles)) {
-      print('${grammar.name}/$file: only in $archive');
-    }
-    final shared = ourFiles.intersection(theirFiles).toList()..sort();
-    final ourQueries = _compileAll(runtime, ours, grammar.directory, shared);
-    final theirQueries = _compileAll(runtime, their, theirs, shared);
-    ourPatterns += ourQueries.values.fold(0, (sum, q) => sum + q.patternCount);
-    theirPatterns += theirQueries.values.fold(
-      0,
-      (sum, q) => sum + q.patternCount,
-    );
-    ourPredicates.addAll(ourQueries);
-    theirPredicates.addAll(theirQueries);
-    List<_Input> inputsOf(_Grammar owner) =>
-        switch (testTrees[repositoryName(owner.url)]) {
-          final testTree? => _inputs(owner, grammars, testTree),
-          null => const [],
-        };
-    final inputs = [
-      ...inputsOf(grammar),
-      for (final name in _alsoParses[grammar.name] ?? const <String>[])
-        for (final other in grammars.where((g) => g.name == name))
-          ...inputsOf(other),
-    ];
-    if (inputs.isEmpty) uncompared.add(grammar);
-    totalInputs += inputs.length;
-    var trees = 0;
-    var captures = 0;
-    for (final input in inputs) {
-      final a = runtime.parse(ours, input.text, ourQueries);
-      final b = runtime.parse(their, input.text, theirQueries);
-      if (a.nodes != b.nodes) {
-        trees++;
-        print(
-          '${grammar.name}: tree differs '
-          '(${a.tree == b.tree ? 'anonymous nodes only' : 'named nodes too'})'
-          ': ${input.label}',
-        );
-        print('  ${_firstDifference(a.nodes, b.nodes)}');
-      }
-      for (final name in shared) {
-        final ourCaptures = a.captures[name];
-        final theirCaptures = b.captures[name];
-        if (ourCaptures == null || theirCaptures == null) continue;
-        final difference = _captureDifference(
-          ourCaptures,
-          theirCaptures,
-          input.text,
-        );
-        if (difference != null) {
-          captures++;
-          print('${grammar.name}/$name differs: ${input.label}');
-          print('  $difference');
-        }
-      }
-    }
-    for (final query in [...ourQueries.values, ...theirQueries.values]) {
-      query.delete();
-    }
-    if (trees > 0) treeDifferences[grammar.name] = trees;
-    if (captures > 0) queryDifferences[grammar.name] = captures;
-    print(
-      inputs.isEmpty
-          ? '${grammar.name}: no corpus or highlight tests to parse'
-          : '${grammar.name}: ${inputs.length} inputs, $trees tree '
-                'differences, $captures query-result differences',
+        grammar.symbol,
+    onlyOurs: ourFiles.difference(theirFiles).toList(),
+    onlyTheirs: theirFiles.difference(ourFiles).toList(),
+    shared: ourFiles.intersection(theirFiles).toList()..sort(),
+    inputs: inputs,
+  );
+}
+
+/// Compiles `tool/parse_compared.dart` in [root] to a kernel file in
+/// [scratch] and returns its path, so each process [_parseThere] starts
+/// runs it without compiling it again.
+///
+/// Throws a [ProcessException] when it does not compile.
+Future<String> _compileParseCompared(String root, String scratch) async {
+  final kernel = p.join(scratch, 'parse_compared.dill');
+  final arguments = [
+    'compile',
+    'kernel',
+    '--verbosity=error',
+    '--output=$kernel',
+    p.join('tool', 'parse_compared.dart'),
+  ];
+  final result = await Process.run(
+    Platform.resolvedExecutable,
+    arguments,
+    workingDirectory: root,
+  );
+  if (result.exitCode != 0) {
+    throw ProcessException(
+      Platform.resolvedExecutable,
+      arguments,
+      '${result.stdout}${result.stderr}'.trim(),
+      result.exitCode,
     );
   }
-  print(
-    '\n$totalInputs inputs: '
-    '${treeDifferences.values.fold(0, (a, b) => a + b)} tree differences '
-    '${treeDifferences.isEmpty ? '' : '$treeDifferences '}and '
-    '${queryDifferences.values.fold(0, (a, b) => a + b)} query-result '
-    'differences${queryDifferences.isEmpty ? '' : ' $queryDifferences'}; '
-    'patterns in the query files both carry: $ourPatterns here, '
-    '$theirPatterns there',
-  );
-  print(
-    'predicates evaluated on each match: ${ourPredicates.evaluated} '
-    'here, ${theirPredicates.evaluated} there; patterns whose captures carry '
-    'their other predicates and directives as text: '
-    '${ourPredicates.carried} here, ${theirPredicates.carried} there',
-  );
-  if (uncompared.isEmpty) return;
-  print(
-    'not compared, having no inputs: '
-    '${uncompared.map((g) => g.name).join(', ')}'
-    '${theirPins.isEmpty ? '; $archive records no pins, so any of these '
-              'may have changed unseen' : ''}',
-  );
-  final repinned = [
-    for (final grammar in uncompared)
-      if (theirPins[grammar.name] case final pin? when pin != grammar.commit)
-        grammar.name,
-  ];
-  if (repinned.isNotEmpty) {
-    stderr.writeln(
-      '✗ ${repinned.join(', ')}: pinned at another commit than in $archive, '
-      'with no inputs to compare',
+  return kernel;
+}
+
+/// Parses the inputs of [pair] with the other archive's grammar under the
+/// runtime at [runtimePath], in processes running [parser], the kernel of
+/// `tool/parse_compared.dart`, as [parseInProcesses] runs them, which read
+/// the request it writes into a directory of the grammar's own under
+/// [scratch] and write their results there.
+Future<ProcessParses> _parseThere(
+  _Pair pair,
+  String runtimePath,
+  String parser,
+  String scratch,
+) {
+  final name = pair.grammar.name;
+  final directory = p.join(scratch, name);
+  final request = File(p.join(directory, 'request.json'))
+    ..parent.createSync(recursive: true)
+    ..writeAsStringSync(
+      jsonEncode({
+        'runtime': runtimePath,
+        'library': p.join(pair.theirs, 'lib$name.dylib'),
+        'symbol': pair.symbol,
+        'queries': pair.theirs,
+        'files': pair.shared,
+        'texts': [for (final input in pair.inputs) input.text],
+      }),
     );
-    exitCode = 1;
+  return parseInProcesses(
+    pair.inputs.length,
+    (first, results) => Process.start(Platform.resolvedExecutable, [
+      parser,
+      request.path,
+      '$first',
+      results,
+    ]),
+    scratch: directory,
+  );
+}
+
+/// Parses every input of [pair] with this archive's grammar under
+/// [runtime], compares each tree and each capture of the query files both
+/// archives carry with what [there] read of the other's, extracted at
+/// [archive], prints each difference and each input the other's grammar
+/// crashed on, and adds them to [totals].
+///
+/// The other's query files are compiled here as well, for the summary's
+/// counts, and the comparison fails unless its processes compiled the
+/// same files, since a capture is compared only for a file both sides
+/// compiled.
+void _compareGrammar(
+  TreeSitterRuntime runtime,
+  String archive,
+  _Pair pair,
+  ProcessParses there,
+  _Totals totals,
+) {
+  final (:grammar, :theirs, :symbol, :onlyOurs, :onlyTheirs, :shared, :inputs) =
+      pair;
+  final ours = openLanguage(
+    p.join(grammar.directory, 'lib${grammar.name}.dylib'),
+    grammar.symbol,
+  );
+  final their = openLanguage(
+    p.join(theirs, 'lib${grammar.name}.dylib'),
+    symbol,
+  );
+  for (final file in onlyOurs) {
+    print('${grammar.name}/$file: only in this archive');
+  }
+  for (final file in onlyTheirs) {
+    print('${grammar.name}/$file: only in $archive');
+  }
+  final ourQueries = _compileAll(runtime, ours, grammar.directory, shared);
+  final theirQueries = _compileAll(runtime, their, theirs, shared);
+  final compiledHere = theirQueries.keys.join(', ');
+  totals.addQueries(ourQueries, theirQueries);
+  for (final query in theirQueries.values) {
+    query.delete();
+  }
+  try {
+    if (there.startProblem case final problem?) {
+      stderr.writeln(
+        '✗ ${grammar.name}: the old release\'s library parses nothing in a '
+        'process of its own: $problem',
+      );
+      exitCode = 1;
+      return;
+    }
+    final compiledThere = there.queries?.join(', ');
+    if (inputs.isNotEmpty && compiledThere != compiledHere) {
+      String named(String? files) =>
+          files == null || files.isEmpty ? 'no query file' : files;
+      stderr.writeln(
+        '✗ ${grammar.name}: the old release\'s process compiles '
+        '${named(compiledThere)}, where this process compiles '
+        '${named(compiledHere)}',
+      );
+      exitCode = 1;
+      return;
+    }
+    _compareInputs(runtime, grammar, ours, ourQueries, inputs, there, totals);
+  } finally {
+    for (final query in ourQueries.values) {
+      query.delete();
+    }
+  }
+}
+
+/// Parses each of [inputs] with [ours], the language of [grammar], and
+/// compares it with the parse of it [there] read, printing each
+/// difference, each input the other's grammar crashed on and a line for
+/// the grammar, and adding them to [totals].
+void _compareInputs(
+  TreeSitterRuntime runtime,
+  _Grammar grammar,
+  Pointer<Void> ours,
+  Map<String, Query> ourQueries,
+  List<_Input> inputs,
+  ProcessParses there,
+  _Totals totals,
+) {
+  final name = grammar.name;
+  final crashedOn = {
+    for (final (:index, :problem) in there.failures) index: problem,
+  };
+  var trees = 0;
+  var captures = 0;
+  for (final (index, input) in inputs.indexed) {
+    final b = there.parsed[index];
+    if (b == null) {
+      print('$name: the old release crashes on ${input.label}');
+      print('  ${crashedOn[index]}');
+      continue;
+    }
+    final a = runtime.parse(ours, input.text, ourQueries);
+    if (a.nodes != b.nodes) {
+      trees++;
+      print(
+        '$name: tree differs '
+        '(${a.tree == b.tree ? 'anonymous nodes only' : 'named nodes too'})'
+        ': ${input.label}',
+      );
+      print('  ${_firstDifference(a.nodes, b.nodes)}');
+    }
+    for (final MapEntry(key: file, value: ourCaptures) in a.captures.entries) {
+      final theirCaptures = b.captures[file];
+      if (theirCaptures == null) continue;
+      final difference = _captureDifference(
+        ourCaptures,
+        theirCaptures,
+        input.text,
+      );
+      if (difference != null) {
+        captures++;
+        print('$name/$file differs: ${input.label}');
+        print('  $difference');
+      }
+    }
+  }
+  print(
+    inputs.isEmpty
+        ? '$name: no corpus or highlight tests to parse'
+        : '$name: ${inputs.length} inputs, $trees tree differences, '
+              '$captures query-result differences'
+              '${crashedOn.isEmpty ? '' : '; the old release crashes on '
+                        '${crashedOn.length}'}',
+  );
+  totals.addGrammar(grammar, inputs.length, trees, captures, crashedOn.length);
+}
+
+/// What the comparison found across every grammar, for its summary.
+final class _Totals {
+  var _inputs = 0;
+  final _treeDifferences = <String, int>{};
+  final _queryDifferences = <String, int>{};
+  final _crashes = <String, int>{};
+  final _uncompared = <_Grammar>[];
+  var _ourPatterns = 0;
+  var _theirPatterns = 0;
+  final _ourPredicates = _PredicateTally();
+  final _theirPredicates = _PredicateTally();
+
+  /// Adds the patterns of [ours] and [theirs], the compiled query files
+  /// both archives carry of one grammar.
+  void addQueries(Map<String, Query> ours, Map<String, Query> theirs) {
+    _ourPatterns += ours.values.fold(0, (sum, q) => sum + q.patternCount);
+    _theirPatterns += theirs.values.fold(0, (sum, q) => sum + q.patternCount);
+    _ourPredicates.addAll(ours);
+    _theirPredicates.addAll(theirs);
+  }
+
+  /// Adds what comparing [inputs] inputs of [grammar] found: [trees] tree
+  /// differences, [captures] query-result differences and [crashes] inputs
+  /// the other archive's grammar crashed on.
+  void addGrammar(
+    _Grammar grammar,
+    int inputs,
+    int trees,
+    int captures,
+    int crashes,
+  ) {
+    _inputs += inputs;
+    if (inputs == 0) _uncompared.add(grammar);
+    if (trees > 0) _treeDifferences[grammar.name] = trees;
+    if (captures > 0) _queryDifferences[grammar.name] = captures;
+    if (crashes > 0) _crashes[grammar.name] = crashes;
+  }
+
+  /// Prints the summary of the comparison with the archive extracted at
+  /// [archive], and sets a failing exit code when that archive's manifest
+  /// pins a grammar with no inputs at another commit.
+  void report(String archive) {
+    int sum(Map<String, int> counts) => counts.values.fold(0, (a, b) => a + b);
+    print(
+      '\n$_inputs inputs: ${sum(_treeDifferences)} tree differences '
+      '${_treeDifferences.isEmpty ? '' : '$_treeDifferences '}and '
+      '${sum(_queryDifferences)} query-result differences'
+      '${_queryDifferences.isEmpty ? '' : ' $_queryDifferences'}; '
+      'patterns in the query files both carry: $_ourPatterns here, '
+      '$_theirPatterns there',
+    );
+    if (_crashes.isNotEmpty) {
+      print(
+        'inputs the old release crashes on, which are not compared: '
+        '${sum(_crashes)} $_crashes',
+      );
+    }
+    print(
+      'predicates evaluated on each match: ${_ourPredicates.evaluated} '
+      'here, ${_theirPredicates.evaluated} there; patterns whose captures '
+      'carry their other predicates and directives as text: '
+      '${_ourPredicates.carried} here, ${_theirPredicates.carried} there',
+    );
+    _reportUncompared(archive);
+  }
+
+  /// Lists every grammar with no inputs, failing when the manifest of the
+  /// archive extracted at [archive] pins one of them at another commit.
+  void _reportUncompared(String archive) {
+    if (_uncompared.isEmpty) return;
+    final manifest = File(p.join(archive, 'manifest.json'));
+    final theirPins = <String, String>{
+      if (manifest.existsSync())
+        for (final MapEntry(:key, :value) in _json(manifest.path).entries)
+          if (value case {'source': {'commit': final String commit}})
+            key: commit,
+    };
+    print(
+      'not compared, having no inputs: '
+      '${_uncompared.map((g) => g.name).join(', ')}'
+      '${theirPins.isEmpty ? '; $archive records no pins, so any of these '
+                'may have changed unseen' : ''}',
+    );
+    final repinned = [
+      for (final grammar in _uncompared)
+        if (theirPins[grammar.name] case final pin? when pin != grammar.commit)
+          grammar.name,
+    ];
+    if (repinned.isNotEmpty) {
+      stderr.writeln(
+        '✗ ${repinned.join(', ')}: pinned at another commit than in '
+        '$archive, with no inputs to compare',
+      );
+      exitCode = 1;
+    }
   }
 }
 

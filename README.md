@@ -35,6 +35,7 @@ tree-sitter-grammars/
 │   ├── validate_manifest.dart      # Checks a built manifest.json
 │   ├── check_release.dart          # Checks a built output/ through the runtime it ships
 │   ├── parse_input.dart            # Parses and reparses one source, for a crash test
+│   ├── parse_compared.dart         # Parses the inputs --against compares with the other archive's grammar
 │   ├── bootstrap_language.dart     # Imports a new language's queries from nvim-treesitter
 │   └── src/                        # Libraries the tools share
 ├── patches/<repository>/           # Patches to a grammar's sources, listed in grammars.json
@@ -91,6 +92,15 @@ dart run tool/check_release.dart --against=<archive>  # also compares grammars
 ```
 
 `--against` parses every example of each grammar's test corpus and every highlight test input from the pinned sources with both archives' grammars under this runtime (for a grammar pinned on a deploy branch, the tests of its `sourceCommit`, read from its object store under `grammars/`; tsx, which is TypeScript with JSX, parses TypeScript's and JavaScript's inputs as well as the one example TypeScript's corpus names it in), and prints each difference in the tree (anonymous nodes included) and in the captures of every query file both archives carry. A match counts only when its pattern's text predicates hold (`#eq?`, `#match?` and `#any-of?`, with their `not-` and `any-` forms, evaluated as tree-sitter documents them; a `#match?` pattern is read as a Dart regular expression), and its ancestry predicates, `#has-ancestor?` and `#has-parent?` with their `not-` forms, read off the tree as the editor reads them: a node of a type the predicate names sits anywhere above the capture's node, or is its parent. Each capture carries its pattern's other predicates and directives, `#set!` among them, as text, so a changed regular expression, `#set!` value or other directive shows as a difference wherever the inputs reach it. It lists every grammar it had no inputs for, and fails when the other archive's manifest pins one of those at another commit.
+
+The other archive's grammars parse in processes of their own, one per grammar and four at a time, running `tool/parse_compared.dart`, compiled to kernel once per run, under this runtime, since an earlier release can hold a scanner that aborts on input a later pin's tests hold, which would end any process that loaded it. Such an input, or one a process parses for longer than 60 seconds, is printed as one the old release crashes on, with the signal and what the process wrote to stderr; a new process parses the inputs after it, and the summary counts the inputs each grammar's process ended on, which are not compared. Each grammar is compared as soon as its processes are done, while those of the grammars after it run. v1.2.2's Ruby scanner aborts on the long heredoc word Ruby's corpus holds at its current pin:
+
+```
+ruby: the old release crashes on tree-sitter-ruby/test/corpus/literals.txt: heredoc with long identifier (>255 chars)
+  the parse ended the process with SIGABRT: Assertion failed: (size == length), function deserialize, file scanner.c, line 160.
+```
+
+Each process writes its parses to a results file of its own, leaving stdout to the grammar's scanner, so whatever a scanner prints there is set aside; a line in the results file that is not a parse is printed as the process failing on that input, and a new process parses the inputs after it. The first line a process writes names the query files it compiled, and the comparison fails when those differ from the ones the check compiles itself from the same grammar's files, since the captures of a file are compared only when both sides compiled it. A process of the other archive's grammar that fails to start, or ends before it is ready to parse, having failed to load the library or read its request, fails the comparison too.
 
 ### Pinning Grammars
 
