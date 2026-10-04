@@ -34,7 +34,8 @@
   (#match? @constant "^_*[A-Z][A-Z0-9_]*$"))
 
 ((identifier) @variable.builtin
-  (#any-of? @variable.builtin "arguments" "module" "console" "window" "document"))
+  (#any-of? @variable.builtin "arguments" "module" "console" "window" "document")
+  (#is-not? local))
 
 ((identifier) @type.builtin
   (#any-of? @type.builtin
@@ -136,7 +137,8 @@
 ((identifier) @function.builtin
   (#any-of? @function.builtin
     "eval" "isFinite" "isNaN" "parseFloat" "parseInt" "decodeURI" "decodeURIComponent" "encodeURI"
-    "encodeURIComponent" "require"))
+    "encodeURIComponent" "require")
+  (#is-not? local))
 
 ; Constructor
 ;------------

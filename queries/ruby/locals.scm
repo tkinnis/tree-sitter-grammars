@@ -1,4 +1,10 @@
-((method) @local.scope
+([
+  (method)
+  (singleton_method)
+  (class)
+  (singleton_class)
+  (module)
+] @local.scope
  (#set! local.scope-inherits false))
 
 [

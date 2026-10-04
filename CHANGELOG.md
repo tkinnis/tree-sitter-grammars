@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Test-structure tests: `tool/check_release.dart` runs every source under `test/tests/<grammar>/` against the grammar's composed `tests.scm` and requires the `.tests` file beside it, each test's line and the names of the groups around it or why they are withheld; the first are JavaScript's (named groups under modifiers, a condition and a timeout; groups named by a variable, a substitution, an escape or nothing; tables; loops, callbacks, hooks and helpers; two tests on a line; a rebinding and an import), TypeScript's (type arguments, a table, a helper, a parameter rebinding) and TSX's
 - `manifest.json` and each grammar's `config.json` report whether a grammar has a `tests.scm` under `queries`
 
+### Changed
+
+- ecma's builtin highlights (`arguments`, `module`, `console`, `window`, `document`, and `eval`, `require` and the other global functions) apply only to a name the file does not define locally (`#is-not? local`), so a parameter or a local named `module` or `require` draws as the variable it is.
+- Ruby's `locals.scm` opens a scope at a singleton method, a class, a singleton class and a module as well as a method, so a name defined in one is local to it and not to the scope around it.
+
 ## [1.2.3] - 2026-10-02
 
 ### Added
