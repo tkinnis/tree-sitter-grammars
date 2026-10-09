@@ -2399,13 +2399,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
---------------------------------------------------------------------------------
-
-This licence covers the work of this repository itself. The tree-sitter
-runtime, each grammar, and the query files that come from nvim-treesitter or
-from a grammar's own repository are covered by their own licences, which
-THIRD_PARTY_NOTICES.md reproduces in full.
 ```
 
 ## Apache License 2.0
