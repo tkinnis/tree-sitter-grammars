@@ -90,7 +90,7 @@
   (#match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$"))
 
 ; Tests named by anything else. A call of a function that is no test's
-; registration is told from one by the function it is handed.
+; registration is told from one by its second argument, the body.
 
 ((identifier) @test
   .
@@ -99,7 +99,8 @@
       (arguments
         .
         (argument) @_name
-        (argument (function_expression)))))
+        .
+        (argument))))
   (#any-of? @test "test" "testWidgets")
   (#not-match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$"))
 
