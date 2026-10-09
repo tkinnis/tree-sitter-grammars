@@ -1047,7 +1047,7 @@ SOFTWARE.
 
 ### tree-sitter-dart
 
-`libdart.dylib` is compiled from https://github.com/UserNobody14/tree-sitter-dart at d4d8f3e337d8be23be27ffc35a0aef972343cd54. Licence: MIT.
+`libdart.dylib` is compiled from https://github.com/UserNobody14/tree-sitter-dart at be07cf7118d3dba06236a3f19541685a68209934. Licence: MIT.
 
 #### LICENSE
 

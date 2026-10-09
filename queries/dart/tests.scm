@@ -5,7 +5,13 @@
 ; these which groups enclose a test, outermost first, and withholds an
 ; answer wherever the source cannot say what a run will call them.
 ;
-; @test         a call registering a test.
+; @test         the name of a function called to register a test: a direct
+;               call of `test` or `testWidgets`, as a statement, after
+;               `await` or as the body of an arrow function. A member of
+;               either, `test.skip`, and a function that merely has the
+;               name are not calls of it. Its @test.name.open and
+;               @test.name.close are the quote that opens the test's name
+;               and the one that closes it, where the name is plain text.
 ; @group        a call registering a group named by plain text. Its
 ;               @group.name.open and @group.name.close are the quote that
 ;               opens the name and the one that closes it, the name being
@@ -29,8 +35,9 @@
 
 ; Groups named by plain text.
 
-(expression_statement
+(_
   (identifier) @_group
+  .
   (selector
     (argument_part
       (arguments
@@ -44,15 +51,15 @@
             .) @_name)
         (argument
           (function_expression
-            body: (function_expression_body) @group.body))))
-    )
+            body: (function_expression_body) @group.body)))))
   (#eq? @_group "group")
   (#match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$")) @group
 
 ; Groups named by anything else.
 
-(expression_statement
+(_
   (identifier) @_group
+  .
   (selector
     (argument_part
       (arguments
@@ -64,12 +71,37 @@
   (#eq? @_group "group")
   (#not-match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$")) @unnamed
 
-; Tests.
+; Tests named by plain text.
 
-(expression_statement
-  (identifier) @_test
-  (selector (argument_part))
-  (#any-of? @_test "test" "testWidgets")) @test
+((identifier) @test
+  .
+  (selector
+    (argument_part
+      (arguments
+        .
+        (argument
+          (string_literal
+            .
+            _ @test.name.open
+            .
+            _ @test.name.close
+            .) @_name))))
+  (#any-of? @test "test" "testWidgets")
+  (#match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$"))
+
+; Tests named by anything else. A call of a function that is no test's
+; registration is told from one by the function it is handed.
+
+((identifier) @test
+  .
+  (selector
+    (argument_part
+      (arguments
+        .
+        (argument) @_name
+        (argument (function_expression)))))
+  (#any-of? @test "test" "testWidgets")
+  (#not-match? @_name "^(?:'[^'\\\\\n$]+'|\"[^\"\\\\\n$]+\")$"))
 
 ; The bodies of functions. `main` is where a file's tests are written, and
 ; holds them with no group around them; any other function or method is
