@@ -391,7 +391,9 @@ bool _contains(TagDefinition outer, TagDefinition inner) =>
 /// UTF-8 [text]. A test is a node captured `@test`, and two captured at
 /// one start are one test: a test registered per row of a table is a call
 /// of what a call returns, and both start where the test does. A group is
-/// a match captured `@group`, named by its `@group.name`; `@unnamed` and
+/// a match captured `@group`, named by its `@group.name`, or by the text
+/// between its `@group.name.open` and `@group.name.close` where a name's
+/// quotes are nodes of their own; `@unnamed` and
 /// `@table` matches are groups whose names the source does not write; each
 /// encloses what its `@group.body` holds. An `@opaque` body that is no
 /// group's `@group.body` is a function's, whose tests are registered under
@@ -424,7 +426,14 @@ List<String> testStructureLines(List<List<Capture>> matches, List<int> text) {
     }
     final body = named('group.body');
     if (body == null) continue;
-    final written = named('group.name');
+    final open = named('group.name.open');
+    final close = named('group.name.close');
+    final written = open != null && close != null
+        ? (start: open.end, end: close.start)
+        : switch (named('group.name')) {
+            final name? => (start: name.start, end: name.end),
+            _ => null,
+          };
     final level = switch ((named('group'), written)) {
       (_?, final name?) => (
         start: body.start,

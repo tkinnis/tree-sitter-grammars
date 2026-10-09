@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - Unreleased
+
+### Added
+
+- `tests.scm` for Dart: the tests a file registers by call and the groups each is registered under, as package:test and flutter_test register them — `@test` for a call of `test` or `testWidgets`, `@group` with `@group.body` for a call of `group` named in plain text, `@unnamed` for a group named by a variable, an interpolation, an escape or a raw or triple-quoted spelling, `@opaque` for the body of a function other than `main` or a group's, and `@rebinding` for a binding of the name `test`, `testWidgets` or `group`. A Dart string's quotes are nodes of their own and its text is not, so a group's name is the text between its `@group.name.open` and `@group.name.close`, the quotes at either end; the editor and `tool/check_release.dart` read that pair where a match has one and `@group.name` where it has not
+- Test-structure tests for Dart (groups nested to two levels and named by either quote, a group with a named argument, `testWidgets`; groups named otherwise, a loop, two tests on a line, a callback, a helper function and a method; a file that defines its own `group`)
+
 ## [1.3.0] - 2026-10-03
 
 ### Added

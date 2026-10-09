@@ -484,6 +484,21 @@ _ @any
       ).deepEquals(['1 ["o","i"]']);
     });
 
+    test('names a group by the text between its name delimiters', () {
+      final source = utf8.encode("g('o',{t()})\n");
+      check(
+        testStructureLines([
+          [
+            capture('group', 0, 12),
+            capture('group.name.open', 2, 3),
+            capture('group.name.close', 4, 5),
+            capture('group.body', 6, 11),
+          ],
+          [capture('test', 7, 10)],
+        ], source),
+      ).deepEquals(['1 ["o"]']);
+    });
+
     test('a test outside every group is enclosed by none', () {
       check(
         testStructureLines([

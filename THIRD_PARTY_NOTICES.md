@@ -2325,6 +2325,7 @@ These files are covered by the licence of tree-sitter-grammars, reproduced below
 - `commonlisp/indents.scm`
 - `commonlisp/tags.scm`
 - `css/tags.scm`
+- `dart/tests.scm`
 - `dtd/indents.scm`
 - `dtd/tags.scm`
 - `ecma/tests.scm`

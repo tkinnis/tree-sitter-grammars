@@ -1,0 +1,7 @@
+5 []
+7 []
+10 ["outer"]
+13 ["outer","inner, double quoted"]
+15 ["outer","inner, double quoted"]
+19 ["outer","with a named argument"]
+24 ["after"]

@@ -8,6 +8,7 @@ analyzer:
     - output/**
     - .cache/**
     - test/highlights/**
+    - test/tests/**
 
 linter:
   rules:

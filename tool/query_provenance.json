@@ -417,6 +417,11 @@
       "path": "queries/tags.scm"
     }
   },
+  "queries/dart/tests.scm": {
+    "origin": "here",
+    "changed": false,
+    "upstream": null
+  },
   "queries/diff/folds.scm": {
     "origin": "nvim",
     "changed": false,
