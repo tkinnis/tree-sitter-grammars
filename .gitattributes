@@ -1,0 +1,6 @@
+# Every file checks out as the bytes the repository holds, whatever the
+# checkout's core.autocrlf says. The build packs query files and notices
+# from the working tree, compares generated text with committed text, and
+# applies patches whose context must match exactly, so a Windows checkout
+# converting to CRLF would build a different archive or refuse to build.
+* -text
