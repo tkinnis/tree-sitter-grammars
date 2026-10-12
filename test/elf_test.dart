@@ -131,6 +131,49 @@ void main() {
       check(glibcVersion('GCC_3.0')).isNull();
     });
 
+    test('counts GLIBC_ABI_DT_RELR as the glibc 2.36 that defines it', () {
+      check(glibcVersion('GLIBC_ABI_DT_RELR')).isNotNull().deepEquals([2, 36]);
+      check(
+        glibcRequirement({
+          'libtree-sitter.so': readElf(
+            _craftedElf({
+              'libc.so.6': ['GLIBC_2.17', 'GLIBC_ABI_DT_RELR'],
+            }),
+          ),
+        }),
+      ).isNotNull().has((it) => it.version, 'version').equals('2.36');
+    });
+
+    test('is unknown for a GLIBC_ name of no known release', () {
+      check(isUnknownGlibcVersion('GLIBC_ABI_SOMETHING_NEW')).isTrue();
+      check(isUnknownGlibcVersion('GLIBC_ABI_DT_RELR')).isFalse();
+      check(isUnknownGlibcVersion('GLIBC_2.17')).isFalse();
+      check(isUnknownGlibcVersion('GLIBC_PRIVATE')).isFalse();
+      check(isUnknownGlibcVersion('GCC_3.0')).isFalse();
+    });
+
+    test('of no known release is refused', () {
+      final scratch = Directory.systemTemp.createTempSync('elf_test');
+      addTearDown(() => scratch.deleteSync(recursive: true));
+      final path =
+          (File(p.join(scratch.path, 'liba.so'))..writeAsBytesSync(
+                _craftedElf({
+                  'libc.so.6': ['GLIBC_2.17', 'GLIBC_ABI_SOMETHING_NEW'],
+                }),
+              ))
+              .path;
+
+      check(
+        elfProblems(
+          ElfExpectation(path: path, soname: 'liba.so', exportedSymbols: []),
+          BuildPlatform.linuxArm64,
+        ),
+      ).contains(
+        '$path: needs GLIBC_ABI_SOMETHING_NEW, a glibc version of no known '
+        'release',
+      );
+    });
+
     test('is the highest version any library names, compared number by '
         'number', () {
       ElfImage needing(List<String> versions) =>

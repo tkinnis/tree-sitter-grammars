@@ -68,8 +68,9 @@ bool isSystemLibrary(String name) => name == 'libc.so.6';
 /// The library must be a 64-bit little-endian shared object (`ET_DYN`)
 /// for [platform]'s machine whose `DT_SONAME` is [ElfExpectation.soname],
 /// which needs nothing but what [isSystemLibrary] allows, has no text
-/// relocations (it was compiled position-independent), and exports every
-/// expected symbol.
+/// relocations (it was compiled position-independent), exports every
+/// expected symbol, and needs no `GLIBC_` version of a release
+/// [glibcVersion] cannot tell ([isUnknownGlibcVersion]).
 List<String> elfProblems(ElfExpectation expectation, BuildPlatform platform) {
   final path = expectation.path;
   final ElfImage image;
@@ -90,6 +91,10 @@ List<String> elfProblems(ElfExpectation expectation, BuildPlatform platform) {
     if (image.textRelocations) '$path: has text relocations',
     for (final symbol in expectation.exportedSymbols)
       if (!image.exports.contains(symbol)) '$path: no $symbol',
+    for (final names in image.versionsNeeded.values)
+      for (final name in names)
+        if (isUnknownGlibcVersion(name))
+          '$path: needs $name, a glibc version of no known release',
   ];
 }
 
@@ -245,15 +250,37 @@ ElfImage readElf(Uint8List bytes) {
 
 final _glibcVersionName = RegExp(r'^GLIBC_(\d+(?:\.\d+)*)$');
 
-/// The numbers of the glibc version the symbol version [name] names, for
-/// example `[2, 17]` for `GLIBC_2.17`; null for any other name, such as
-/// `GLIBC_PRIVATE`.
-List<int>? glibcVersion(String name) => _glibcVersionName
-    .firstMatch(name)
-    ?.group(1)!
-    .split('.')
-    .map(int.parse)
-    .toList();
+/// The glibc release that first defines each `GLIBC_` symbol version
+/// whose name holds no number: a feature of the image rather than of a
+/// symbol, which the linker names in the version-needed section and the
+/// loader refuses the image on an older glibc for. `GLIBC_ABI_DT_RELR`
+/// is what a library linked with packed relative relocations
+/// (`-z pack-relative-relocs`) needs.
+const glibcAbiVersions = {
+  'GLIBC_ABI_DT_RELR': [2, 36],
+};
+
+/// The numbers of the glibc release that defines the symbol version
+/// [name], for example `[2, 17]` for `GLIBC_2.17` and `[2, 36]` for
+/// `GLIBC_ABI_DT_RELR`, by [glibcAbiVersions]; null for any other name,
+/// such as `GLIBC_PRIVATE`.
+List<int>? glibcVersion(String name) =>
+    glibcAbiVersions[name] ??
+    _glibcVersionName
+        .firstMatch(name)
+        ?.group(1)!
+        .split('.')
+        .map(int.parse)
+        .toList();
+
+/// Whether [name] is a `GLIBC_` symbol version that [glibcVersion] knows
+/// no release for and that is not `GLIBC_PRIVATE`: one whose glibc the
+/// libraries' requirement cannot count, so it would promise too old a
+/// glibc.
+bool isUnknownGlibcVersion(String name) =>
+    name.startsWith('GLIBC_') &&
+    name != 'GLIBC_PRIVATE' &&
+    glibcVersion(name) == null;
 
 /// Orders the version numbers [a] and [b] number by number, a missing
 /// number counting as 0, so that 2.9 comes before 2.17.
@@ -265,10 +292,10 @@ int compareVersions(List<int> a, List<int> b) {
   return 0;
 }
 
-/// The glibc a set of libraries needs: the highest `GLIBC_` version any
-/// of [images], by path, names in its version-needed section, written as
-/// `build_info.json` records it (`2.17`), and the path of the first image
-/// that names it; null when none names one.
+/// The glibc a set of libraries needs: the highest [glibcVersion] of the
+/// `GLIBC_` versions any of [images], by path, names in its version-needed
+/// section, written as `build_info.json` records it (`2.17`), and the path
+/// of the first image that names it; null when none names one.
 ({String version, String library})? glibcRequirement(
   Map<String, ElfImage> images,
 ) {
