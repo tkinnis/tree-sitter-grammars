@@ -24,7 +24,19 @@ const _toolchain = Toolchain(
   deploymentTarget: '13.0',
 );
 
+/// Whether a `clang.exe` is on `PATH`, which these tests link with as the
+/// build does.
+final _hasClang = (Platform.environment['PATH'] ?? '')
+    .split(';')
+    .any((directory) => File(p.join(directory, 'clang.exe')).existsSync());
+
 void main() {
+  if (!_hasClang) {
+    test('links DLLs with the build\'s flags', () {
+      markTestSkipped('no clang.exe on PATH, which a build on Windows needs');
+    });
+    return;
+  }
   late String scratch;
   late Compiler compiler;
   late BuildFlags flags;

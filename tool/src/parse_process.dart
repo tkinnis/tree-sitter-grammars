@@ -305,9 +305,10 @@ Future<({List<String>? queries, int next, String? problem})> _readParses(
   } finally {
     process.kill(ProcessSignal.sigkill);
     await lines.cancel();
-    results.deleteSync();
+    if (!Platform.isWindows) results.deleteSync();
   }
   final exitCode = await process.exitCode;
+  if (Platform.isWindows) await _deleteOnceClosed(results);
   await output;
   final problem =
       malformed ??
@@ -317,6 +318,23 @@ Future<({List<String>? queries, int next, String? problem})> _readParses(
         timeout: timeout,
       );
   return (queries: queries, next: next, problem: problem);
+}
+
+/// Deletes [file], which a process that has just ended had open.
+///
+/// Windows refuses to delete a file another process holds open, and a
+/// killed process can hold its files for a moment after its exit code is
+/// known, so a refusal is retried for up to a second.
+Future<void> _deleteOnceClosed(File file) async {
+  for (var attempt = 0; ; attempt++) {
+    try {
+      file.deleteSync();
+      return;
+    } on FileSystemException {
+      if (attempt == 100) rethrow;
+      await Future<void>.delayed(_pollInterval);
+    }
+  }
 }
 
 /// The bytes written to [file], each read within [_pollInterval] of its
