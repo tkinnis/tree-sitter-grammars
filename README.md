@@ -11,7 +11,7 @@ This repository contains:
 - **Patches** (`patches/`): fixes to grammar sources, applied to a grammar's tree at its pin before it compiles
 - **Tests** (`test/`): tests of the build tooling, run with `dart test`
 
-A local command builds the archive from pinned sources: the tree-sitter runtime **v0.27.0** (commit `6070dbfefd326bd735e5683eb128cc1b57dad0c0`) and each grammar at one upstream commit, with the patches under `patches/` that its entry lists applied. Every library is compiled with `-O3` and tree-sitter's internal assertions on, for the platform the build runs on: a thin binary for **macOS on arm64** with a deployment target of macOS 13.0, or a DLL for **Windows on arm64** (or **x64**, built by an x64 Dart) that needs nothing but Windows 10 or later. Each release attaches the source of every repository it compiles from, so it can be rebuilt without those repositories.
+A local command builds the archive from pinned sources: the tree-sitter runtime **v0.27.0** (commit `6070dbfefd326bd735e5683eb128cc1b57dad0c0`) and each grammar at one upstream commit, with the patches under `patches/` that its entry lists applied. Every library is compiled with `-O3` and tree-sitter's internal assertions on, for the platform the build runs on: a thin binary for **macOS on arm64** with a deployment target of macOS 13.0, a shared object for **Linux on arm64** that needs nothing but glibc, or a DLL for **Windows on arm64** (or **x64**, built by an x64 Dart) that needs nothing but Windows 10 or later. Each release attaches the source of every repository it compiles from, so it can be rebuilt without those repositories.
 
 ## Supported Languages
 
@@ -26,7 +26,7 @@ tree-sitter-grammars/
 ├── queries/                        # Query files and config.json per language
 ├── tool/
 │   ├── grammars.json               # Each grammar's repository, pinned commit and licence
-│   ├── toolchain.json              # The tree-sitter runtime, CLI, macOS target and Windows CLIs
+│   ├── toolchain.json              # The tree-sitter runtime, CLI, macOS target and Linux and Windows CLIs
 │   ├── query_provenance.json       # Where each query file came from
 │   ├── build_tree_sitter_grammars.dart  # The build
 │   ├── pin_grammars.dart           # Sets and checks grammar pins
@@ -67,6 +67,12 @@ On macOS:
 - Xcode with the macOS SDK (the build uses its clang, found through `xcrun`)
 - macOS on arm64
 
+On Linux:
+
+- Dart SDK 3.11+ on arm64
+- clang, whose `clang` is on `PATH`, with the system's linker and glibc's development files for `aarch64-linux-gnu` (on Debian or Ubuntu, `clang` and `libc6-dev`)
+- git, gzip, GNU tar and shasum in `/usr/bin`
+
 On Windows:
 
 - Dart SDK 3.11+, native to the architecture the build targets: an arm64 Dart builds `windows-arm64`, an x64 Dart `windows-x64`
@@ -105,6 +111,18 @@ A build on Windows checks the same pins, digests, patches, notices and queries, 
 - The CLI that generates latex and swift is the release asset `tool/toolchain.json` pins for the architecture under `windows`; what it generates must have the same `generatedSha256` as on macOS.
 - The archive carries `THIRD_PARTY_NOTICES.md` with each library named as Windows names it; the committed file, which names them as macOS does, must still be what the pinned sources produce.
 - `build_info.json` records the platform (`windows-arm64` or `windows-x64`), LLVM's clang, the MSVC tools and the Windows SDK, each with its path, in place of the deployment target, Xcode's clang and the macOS SDK.
+
+### Building on Linux
+
+A build on Linux checks the same pins, digests, patches, notices and queries, and differs from the macOS build only where the platform does:
+
+- Each library is a shared object: `libtree-sitter.so` and `lib<language>.so`, the names `OS.dylibFileName` gives them, beside the query files in `dylibs/<language>/` as on macOS. The first `clang` on `PATH` compiles them for `aarch64-linux-gnu` with the macOS build's `-O3`, `-std=c11`, `-fPIC` and, for the runtime, `-fvisibility=hidden`, `-D_POSIX_C_SOURCE=200112L`, `-D_DEFAULT_SOURCE` and `-D_BSD_SOURCE`, with neither an SDK nor `_DARWIN_C_SOURCE`, against the system's headers and C library. Each is linked `-shared` with its file name as its soname (`-Wl,-soname,lib<language>.so`), as macOS gives each its `@rpath` install name, and with `-Wl,-z,defs`, so a symbol nothing defines fails the link rather than the first load.
+- The library check reads each shared object's ELF headers in Dart (`tool/src/elf.dart`): a 64-bit `ET_DYN` for `EM_AARCH64`, a soname that is its own file name, no `DT_NEEDED` but `libc.so.6`, no text relocations, and the expected exports; the runtime must export every `api.h` function but the three that need the wasm feature, and the allocator variables `lib/src/alloc.h` marks `TS_PUBLIC`.
+- Every compiler invocation sees only `PATH` (`/usr/bin:/bin:/usr/sbin:/sbin`) and `TMPDIR`.
+- The bundles are written by `/usr/bin/git` and compressed by `/usr/bin/gzip -n -9`, and the archive is packed by GNU tar (`/usr/bin/tar`) as the same ustar stream the macOS archive is, files only, owned by root:wheel; `build_info.json` records each tool's version.
+- The CLI that generates latex and swift is the release asset `tool/toolchain.json` pins for the architecture under `linux`; what it generates must have the same `generatedSha256` as on macOS.
+- The archive carries `THIRD_PARTY_NOTICES.md` with each library named as Linux names it.
+- `build_info.json` records the platform (`linux-arm64`), clang and its path, and the glibc it links against (`getconf GNU_LIBC_VERSION`) with the path of that `libc.so.6`, in place of the deployment target, Xcode's clang and the macOS SDK. A library needs that glibc or a later one, and the release notes say so; it may run on an earlier one, as no check reads the symbol versions it needs.
 
 `tool/check_release.dart` checks only an archive built for the platform it runs on, whose libraries are the only ones it can load. A scanner's failed assertion ends a process on Windows with `abort`, which the Universal CRT turns into a fail-fast (`STATUS_STACK_BUFFER_OVERRUN`) or, in a process with a window, a message box first.
 
@@ -237,7 +255,7 @@ It runs every crash test under `test/crashes/<grammar>/`: each source there is p
 
 ## Using Pre-built Binaries
 
-Download `grammars-macos-arm64.tar.gz` from [GitHub Releases](../../releases). A build on Windows packs `grammars-windows-arm64.tar.gz` or `grammars-windows-x64.tar.gz` with the same layout, holding `tree-sitter.dll` in place of `libtree-sitter.dylib` and `dylibs/<language>/<language>.dll` in place of `lib<language>.dylib`; its `manifest.json` is the same.
+Download `grammars-macos-arm64.tar.gz` from [GitHub Releases](../../releases). A build on Linux packs `grammars-linux-arm64.tar.gz` with the same layout, holding `libtree-sitter.so` in place of `libtree-sitter.dylib` and `dylibs/<language>/lib<language>.so` in place of `lib<language>.dylib`. A build on Windows packs `grammars-windows-arm64.tar.gz` or `grammars-windows-x64.tar.gz` with the same layout, holding `tree-sitter.dll` in place of `libtree-sitter.dylib` and `dylibs/<language>/<language>.dll` in place of `lib<language>.dylib`. The `manifest.json` of each is the same.
 
 ### Archive Contents
 
@@ -360,7 +378,7 @@ Each language has a `config.json` with metadata and editor settings:
 
 ## Creating Releases
 
-A release is built, packed and published on a Mac by the local commands below; its Windows archives are built afterwards from the assets it published (step 4).
+A release is built, packed and published on a Mac by the local commands below; its Linux and Windows archives are built afterwards from the assets it published (step 4).
 
 1. Tag a clean `HEAD` with an annotated tag:
 
@@ -376,7 +394,7 @@ dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0
 
 A release reads this repository's own files (`tool/grammars.json`, `tool/toolchain.json`, `tool/query_provenance.json`, `queries/`, the licences and `THIRD_PARTY_NOTICES.md`) from the tree of the commit it builds, extracted into `build/repository` and checked against the committed blobs, never from the working tree, so an edit made while it runs cannot reach the archive. It packs nothing unless, once every check has passed, `HEAD` is still that commit and the working tree still clean, and `tool/check_release.dart` refuses a `build_info.json` that records a release built from a dirty working tree.
 
-It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of the commit built, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has. On Windows the same command packs `output/grammars-windows-<arch>.tar.gz` (or `.dry-run.tar.gz`) the same way, 0755 going to each DLL.
+It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammars-macos-arm64.tar.gz.sha256`. The archive holds files only, in sorted order, as ustar with no macOS metadata, extended attributes, ACLs or file flags; every file is owned by root:wheel, has mode 0644 (0755 for a dylib) and carries the time of the commit built, and `gzip -n -9` compresses it, so the same build packs to the same bytes. `--dry-run` skips only the tag requirement and packs the same bytes into `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset has. On Linux the same command packs `output/grammars-linux-arm64.tar.gz`, and on Windows `output/grammars-windows-<arch>.tar.gz` (or `.dry-run.tar.gz`), the same way, 0755 going to each shared object or DLL.
 
 The archive's sha256 identifies a build of one commit: `build_info.json`, which the archive carries, names the commit, and every file carries its time. A dry run of the commit a tag will name packs the tag's bytes; a dry run of any other commit, even one that changes nothing else in the archive, packs another sha256. Compare a digest only with a build of the same commit.
 
@@ -389,9 +407,9 @@ git push origin v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --publish
 ```
 
-`--publish` runs on macOS only, since it creates the release with the source bundles the macOS build packed; a build on Windows attaches its archive to that release instead (step 4). `--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
+`--publish` runs on macOS only, since it creates the release with the source bundles the macOS build packed; a build on Linux or Windows attaches its archive to that release instead (step 4). `--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
 
-4. On Windows, build the same tag from the release's own assets, then attach the archive and its `.sha256` to the release:
+4. On Linux and on Windows, build the same tag from the release's own assets, then attach the archive and its `.sha256` to the release (on Linux, `grammars-linux-arm64.tar.gz`):
 
 ```bash
 gh release download v1.1.0 --repo tkinnis/tree-sitter-grammars --dir ../v1.1.0-assets
@@ -399,7 +417,7 @@ dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1
 gh release upload v1.1.0 --repo tkinnis/tree-sitter-grammars output/grammars-windows-arm64.tar.gz output/grammars-windows-arm64.tar.gz.sha256
 ```
 
-A build on Windows that packs its own source bundles compresses them with `dart:io`'s zlib rather than macOS's `/usr/bin/gzip -n -9`, so their sha256s, which its `build_info.json` records and its archive carries, are not those of the bundles the release attaches. With `--sources` it copies the release's bundles byte for byte into `output/sources/` and records their sha256s, so the Windows archive's `build_info.json` names assets the release has. Attaching it is a step of its own, since `--publish` creates a release and this one already exists.
+A build on Windows that packs its own source bundles compresses them with `dart:io`'s zlib rather than macOS's `/usr/bin/gzip -n -9`, so their sha256s, which its `build_info.json` records and its archive carries, are not those of the bundles the release attaches. With `--sources` it copies the release's bundles byte for byte into `output/sources/` and records their sha256s, so the Windows archive's `build_info.json` names assets the release has. A build on Linux compresses its own bundles with its own `/usr/bin/gzip`, whose bytes need not be macOS's, and is built from the release's assets for the same reason. Attaching it is a step of its own, since `--publish` creates a release and this one already exists.
 
 ### Rebuilding a Release from Its Source Bundles
 

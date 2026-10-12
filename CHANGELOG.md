@@ -14,10 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tool/src/pe.dart` checks each DLL's machine, export name, imports and exports, read from its PE headers, as `tool/src/macho.dart` checks a dylib
 - `tool/toolchain.json` pins the tree-sitter CLI release asset each Windows architecture generates latex and swift with, under `windows`
 - `.gitattributes` checks every file out as the bytes the repository holds, so a Windows checkout with `core.autocrlf` builds the same archive
+- A build on Linux on arm64: `dart run tool/build_tree_sitter_grammars.dart` compiles the runtime and every grammar with the first `clang` on `PATH` for `aarch64-linux-gnu`, at `-O3` with tree-sitter's assertions on, `-fPIC`, linked `-shared` with each file name as its soname and `-z defs`, into `libtree-sitter.so` and `dylibs/<language>/lib<language>.so`, each needing nothing but `libc.so.6`; `--release` packs them with GNU tar into `grammars-linux-arm64.tar.gz`, laid out as the macOS archive is
+- `tool/src/elf.dart` checks each shared object's machine, type, soname, dependencies, text relocations and exports, read from its ELF headers, as `tool/src/pe.dart` checks a DLL
+- `tool/toolchain.json` pins the tree-sitter CLI release asset Linux on arm64 generates latex and swift with, under `linux`
 
 ### Changed
 
 - `build_info.json` of a Windows build records its platform, LLVM's clang, the MSVC tools and the Windows SDK in place of the deployment target, Xcode's clang and the macOS SDK; a macOS build records what it did
+- `build_info.json` of a Linux build records its platform, clang and the glibc it links against, with the path of each, in place of the deployment target, Xcode's clang and the macOS SDK
 - `manifest.json` spells `dylib_dir` with `/` on every platform
 
 ## [1.4.0] - 2026-10-08
