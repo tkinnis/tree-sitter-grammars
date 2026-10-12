@@ -38,6 +38,40 @@ void main() {
     ).equals('x86_64-pc-windows-msvc');
   });
 
+  test('names the libraries and archive of Linux as Linux does', () {
+    const linux = BuildPlatform.linuxArm64;
+
+    check(linux.id).equals('linux-arm64');
+    check(linux.osName).equals('Linux');
+    check(linux.runtimeFileName).equals('libtree-sitter.so');
+    check(linux.libraryFileName('c-sharp')).equals('libc-sharp.so');
+    check(linux.isLibrary('dylibs/c/libc.so')).isTrue();
+    check(linux.isLibrary('dylibs/c/libc.dylib')).isFalse();
+    check(linux.releaseArchiveName).equals('grammars-linux-arm64.tar.gz');
+    check(
+      linux.dryRunArchiveName,
+    ).equals('grammars-linux-arm64.dry-run.tar.gz');
+    check(linux.linuxTarget).equals('aarch64-linux-gnu');
+    check(() => linux.windowsTarget).throws<StateError>();
+    check(() => BuildPlatform.windowsArm64.linuxTarget).throws<StateError>();
+  });
+
+  test('each operating system is one of the three, and only one', () {
+    for (final platform in BuildPlatform.values) {
+      check(
+        [
+          platform.isMacos,
+          platform.isLinux,
+          platform.isWindows,
+        ].where((it) => it),
+      ).length.equals(1);
+    }
+    check(BuildPlatform.isAnyLibrary('x/libx.so')).isTrue();
+    check(BuildPlatform.isAnyLibrary('x/x.dll')).isTrue();
+    check(BuildPlatform.isAnyLibrary('x/libx.dylib')).isTrue();
+    check(BuildPlatform.isAnyLibrary('x/config.json')).isFalse();
+  });
+
   test('parses each id and nothing else', () {
     for (final platform in BuildPlatform.values) {
       check(BuildPlatform.parse(platform.id)).equals(platform);
@@ -50,5 +84,6 @@ void main() {
     final host = BuildPlatform.host;
 
     check(host.isWindows).equals(Platform.isWindows);
-  }, testOn: 'mac-os || windows');
+    check(host.os).equals(Platform.operatingSystem);
+  }, testOn: 'mac-os || linux || windows');
 }

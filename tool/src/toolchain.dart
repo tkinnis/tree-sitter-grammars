@@ -1,6 +1,6 @@
 /// Reads `tool/toolchain.json`: the tree-sitter runtime, the tree-sitter CLI
-/// and the macOS target every build uses, and the CLI each Windows
-/// architecture generates with.
+/// and the macOS target every build uses, and the CLI each Linux and
+/// Windows architecture generates with.
 library;
 
 import 'dart:convert';
@@ -34,7 +34,7 @@ final class Toolchain {
     required this.arch,
     required this.deploymentTarget,
     this.runtimeExtraNotices = const [],
-    this.windowsCli = const {},
+    this.cliPins = const {},
   });
 
   /// Parses and checks the contents of `tool/toolchain.json`.
@@ -85,7 +85,7 @@ final class Toolchain {
         RegExp(r'^\d+\.\d+$'),
       ),
       runtimeExtraNotices: _paths(treeSitter, 'treeSitter.extraNotices'),
-      windowsCli: _windowsCli(root),
+      cliPins: _cliPins(root),
     );
     if (toolchain.runtimeVersion != toolchain.cliVersion) {
       throw ToolchainException(
@@ -132,10 +132,12 @@ final class Toolchain {
   /// `treeSitter.extraNotices`, empty when absent.
   final List<String> runtimeExtraNotices;
 
-  /// The CLI release asset each Windows architecture runs, by
-  /// [BuildPlatform.arch]: `windows.<arch>` of `toolchain.json`, empty when
-  /// it has no `windows` object. [cliVersion] is the release of each.
-  final Map<String, CliAsset> windowsCli;
+  /// The CLI release asset each architecture of an operating system other
+  /// than macOS runs, by [BuildPlatform.os] and then [BuildPlatform.arch]:
+  /// `<os>.<arch>` of `toolchain.json`, for example `linux.arm64`, with no
+  /// entry for an operating system it has no object of. [cliVersion] is the
+  /// release of each.
+  final Map<String, Map<String, CliAsset>> cliPins;
 
   /// [treeSitterTag] without its leading `v`, as the runtime's Makefile
   /// declares it.
@@ -145,15 +147,15 @@ final class Toolchain {
   Uri get cliUrl => _releaseAsset(cliAsset);
 
   /// The CLI release asset a build on [platform] runs: [cliAsset] on
-  /// macOS, and the asset `windows.<arch>` names on Windows.
+  /// macOS, and the asset `<os>.<arch>` names on Linux and Windows.
   ///
-  /// Throws a [ToolchainException] for a Windows architecture
-  /// `toolchain.json` pins no CLI for.
+  /// Throws a [ToolchainException] for an architecture `toolchain.json`
+  /// pins no CLI for.
   CliAsset cliFor(BuildPlatform platform) {
-    if (!platform.isWindows) return (asset: cliAsset, sha256: cliSha256);
-    return windowsCli[platform.arch] ??
+    if (platform.isMacos) return (asset: cliAsset, sha256: cliSha256);
+    return cliPins[platform.os]?[platform.arch] ??
         (throw ToolchainException(
-          'windows.${platform.arch} pins no CLI for ${platform.id}',
+          '${platform.os}.${platform.arch} pins no CLI for ${platform.id}',
         ));
   }
 
@@ -167,40 +169,44 @@ final class Toolchain {
   );
 }
 
-/// The optional `windows` object of [root]: for each Windows architecture
-/// a build targets, the CLI release asset it generates with and its sha256.
-Map<String, CliAsset> _windowsCli(Object? root) {
-  if (root is! Map<String, Object?> || root['windows'] == null) {
-    return const {};
-  }
-  final windows = _object(root, 'windows');
-  final architectures = {
+/// The optional `<os>` object of [root] for every operating system but
+/// macOS a build targets: for each of its architectures a build targets,
+/// the CLI release asset it generates with and its sha256.
+Map<String, Map<String, CliAsset>> _cliPins(Object? root) {
+  final pins = <String, Map<String, CliAsset>>{};
+  for (final os in {
     for (final platform in BuildPlatform.values)
-      if (platform.isWindows) platform.arch,
-  };
-  final assets = <String, CliAsset>{};
-  for (final arch in windows.keys) {
-    if (!architectures.contains(arch)) {
-      throw ToolchainException(
-        'windows.$arch is no Windows architecture a build targets; '
-        'those are ${architectures.join(', ')}',
+      if (!platform.isMacos) platform.os,
+  }) {
+    if (root is! Map<String, Object?> || root[os] == null) continue;
+    final object = _object(root, os);
+    final targeted = [
+      for (final platform in BuildPlatform.values)
+        if (platform.os == os) platform,
+    ];
+    final architectures = {for (final platform in targeted) platform.arch};
+    final osName = targeted.first.osName;
+    final assets = <String, CliAsset>{};
+    for (final arch in object.keys) {
+      if (!architectures.contains(arch)) {
+        throw ToolchainException(
+          '$os.$arch is no $osName architecture a build targets; '
+          'those are ${architectures.join(', ')}',
+        );
+      }
+      final pin = _object(object, arch);
+      assets[arch] = (
+        asset: _string(
+          pin,
+          '$os.$arch.cliAsset',
+          RegExp('^tree-sitter-$os-$arch\\.gz\$'),
+        ),
+        sha256: _string(pin, '$os.$arch.cliSha256', RegExp(r'^[0-9a-f]{64}$')),
       );
     }
-    final pin = _object(windows, arch);
-    assets[arch] = (
-      asset: _string(
-        pin,
-        'windows.$arch.cliAsset',
-        RegExp('^tree-sitter-windows-$arch\\.gz\$'),
-      ),
-      sha256: _string(
-        pin,
-        'windows.$arch.cliSha256',
-        RegExp(r'^[0-9a-f]{64}$'),
-      ),
-    );
+    pins[os] = assets;
   }
-  return assets;
+  return pins;
 }
 
 Map<String, Object?> _object(Object? root, String key) {

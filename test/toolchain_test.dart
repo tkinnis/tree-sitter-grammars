@@ -80,13 +80,61 @@ void main() {
     );
   });
 
-  test('a toolchain.json with no windows object builds for macOS only', () {
+  test('the committed toolchain.json pins a CLI for Linux on arm64', () {
+    final toolchain = Toolchain.parse(
+      File('tool/toolchain.json').readAsStringSync(),
+    );
+
+    check(toolchain.cliFor(BuildPlatform.linuxArm64)).equals((
+      asset: 'tree-sitter-linux-arm64.gz',
+      sha256:
+          '3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb',
+    ));
+    check(toolchain.cliUrlFor(BuildPlatform.linuxArm64).toString()).equals(
+      'https://github.com/tree-sitter/tree-sitter/releases/download/'
+      'v0.27.0/tree-sitter-linux-arm64.gz',
+    );
+  });
+
+  test('a toolchain.json with no windows or linux object builds for macOS '
+      'only', () {
     final toolchain = Toolchain.parse(jsonEncode(_valid()));
 
-    check(toolchain.windowsCli).isEmpty();
+    check(toolchain.cliPins).isEmpty();
     check(
       () => toolchain.cliFor(BuildPlatform.windowsArm64),
     ).throws<ToolchainException>();
+    check(() => toolchain.cliFor(BuildPlatform.linuxArm64))
+        .throws<ToolchainException>()
+        .has((e) => e.message, 'message')
+        .startsWith('linux.arm64 pins no CLI');
+  });
+
+  test('a Linux architecture no build targets is refused', () {
+    final json = _valid()
+      ..['linux'] = {
+        'x86': {'cliAsset': 'tree-sitter-linux-x86.gz', 'cliSha256': '0' * 64},
+      };
+
+    check(() => Toolchain.parse(jsonEncode(json)))
+        .throws<ToolchainException>()
+        .has((e) => e.message, 'message')
+        .startsWith('linux.x86 is no Linux architecture');
+  });
+
+  test('a Linux CLI asset of another operating system is refused', () {
+    final json = _valid()
+      ..['linux'] = {
+        'arm64': {
+          'cliAsset': 'tree-sitter-macos-arm64.gz',
+          'cliSha256': '0' * 64,
+        },
+      };
+
+    check(() => Toolchain.parse(jsonEncode(json)))
+        .throws<ToolchainException>()
+        .has((e) => e.message, 'message')
+        .startsWith('linux.arm64.cliAsset');
   });
 
   test('a Windows architecture no build targets is refused', () {

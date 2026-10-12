@@ -441,12 +441,14 @@ void main() {
           '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e',
       arch: 'arm64',
       deploymentTarget: '13.0',
-      windowsCli: {
-        'arm64': (
-          asset: 'tree-sitter-windows-arm64.gz',
-          sha256:
-              'b53d97b1291a30236a25f7298d4b4b14ada8558099461e3769cf0fca6db6fdec',
-        ),
+      cliPins: {
+        'windows': {
+          'arm64': (
+            asset: 'tree-sitter-windows-arm64.gz',
+            sha256:
+                'b53d97b1291a30236a25f7298d4b4b14ada8558099461e3769cf0fca6db6fdec',
+          ),
+        },
       },
     );
     const environment = {
@@ -560,7 +562,7 @@ void main() {
       check(record.containsKey('deploymentTarget')).isFalse();
       check(
         (record['treeSitterCli']! as Map)['sha256'],
-      ).equals(toolchain.windowsCli['arm64']!.sha256);
+      ).equals(toolchain.cliPins['windows']!['arm64']!.sha256);
       check(tools['msvcTools']).equals('14.44.35207');
       check(tools['msvcToolsPath']).equals(compiler.msvcToolsPath);
       check(tools['sdk']).equals('10.0.26100.0');

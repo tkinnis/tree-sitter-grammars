@@ -33,8 +33,11 @@ Toolchain _toolchain(String sha256) => Toolchain(
   cliSha256: sha256,
   arch: 'arm64',
   deploymentTarget: '13.0',
-  windowsCli: {
-    'arm64': (asset: 'tree-sitter-windows-arm64.gz', sha256: sha256),
+  cliPins: {
+    'linux': {'arm64': (asset: 'tree-sitter-linux-arm64.gz', sha256: sha256)},
+    'windows': {
+      'arm64': (asset: 'tree-sitter-windows-arm64.gz', sha256: sha256),
+    },
   },
 );
 
@@ -93,6 +96,27 @@ void main() {
       downloads,
     ).deepEquals([toolchain.cliUrlFor(BuildPlatform.windowsArm64)]);
     check(p.basename(cli)).equals('tree-sitter-0.27.0.exe');
+    check(File(cli).readAsStringSync()).equals(_executable);
+  });
+
+  test('on Linux, downloads the asset its architecture pins, with no '
+      'extension', () async {
+    final cli = await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: BuildPlatform.linuxArm64,
+    );
+
+    check(
+      downloads,
+    ).deepEquals([toolchain.cliUrlFor(BuildPlatform.linuxArm64)]);
+    check(
+      File(
+        cached('tree-sitter-0.27.0-tree-sitter-linux-arm64.gz'),
+      ).existsSync(),
+    ).isTrue();
+    check(p.basename(cli)).equals('tree-sitter-0.27.0');
     check(File(cli).readAsStringSync()).equals(_executable);
   });
 

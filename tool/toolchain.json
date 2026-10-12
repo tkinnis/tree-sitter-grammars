@@ -16,6 +16,12 @@
     "arch": "arm64",
     "deploymentTarget": "13.0"
   },
+  "linux": {
+    "arm64": {
+      "cliAsset": "tree-sitter-linux-arm64.gz",
+      "cliSha256": "3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb"
+    }
+  },
   "windows": {
     "arm64": {
       "cliAsset": "tree-sitter-windows-arm64.gz",

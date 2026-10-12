@@ -44,7 +44,9 @@ typedef PeImage = ({
 int peMachine(BuildPlatform platform) => switch (platform) {
   BuildPlatform.windowsArm64 => 0xaa64,
   BuildPlatform.windowsX64 => 0x8664,
-  BuildPlatform.macosArm64 => throw StateError('macOS builds no PE image'),
+  BuildPlatform.macosArm64 || BuildPlatform.linuxArm64 => throw StateError(
+    '${platform.osName} builds no PE image',
+  ),
 };
 
 /// Whether a library may import from the DLL [name]: `KERNEL32.dll`, and
