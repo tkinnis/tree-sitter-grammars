@@ -198,7 +198,7 @@ git -C tree-sitter checkout <commit of the tag>
 git add tree-sitter
 ```
 
-In `tool/toolchain.json`, set `treeSitter`'s `tag` and `commit`, `treeSitterCli`'s `version` and `sha256` to that release's `tree-sitter-macos-arm64.gz`, and each `windows.<arch>.cliSha256` to that release's `tree-sitter-windows-<arch>.gz`. Then record the digests afresh, regenerate the notices, build, and compare the build with the last release's extracted archive:
+In `tool/toolchain.json`, set `treeSitter`'s `tag` and `commit`, `treeSitterCli`'s `version` and `sha256` to that release's `tree-sitter-macos-arm64.gz`, each `linux.<arch>.cliSha256` to that release's `tree-sitter-linux-<arch>.gz`, and each `windows.<arch>.cliSha256` to that release's `tree-sitter-windows-<arch>.gz`. Then record the digests afresh, regenerate the notices, build, and compare the build with the last release's extracted archive:
 
 ```bash
 dart run tool/pin_grammars.dart --record-files
