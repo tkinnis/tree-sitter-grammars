@@ -243,11 +243,11 @@ Future<void> unpackTarGz(
         .skip(stripComponents)
         .toList();
     if (segments.isEmpty) continue;
-    if (segments.contains('..')) {
+    final path = p.joinAll([destination, ...segments]);
+    if (segments.any(_leavesItsDirectory) || !p.isWithin(destination, path)) {
       throw TarException('$archive: ${member.path} leads out of the archive');
     }
     final relative = segments.join('/');
-    final path = p.joinAll([destination, ...segments]);
     switch (member.type) {
       case TarMemberType.directory:
         Directory(path).createSync(recursive: true);
@@ -265,6 +265,17 @@ Future<void> unpackTarGz(
   }
   unpackedModes[p.normalize(p.absolute(destination))] = modes;
 }
+
+/// Whether the path segment [segment] of a tar member could lead a joined
+/// path out of the directory it is unpacked into: `..`, or, since Windows
+/// reads `\` as a separator and `C:` as a drive, any segment holding
+/// either, or one the host's path rules read as a root.
+bool _leavesItsDirectory(String segment) =>
+    segment == '..' ||
+    segment.contains(r'\') ||
+    segment.contains(':') ||
+    p.isAbsolute(segment) ||
+    p.rootPrefix(segment).isNotEmpty;
 
 /// The bytes of the file at [path] relative to the top-level directory
 /// of the gzip-compressed tar [archive], or null when it holds no such

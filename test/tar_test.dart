@@ -116,20 +116,35 @@ void main() {
     check(await tarGzFile(archive, 'missing.c')).isNull();
   });
 
-  test('refuses a member leading out of the destination', () async {
-    final archive = p.join(scratch, 'x.tar.gz');
-    File(archive).writeAsBytesSync(
-      gzipCompress(
-        ustar([
-          (path: 'top/../../evil', bytes: const [], mode: 0x1a4, epoch: 0),
-        ]),
-      ),
-    );
+  // Windows reads `\` as a separator and a drive letter as a root, so a
+  // member that names either can leave the destination there though no
+  // `/`-separated segment of it is `..`.
+  for (final (name, member) in [
+    ('through ..', 'top/../../evil'),
+    ('through a backslash', r'top/a\..\..\evil'),
+    ('through a drive letter', 'top/C:/evil'),
+    ('through a drive-relative path', 'top/C:evil'),
+    ('through a rooted path', r'top/\evil'),
+  ]) {
+    test('refuses a member leading out of the destination $name', () async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress(
+          ustar([(path: member, bytes: const [], mode: 0x1a4, epoch: 0)]),
+        ),
+      );
 
-    await check(
-      unpackTarGz(archive, p.join(scratch, 'out'), stripComponents: 1),
-    ).throws<TarException>();
-  });
+      await check(
+        unpackTarGz(
+          archive,
+          p.join(scratch, 'out', 'nested'),
+          stripComponents: 1,
+        ),
+      ).throws<TarException>();
+      check(File(p.join(scratch, 'evil')).existsSync()).isFalse();
+      check(File(p.join(scratch, 'out', 'evil')).existsSync()).isFalse();
+    });
+  }
 
   test('hashes a file as sha256 does', () async {
     final file = File(p.join(scratch, 'abc'))..writeAsStringSync('abc');
