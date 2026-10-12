@@ -1,6 +1,7 @@
 /// Checks each built Linux library's ELF header, dynamic section and
 /// exports, as `macho.dart` checks a macOS library's load commands and
-/// `pe.dart` a Windows library's PE headers.
+/// `pe.dart` a Windows library's PE headers, and reads the glibc versions
+/// it needs from its version-needed section.
 ///
 /// The file is read in Dart rather than through a tool's printout, so the
 /// check depends on no tool's version or output format.
@@ -39,6 +40,7 @@ typedef ElfImage = ({
   List<String> needed,
   bool textRelocations,
   List<String> exports,
+  Map<String, List<String>> versionsNeeded,
 });
 
 /// `ET_DYN`, the `e_type` of a shared object.
@@ -91,12 +93,18 @@ List<String> elfProblems(ElfExpectation expectation, BuildPlatform platform) {
   ];
 }
 
-/// Reads the machine, the type, the dynamic section and the exported
-/// dynamic symbols of the 64-bit little-endian ELF image [bytes].
+/// Reads the machine, the type, the dynamic section, the exported
+/// dynamic symbols and the version-needed section of the 64-bit
+/// little-endian ELF image [bytes].
 ///
 /// A symbol counts as exported when it is defined in a section, bound
 /// global or weak, and of default or protected visibility: what the
 /// dynamic linker resolves another object's reference to it with.
+///
+/// `versionsNeeded` holds, by the file each names, the symbol versions the
+/// version-needed section (`.gnu.version_r`, `SHT_GNU_verneed`) lists, for
+/// example `{'libc.so.6': ['GLIBC_2.17']}`: those the loader requires that
+/// file to define before it loads the image.
 ///
 /// Throws a [FormatException] for anything that is not such an image.
 ElfImage readElf(Uint8List bytes) {
@@ -157,10 +165,12 @@ ElfImage readElf(Uint8List bytes) {
 
   const dynamicSection = 6;
   const dynamicSymbols = 11;
+  const versionsNeededSection = 0x6ffffffe; // SHT_GNU_verneed
   String? soname;
   final needed = <String>[];
   var textRelocations = false;
   final exports = <String>[];
+  final versionsNeeded = <String, List<String>>{};
   for (var index = 0; index < sectionCount; index++) {
     final current = section(index);
     if (current.type == dynamicSection) {
@@ -195,6 +205,31 @@ ElfImage readElf(Uint8List bytes) {
           exports.add(string(current.link, u32(symbol)));
         }
       }
+    } else if (current.type == versionsNeededSection && current.size > 0) {
+      // Elf64_Verneed entries, each followed through vn_aux by its
+      // vn_cnt Elf64_Vernaux entries; vn_next and vna_next are byte
+      // offsets from the entry, 0 after the last.
+      final end = current.offset + current.size;
+      var entry = current.offset;
+      while (true) {
+        require(entry + 16 <= end, 'version need past its section');
+        require(u16(entry) == 1, 'version need of version ${u16(entry)}');
+        final names = versionsNeeded.putIfAbsent(
+          string(current.link, u32(entry + 4)),
+          () => [],
+        );
+        var aux = entry + u32(entry + 8);
+        for (var count = u16(entry + 2); count > 0; count--) {
+          require(aux + 16 <= end, 'version need entry past its section');
+          names.add(string(current.link, u32(aux + 8)));
+          final next = u32(aux + 12);
+          require(next != 0 || count == 1, 'version need entries end early');
+          aux += next;
+        }
+        final next = u32(entry + 12);
+        if (next == 0) break;
+        entry += next;
+      }
     }
   }
   return (
@@ -204,5 +239,82 @@ ElfImage readElf(Uint8List bytes) {
     needed: needed,
     textRelocations: textRelocations,
     exports: exports,
+    versionsNeeded: versionsNeeded,
   );
+}
+
+final _glibcVersionName = RegExp(r'^GLIBC_(\d+(?:\.\d+)*)$');
+
+/// The numbers of the glibc version the symbol version [name] names, for
+/// example `[2, 17]` for `GLIBC_2.17`; null for any other name, such as
+/// `GLIBC_PRIVATE`.
+List<int>? glibcVersion(String name) => _glibcVersionName
+    .firstMatch(name)
+    ?.group(1)!
+    .split('.')
+    .map(int.parse)
+    .toList();
+
+/// Orders the version numbers [a] and [b] number by number, a missing
+/// number counting as 0, so that 2.9 comes before 2.17.
+int compareVersions(List<int> a, List<int> b) {
+  for (var i = 0; i < a.length || i < b.length; i++) {
+    final order = (i < a.length ? a[i] : 0).compareTo(i < b.length ? b[i] : 0);
+    if (order != 0) return order;
+  }
+  return 0;
+}
+
+/// The glibc a set of libraries needs: the highest `GLIBC_` version any
+/// of [images], by path, names in its version-needed section, written as
+/// `build_info.json` records it (`2.17`), and the path of the first image
+/// that names it; null when none names one.
+({String version, String library})? glibcRequirement(
+  Map<String, ElfImage> images,
+) {
+  List<int>? highest;
+  String? library;
+  for (final MapEntry(key: path, value: image) in images.entries) {
+    for (final names in image.versionsNeeded.values) {
+      for (final version in names.map(glibcVersion).nonNulls) {
+        if (highest == null || compareVersions(version, highest) > 0) {
+          highest = version;
+          library = path;
+        }
+      }
+    }
+  }
+  return highest == null
+      ? null
+      : (version: highest.join('.'), library: library!);
+}
+
+/// [glibcRequirement] of the libraries at [paths], read from disk.
+///
+/// Throws a [FormatException] for a file that is no ELF image.
+({String version, String library})? readGlibcRequirement(List<String> paths) =>
+    glibcRequirement({
+      for (final path in paths) path: readElf(File(path).readAsBytesSync()),
+    });
+
+/// Every way [recorded], the `glibcRequirement` of `build_info.json`,
+/// differs from the [glibcRequirement] of the libraries at [paths]; empty
+/// when it is the version they need.
+///
+/// A file that is no ELF image is [elfProblems]' to report, and leaves
+/// nothing to compare.
+List<String> glibcRequirementProblems(Object? recorded, List<String> paths) {
+  final ({String version, String library})? needed;
+  try {
+    needed = readGlibcRequirement(paths);
+  } on FormatException {
+    return const [];
+  }
+  return [
+    if (needed == null)
+      'no library names the glibc version it needs'
+    else if (recorded != needed.version)
+      'build_info.json records the glibc requirement $recorded; '
+          '${needed.library} needs glibc ${needed.version}',
+  ];
 }
