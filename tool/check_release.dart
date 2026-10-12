@@ -36,7 +36,9 @@
 ///   toolchain's architecture with its `minos`, an `@rpath` install name
 ///   and no dependency beyond `libSystem`; on Linux, a shared object for
 ///   the platform's machine whose soname is its file name, which needs
-///   nothing but `libc.so.6` and has no text relocations; on Windows, a
+///   nothing but `libc.so.6` and has no text relocations, the highest
+///   `GLIBC_` version any of them names in its version-needed section
+///   being the `glibcRequirement` `build_info.json` records; on Windows, a
 ///   DLL for the platform's machine whose export table carries its file
 ///   name and which imports nothing but `KERNEL32.dll` and the Universal
 ///   CRT.
@@ -293,6 +295,7 @@ _check(
       runtimePath,
       p.join(sourceRoot, 'tree-sitter'),
       grammars,
+      info,
       problems,
     );
   } else if (_platform.isWindows) {
@@ -616,11 +619,14 @@ void _checkDlls(
 /// grammar's shared object must be what [elfProblems] requires, the
 /// runtime exporting every function of the `api.h` under [runtimeSource]
 /// that [_checkExports] requires through `dart:ffi`, and the allocator
-/// variables its `alloc.h` marks `TS_PUBLIC`.
+/// variables its `alloc.h` marks `TS_PUBLIC`; and the `glibcRequirement`
+/// [info] records must be the highest glibc version any of them needs, as
+/// [glibcRequirementProblems] reads it.
 void _checkElfLibraries(
   String runtimePath,
   String runtimeSource,
   List<_Grammar> grammars,
+  Map<String, Object?> info,
   List<String> problems,
 ) {
   final expectations = [
@@ -651,6 +657,16 @@ void _checkElfLibraries(
     'libraries: $good/${expectations.length} ${_platform.id} shared '
     'objects named as their files, position-independent, libc only',
   );
+  final glibc = glibcRequirementProblems(info['glibcRequirement'], [
+    for (final expectation in expectations) expectation.path,
+  ]);
+  problems.addAll(glibc);
+  if (glibc.isEmpty) {
+    print(
+      'glibc: ${info['glibcRequirement']} and later, as build_info.json '
+      'records',
+    );
+  }
 }
 
 Future<void> _checkLibraries(

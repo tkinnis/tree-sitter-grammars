@@ -83,6 +83,7 @@ Map<String, Object?> _info(
               release: null,
               toolchain: _toolchain,
               compiler: _compiler,
+              glibcRequirement: null,
               flags: flags,
               grammarFlags: grammarFlags ?? _grammarFlags(),
               repositoryCommit: '77ac13625d220bcf955cb12f697e438238c774e0',
@@ -121,6 +122,34 @@ void main() {
       check(list.where((flag) => flag.contains('NDEBUG'))).isEmpty();
       check(list).contains('-mmacosx-version-min=13.0');
     }
+  });
+
+  test('build_info of a macOS build records what it did before Linux '
+      'builds recorded a glibc requirement', () {
+    final record = _info(flags);
+
+    check(record.keys).deepEquals([
+      'release',
+      'platform',
+      'deploymentTarget',
+      'repository',
+      'treeSitter',
+      'treeSitterCli',
+      'toolchain',
+      'sources',
+      'generated',
+    ]);
+    check((record['toolchain']! as Map).keys).deepEquals([
+      'clang',
+      'clangPath',
+      'sdk',
+      'sdkBuild',
+      'sdkPath',
+      'git',
+      'gzip',
+      'tar',
+      'flags',
+    ]);
   });
 
   test('build_info records the tools that write the bundles', () {
@@ -510,6 +539,7 @@ void main() {
                   release: null,
                   toolchain: toolchain,
                   compiler: compiler,
+                  glibcRequirement: '2.17',
                   flags: linuxFlags,
                   grammarFlags: {
                     'json':
@@ -581,13 +611,24 @@ void main() {
       ).deepEquals(['-Wl,-soname,libjson.so']);
     });
 
-    test('records the platform, the compiler, the C library and the CLI it '
-        'runs', () {
+    test('records the platform, the glibc its libraries need, the compiler, '
+        'the build host\'s C library and the CLI it runs', () {
       final record = info();
       final tools = record['toolchain']! as Map<String, Object?>;
 
       check(record['platform']).equals('linux-arm64');
-      check(record.containsKey('deploymentTarget')).isFalse();
+      check(record['glibcRequirement']).equals('2.17');
+      check(record.keys).deepEquals([
+        'release',
+        'platform',
+        'glibcRequirement',
+        'repository',
+        'treeSitter',
+        'treeSitterCli',
+        'toolchain',
+        'sources',
+        'generated',
+      ]);
       check(
         (record['treeSitterCli']! as Map)['sha256'],
       ).equals(toolchain.cliPins['linux']!['arm64']!.sha256);
@@ -734,6 +775,7 @@ void main() {
                   release: null,
                   toolchain: toolchain,
                   compiler: compiler,
+                  glibcRequirement: null,
                   flags: windowsFlags,
                   grammarFlags: {
                     'json': {
@@ -797,7 +839,16 @@ void main() {
       final tools = record['toolchain']! as Map<String, Object?>;
 
       check(record['platform']).equals('windows-arm64');
-      check(record.containsKey('deploymentTarget')).isFalse();
+      check(record.keys).deepEquals([
+        'release',
+        'platform',
+        'repository',
+        'treeSitter',
+        'treeSitterCli',
+        'toolchain',
+        'sources',
+        'generated',
+      ]);
       check(
         (record['treeSitterCli']! as Map)['sha256'],
       ).equals(toolchain.cliPins['windows']!['arm64']!.sha256);

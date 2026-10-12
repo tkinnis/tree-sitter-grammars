@@ -200,8 +200,8 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
   final runsOn = switch (platform.os) {
     'windows' => 'Windows 10 and later on ${platform.arch}',
     'linux' =>
-      'Linux on ${platform.arch} with '
-          '${(info['toolchain'] as Map?)?['hostLibc'] ?? 'glibc'} and later',
+      'Linux on ${platform.arch} with glibc ${info['glibcRequirement']} and '
+          'later',
     _ => 'macOS ${info['deploymentTarget']} and later on arm64',
   };
   return 'tree-sitter ${treeSitter['tag']} (${treeSitter['commit']}), '

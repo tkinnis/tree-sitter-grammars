@@ -332,6 +332,7 @@ Future<void> _build(String root, _Options options) async {
   );
 
   _step('Checking every library');
+  String? glibcRequirement;
   if (platform.isLinux) {
     _requireNone('libraries', [
       ...elfProblems(
@@ -356,6 +357,23 @@ Future<void> _build(String root, _Options options) async {
           platform,
         ),
     ]);
+    final needed = readGlibcRequirement([
+      p.join(outputDirectory, platform.runtimeFileName),
+      for (final build in builds)
+        p.join(
+          outputDirectory,
+          build.dylibDirectory,
+          build.libraryFileName(platform),
+        ),
+    ]);
+    _requireNone('libraries', [
+      if (needed == null) 'no library names the glibc version it needs',
+    ]);
+    glibcRequirement = needed!.version;
+    print(
+      '  glibc ${needed.version} and later, as '
+      '${p.relative(needed.library, from: outputDirectory)} needs',
+    );
   } else if (platform.isWindows) {
     _requireNone('libraries', [
       ...dllProblems(
@@ -422,6 +440,7 @@ Future<void> _build(String root, _Options options) async {
     release: release,
     toolchain: toolchain,
     compiler: compiler,
+    glibcRequirement: glibcRequirement,
     flags: flags,
     grammarFlags: {
       for (final build in builds)

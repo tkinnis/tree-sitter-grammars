@@ -244,17 +244,19 @@ void main() {
       );
   });
 
-  test('the notes of a Linux archive name it and the glibc it was built '
-      'against', () {
+  test('the notes of a Linux archive name it and the glibc its libraries '
+      'need, not the one it was built on', () {
     final notes = releaseNotes({
       'platform': 'linux-arm64',
+      'glibcRequirement': '2.17',
       'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
       'toolchain': {'hostLibc': 'glibc 2.43'},
       'sources': const <String, Object?>{},
     }, 'aa');
 
     check(notes)
-      ..contains('Linux on arm64 with glibc 2.43 and later')
+      ..contains('Linux on arm64 with glibc 2.17 and later')
+      ..not((it) => it.contains('2.43'))
       ..contains('`grammars-linux-arm64.tar.gz`: sha256 `aa`')
       ..not((it) => it.contains('macOS'));
   });
