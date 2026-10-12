@@ -5,15 +5,19 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/parse_process.dart';
 import '../tool/src/release_check.dart' show composeQuery, queryFiles;
 import '../tool/src/tree_sitter_ffi.dart';
 
 /// The built `output/` whose runtime and JSON grammar these tests run.
 final _output = p.absolute('output');
-final _runtime = p.join(_output, 'libtree-sitter.dylib');
+final _runtime = p.join(_output, BuildPlatform.host.runtimeFileName);
 final _grammar = p.join(_output, 'dylibs', 'json');
-final _library = p.join(_grammar, 'libjson.dylib');
+final _library = p.join(_grammar, BuildPlatform.host.libraryFileName('json'));
+
+/// A library file name of this platform that no file has.
+final _missing = BuildPlatform.host.libraryFileName('none');
 
 void main() {
   final built = File(_runtime).existsSync() && File(_library).existsSync();
@@ -94,7 +98,7 @@ void main() {
             ..writeAsStringSync(
               jsonEncode({
                 'runtime': _runtime,
-                'library': p.join(scratch.path, 'libnone.dylib'),
+                'library': p.join(scratch.path, _missing),
                 'symbol': 'none',
                 'queries': _grammar,
                 'files': <String>[],
@@ -112,7 +116,7 @@ void main() {
           ]);
 
           check(run.exitCode).equals(1);
-          check(run.stderr as String).contains('libnone.dylib');
+          check(run.stderr as String).contains(_missing);
           check(results.readAsStringSync()).isEmpty();
         },
       );
