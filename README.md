@@ -360,7 +360,7 @@ Each language has a `config.json` with metadata and editor settings:
 
 ## Creating Releases
 
-A release is built, packed and published on a Mac by the local commands below.
+A release is built, packed and published on a Mac by the local commands below; its Windows archives are built afterwards from the assets it published (step 4).
 
 1. Tag a clean `HEAD` with an annotated tag:
 
@@ -389,7 +389,17 @@ git push origin v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --publish
 ```
 
-`--publish` runs on macOS only: it creates the release, and a build on Windows, whose source bundles are compressed by another gzip and so have other sha256s, cannot attach its archive to a release another build created. `--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
+`--publish` runs on macOS only, since it creates the release with the source bundles the macOS build packed; a build on Windows attaches its archive to that release instead (step 4). `--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
+
+4. On Windows, build the same tag from the release's own assets, then attach the archive and its `.sha256` to the release:
+
+```bash
+gh release download v1.1.0 --repo tkinnis/tree-sitter-grammars --dir ../v1.1.0-assets
+dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets
+gh release upload v1.1.0 --repo tkinnis/tree-sitter-grammars output/grammars-windows-arm64.tar.gz output/grammars-windows-arm64.tar.gz.sha256
+```
+
+A build on Windows that packs its own source bundles compresses them with `dart:io`'s zlib rather than macOS's `/usr/bin/gzip -n -9`, so their sha256s, which its `build_info.json` records and its archive carries, are not those of the bundles the release attaches. With `--sources` it copies the release's bundles byte for byte into `output/sources/` and records their sha256s, so the Windows archive's `build_info.json` names assets the release has. Attaching it is a step of its own, since `--publish` creates a release and this one already exists.
 
 ### Rebuilding a Release from Its Source Bundles
 

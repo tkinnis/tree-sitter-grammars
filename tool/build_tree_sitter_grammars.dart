@@ -159,11 +159,13 @@ Future<void> _build(String root, _Options options) async {
   if (publish && platform.isWindows) {
     // A release is created once, with the macOS archive and the source
     // bundles it was built from; publishing creates it, so a second
-    // platform's archive cannot be published the same way.
+    // platform's archive cannot be published the same way. It is built
+    // from the release's downloaded bundles instead, so the bundle sha256s
+    // its build_info.json records are those of assets the release has.
     throw const BuildException(
       '--publish creates the release from a build on macOS; a build on '
-      'Windows packs its archive with --release, and attaching it to the '
-      'release is not automated',
+      'Windows packs its archive with --release=<tag> --sources=<the '
+      "release's downloaded assets>, and is attached with gh release upload",
     );
   }
   final bundles = sources == null ? null : _sourcesDirectory(root, sources);
