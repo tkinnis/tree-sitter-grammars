@@ -8,14 +8,12 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
 import 'compiler.dart';
 import 'toolchain.dart';
 
 /// This repository's canonical URL, which names the archive's origin.
 const repositoryUrl = 'https://github.com/tkinnis/tree-sitter-grammars';
-
-/// The only variables a compiler invocation may see.
-const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 
 /// The contents of `output/build_info.json`.
 ///
@@ -27,6 +25,10 @@ const allowedCompilerVariables = {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 /// by grammar, as `generatedRecord` writes it; [packingTools] the versions
 /// `packingToolVersions` reads of the git, gzip and tar that write the
 /// bundles and the archive.
+///
+/// A macOS build records its deployment target and Xcode's clang and SDK;
+/// a Windows build records LLVM's clang, the MSVC tools and the Windows
+/// SDK, each with its path, in their place.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -42,8 +44,11 @@ Map<String, Object?> buildInfo({
   required Map<String, String> packingTools,
 }) => {
   'release': release,
-  'platform': 'macos-${toolchain.arch}',
-  'deploymentTarget': toolchain.deploymentTarget,
+  'platform': compiler.platform.isWindows
+      ? compiler.platform.id
+      : 'macos-${toolchain.arch}',
+  if (!compiler.platform.isWindows)
+    'deploymentTarget': toolchain.deploymentTarget,
   'repository': {
     'url': repositoryUrl,
     'commit': repositoryCommit,
@@ -57,14 +62,21 @@ Map<String, Object?> buildInfo({
   },
   'treeSitterCli': {
     'version': toolchain.cliVersion,
-    'sha256': toolchain.cliSha256,
+    'sha256': toolchain.cliFor(compiler.platform).sha256,
   },
   'toolchain': {
     'clang': compiler.version,
     'clangPath': compiler.path,
-    'sdk': compiler.sdkVersion,
-    'sdkBuild': compiler.sdkBuildVersion,
-    'sdkPath': compiler.sdkPath,
+    if (compiler.platform.isWindows) ...{
+      'msvcTools': compiler.msvcToolsVersion,
+      'msvcToolsPath': compiler.msvcToolsPath,
+      'sdk': compiler.sdkVersion,
+      'sdkPath': compiler.sdkPath,
+    } else ...{
+      'sdk': compiler.sdkVersion,
+      'sdkBuild': compiler.sdkBuildVersion,
+      'sdkPath': compiler.sdkPath,
+    },
     'git': packingTools['git'],
     'gzip': packingTools['gzip'],
     'tar': packingTools['tar'],
@@ -136,12 +148,17 @@ List<CompileCommand> parseCompileCommands(String json) => [
 /// define `NDEBUG` either, and every one of those records must have been
 /// passed. The runtime must have one invocation and each of [grammarNames]
 /// one link, every object a link names must have been compiled, and no
-/// invocation may see a variable outside [allowedCompilerVariables].
+/// invocation may see a variable outside [allowedCompilerVariablesOf] the
+/// platform [info] records, macOS when it records none.
 List<String> buildFlagProblems(
   Map<String, Object?> info,
   List<CompileCommand> commands,
   Set<String> grammarNames,
 ) {
+  final platform =
+      BuildPlatform.parse(info['platform']) ?? BuildPlatform.macosArm64;
+  final allowed = allowedCompilerVariablesOf(platform);
+  String kindOf(String output) => _kind(output, platform);
   final toolchain = info['toolchain']! as Map<String, Object?>;
   final recorded = (toolchain['flags']! as Map<String, Object?>);
   final clang = toolchain['clangPath']! as String;
@@ -163,14 +180,14 @@ List<String> buildFlagProblems(
   ];
   final compiled = {
     for (final command in commands)
-      if (_kind(command.output) == 'grammarCompile')
+      if (kindOf(command.output) == 'grammarCompile')
         p.normalize(p.join(command.directory, command.output)),
   };
   final passed = <String>{};
   final linked = <String>{};
   var runtimes = 0;
   for (final command in commands) {
-    final kind = _kind(command.output);
+    final kind = kindOf(command.output);
     final grammar = p.basename(p.dirname(command.output));
     final invocation = kind == 'grammarCompile'
         ? '${p.basenameWithoutExtension(command.output)}.c'
@@ -201,11 +218,11 @@ List<String> buildFlagProblems(
     final shape = switch (kind) {
       'runtime' => _runtimeTailProblem(tail, command.output),
       'grammarCompile' => _compileTailProblem(tail, command.output, invocation),
-      _ => _linkTailProblem(own, tail, command.output),
+      _ => _linkTailProblem(own, tail, command.output, platform),
     };
     if (shape != null) problems.add('${command.output}: $shape');
     final stray = command.environment.keys.where(
-      (name) => !allowedCompilerVariables.contains(name),
+      (name) => !allowed.contains(name),
     );
     if (stray.isNotEmpty) {
       problems.add('${command.output}: environment has ${stray.join(', ')}');
@@ -228,7 +245,9 @@ List<String> buildFlagProblems(
   }
   if (runtimes != 1) problems.add('$runtimes runtime invocations, not 1');
   for (final name in grammarNames) {
-    if (!linked.contains('lib$name.dylib')) problems.add('$name: never linked');
+    if (!linked.contains(platform.libraryFileName(name))) {
+      problems.add('$name: never linked');
+    }
   }
   if (linked.length != grammarNames.length) {
     problems.add('${linked.length} links for ${grammarNames.length} grammars');
@@ -268,7 +287,8 @@ List<String> checkRecordedFlags({
   return buildFlagProblems(info, commands, grammarNames);
 }
 
-String _kind(String output) => p.basename(output) == 'libtree-sitter.dylib'
+String _kind(String output, BuildPlatform platform) =>
+    p.basename(output) == platform.runtimeFileName
     ? 'runtime'
     : output.endsWith('.o')
     ? 'grammarCompile'
@@ -300,12 +320,20 @@ String? _compileTailProblem(List<String> tail, String output, String source) =>
 
 /// Whether a link passing [own] flags and then [tail] writes [output]
 /// under its own install name from objects only; the problem, or null.
-String? _linkTailProblem(List<String> own, List<String> tail, String output) {
+///
+/// A Windows DLL has no install name to check: its export table carries
+/// the file name its link writes.
+String? _linkTailProblem(
+  List<String> own,
+  List<String> tail,
+  String output,
+  BuildPlatform platform,
+) {
   final installName = '-Wl,-install_name,@rpath/${p.basename(output)}';
   final objects = tail.length < 3
       ? const <String>[]
       : tail.sublist(0, tail.length - 2);
-  if (!own.contains(installName)) {
+  if (!platform.isWindows && !own.contains(installName)) {
     return 'its recorded flags name no install name $installName';
   }
   return tail.length >= 3 &&

@@ -182,8 +182,8 @@ void ts_parser_delete(
       final queries = composeAll(['tsx']);
 
       check(problems).deepEquals([
-        "queries/ecma/l.scm: no grammar's l.scm inherits it, so nothing "
-            'reads it',
+        "${p.join('queries', 'ecma', 'l.scm')}: no grammar's l.scm inherits "
+            'it, so nothing reads it',
       ]);
       check(queries.queryOnlyCount).equals(3);
       check(queries.queryOnlyReadCount).equals(2);

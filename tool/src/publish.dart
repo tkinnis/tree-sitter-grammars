@@ -7,6 +7,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
+
 /// The GitHub repository releases are published to.
 const releaseRepository = 'tkinnis/tree-sitter-grammars';
 
@@ -193,9 +195,14 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
             '`${record['commit']}` | `${p.basename('${record['file']}')}` | '
             '`${record['sha256']}` |',
   ];
+  final platform =
+      BuildPlatform.parse(info['platform']) ?? BuildPlatform.macosArm64;
+  final runsOn = platform.isWindows
+      ? 'Windows 10 and later on ${platform.arch}'
+      : 'macOS ${info['deploymentTarget']} and later on arm64';
   return 'tree-sitter ${treeSitter['tag']} (${treeSitter['commit']}), '
-      'macOS ${info['deploymentTarget']} and later on arm64.\n\n'
-      '`grammars-macos-arm64.tar.gz`: sha256 `$archiveSha256`.\n\n'
+      '$runsOn.\n\n'
+      '`${platform.releaseArchiveName}`: sha256 `$archiveSha256`.\n\n'
       'Every repository the release compiles from, at the commit it pins, '
       'is attached as the source bundle named below, and so are the '
       'sources the pinned CLI generates for a grammar that commits none; '

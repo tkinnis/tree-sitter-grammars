@@ -166,9 +166,11 @@ void main() {
       ).deepEquals(['(a)', null, '(b)', '(c)', null, '(d)']);
       check(result.failures.map((failure) => failure.index)).deepEquals([1, 4]);
       for (final failure in result.failures) {
+        // abort() on Windows ends the process by a fail-fast, not a signal.
         check(failure.problem).equals(
-          'the parse ended the process with SIGABRT: Assertion failed: '
-          '(stand-in)',
+          'the parse ended the process with '
+          '${Platform.isWindows ? 'STATUS_STACK_BUFFER_OVERRUN (0xC0000409)' : 'SIGABRT'}: '
+          'Assertion failed: (stand-in)',
         );
       }
     });
@@ -360,6 +362,20 @@ void main() {
       check(parseProcessProblem(0, 'a warning\n')).isNull();
     });
 
+    test('a process an exception ends on Windows names the exception', () {
+      check(parseProcessProblem(-1073741819, 'faulted\n')).equals(
+        'the parse ended the process with STATUS_ACCESS_VIOLATION '
+        '(0xC0000005): faulted',
+      );
+      check(parseProcessProblem(-1073740791, '')).equals(
+        'the parse ended the process with STATUS_STACK_BUFFER_OVERRUN '
+        '(0xC0000409)',
+      );
+      check(
+        parseProcessProblem(3, 'Assertion failed!\n'),
+      ).equals('the parse exited 3: Assertion failed!');
+    }, testOn: 'windows');
+
     test('a process a signal ends names the signal and what it said', () {
       check(
         parseProcessProblem(-6, '\nAssertion failed: (length <= 1024)\nmore\n'),
@@ -373,7 +389,7 @@ void main() {
       check(
         parseProcessProblem(-30, ''),
       ).equals('the parse ended the process with signal 30');
-    });
+    }, testOn: '!windows');
 
     test('a process that exits non-zero, or runs too long, fails', () {
       check(

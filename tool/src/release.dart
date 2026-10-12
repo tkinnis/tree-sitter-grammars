@@ -1,5 +1,6 @@
-/// Checks that the repository is in a state a release builds from, and
-/// names the archive a build packs.
+/// Checks that the repository is in a state a release builds from.
+///
+/// `BuildPlatform.releaseArchiveName` names the archive a build packs.
 library;
 
 import 'git.dart';
@@ -13,14 +14,6 @@ final class ReleaseException implements Exception {
   @override
   String toString() => message;
 }
-
-/// The release asset a build packs for `macos-arm64`.
-const releaseArchiveName = 'grammars-macos-arm64.tar.gz';
-
-/// The archive a `--dry-run` build packs: the bytes a tagged build of the
-/// same commit packs, under a name no release asset has, so it is never
-/// mistaken for or uploaded as the release.
-const dryRunArchiveName = 'grammars-macos-arm64.dry-run.tar.gz';
 
 /// Requires the repository at [root] to have a clean working tree and,
 /// unless [dryRun], [release] to be an annotated tag under `refs/tags/`

@@ -465,7 +465,8 @@ void main() {
 
       check(read('tool/query_provenance.json')).equals(provenance);
       check(staging()).isEmpty();
-    });
+      // chflags, which makes a file refuse its replacement, is macOS's.
+    }, testOn: 'mac-os');
 
     test('removes an import only after writing the provenance', () async {
       await run(request());
@@ -483,7 +484,8 @@ void main() {
       check(rerun.removals).deepEquals(['queries/mylang/folds.scm']);
       check(exists('queries/mylang/folds.scm')).isFalse();
       check(readRepositoryProvenance(root).problems).isEmpty();
-    });
+      // chflags, which makes a file refuse its removal, is macOS's.
+    }, testOn: 'mac-os');
 
     test(
       'refuses a planned path that is not a file, writing nothing',
@@ -1005,8 +1007,14 @@ void main() {
   });
 
   group('the command', () {
-    Future<ProcessResult> command(List<String> args) =>
-        Process.run('dart', ['run', 'tool/bootstrap_language.dart', ...args]);
+    // Dart writes UTF-8, which Process.run would otherwise decode by the
+    // console's code page on Windows.
+    Future<ProcessResult> command(List<String> args) => Process.run(
+      'dart',
+      ['run', 'tool/bootstrap_language.dart', ...args],
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
+    );
 
     test('exits 64 with its usage for arguments it does not take', () async {
       final result = await command(['--language=Nix']);

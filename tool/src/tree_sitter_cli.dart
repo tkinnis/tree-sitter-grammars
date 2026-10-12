@@ -6,7 +6,9 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
 import 'compiler.dart';
+import 'tar.dart';
 import 'toolchain.dart';
 
 /// Thrown when the CLI cannot be supplied or a generation fails.
@@ -19,8 +21,10 @@ final class CliException implements Exception {
   String toString() => message;
 }
 
-/// The sha256 of [path], as `shasum -a 256` computes it.
+/// The sha256 of [path], as `shasum -a 256` computes it; on Windows, which
+/// has no `shasum`, as [dartFileSha256] does.
 Future<String> sha256Of(String path) async {
+  if (Platform.isWindows) return dartFileSha256(path);
   final result = await Process.run('shasum', ['-a', '256', path]);
   if (result.exitCode != 0) {
     throw CliException('shasum $path failed: ${result.stderr}');
@@ -34,36 +38,46 @@ typedef Downloader = Future<void> Function(Uri url, String destination);
 /// Returns the path of the pinned CLI under [root]`/.cache/`, fetching its
 /// release asset with [download] when it is absent or its digest is wrong.
 ///
-/// The asset's sha256 is checked against `toolchain.json` every time, and
-/// the executable is decompressed afresh from the checked asset, so a
-/// modified executable in the cache never runs. Throws a [CliException]
-/// when the fetched asset's digest is not the pinned one.
+/// The asset is the one `toolchain.json` pins for [platform], by default
+/// the platform this process runs on, and its executable ends in `.exe` on
+/// Windows. The asset's sha256 is checked against `toolchain.json` every
+/// time, and the executable is decompressed afresh from the checked asset,
+/// so a modified executable in the cache never runs. Throws a
+/// [CliException] when the fetched asset's digest is not the pinned one.
 Future<String> ensureCli(
   String root,
   Toolchain toolchain, {
   Downloader download = _download,
+  BuildPlatform? platform,
 }) async {
+  platform ??= BuildPlatform.host;
+  final pinned = toolchain.cliFor(platform);
+  final url = toolchain.cliUrlFor(platform);
   final cache = Directory(p.join(root, '.cache'))..createSync(recursive: true);
   final asset = p.join(
     cache.path,
     'tree-sitter-${toolchain.cliVersion}-'
-    '${toolchain.cliAsset}',
+    '${pinned.asset}',
   );
-  if (!File(asset).existsSync() ||
-      await sha256Of(asset) != toolchain.cliSha256) {
-    await download(toolchain.cliUrl, asset);
+  if (!File(asset).existsSync() || await sha256Of(asset) != pinned.sha256) {
+    await download(url, asset);
   }
   final digest = await sha256Of(asset);
-  if (digest != toolchain.cliSha256) {
+  if (digest != pinned.sha256) {
     throw CliException(
-      '${toolchain.cliUrl} has sha256 $digest, '
-      'toolchain.json expects ${toolchain.cliSha256}',
+      '$url has sha256 $digest, '
+      'toolchain.json expects ${pinned.sha256}',
     );
   }
-  final executable = p.join(cache.path, 'tree-sitter-${toolchain.cliVersion}');
+  final executable = p.join(
+    cache.path,
+    'tree-sitter-${toolchain.cliVersion}${platform.isWindows ? '.exe' : ''}',
+  );
   File(
     executable,
   ).writeAsBytesSync(gzip.decode(File(asset).readAsBytesSync()), flush: true);
+  // NTFS has no execute bit to set: Windows runs any .exe.
+  if (Platform.isWindows) return executable;
   final chmod = await Process.run('chmod', ['755', executable]);
   if (chmod.exitCode != 0) throw CliException('chmod: ${chmod.stderr}');
   return executable;

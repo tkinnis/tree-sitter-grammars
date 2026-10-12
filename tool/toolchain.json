@@ -15,5 +15,15 @@
   "macos": {
     "arch": "arm64",
     "deploymentTarget": "13.0"
+  },
+  "windows": {
+    "arm64": {
+      "cliAsset": "tree-sitter-windows-arm64.gz",
+      "cliSha256": "b53d97b1291a30236a25f7298d4b4b14ada8558099461e3769cf0fca6db6fdec"
+    },
+    "x64": {
+      "cliAsset": "tree-sitter-windows-x64.gz",
+      "cliSha256": "2d6c014b4e91d3d302ba7b30b3b625914027c3861ae7817e068a273e3f034550"
+    }
   }
 }

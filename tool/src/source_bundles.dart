@@ -15,6 +15,7 @@ import 'package:path/path.dart' as p;
 import 'git.dart';
 import 'grammar_pins.dart';
 import 'source_patches.dart';
+import 'tar.dart';
 import 'toolchain.dart';
 
 /// The directory of `output/` holding the bundles.
@@ -89,19 +90,62 @@ List<PinnedSource> pinnedSources(
       ),
 ];
 
-/// The executables every bundle is packed and unpacked with, named by path
-/// so a different `git`, `tar` or `gzip` earlier on `PATH` never writes the
-/// bytes. `/usr/bin/git` runs the git of the Xcode that `xcrun` selects,
-/// honouring `DEVELOPER_DIR`, as the build's clang does.
-const bundleGit = '/usr/bin/git';
+/// The git every bundle is written with, named by path so a different
+/// `git` earlier on `PATH` never writes the bytes.
+///
+/// On macOS it is `/usr/bin/git`, which runs the git of the Xcode that
+/// `xcrun` selects, honouring `DEVELOPER_DIR`, as the build's clang does.
+/// Windows has no git of fixed path, so there it is the first `git.exe` on
+/// `PATH`, resolved once to its absolute path, which `build_info.json`
+/// records beside its version.
+String get bundleGit => Platform.isWindows ? _windowsGit : '/usr/bin/git';
+
+/// The executables a build on macOS packs and unpacks with; a build on
+/// Windows does both in Dart, with `tar.dart`.
 const _tar = '/usr/bin/tar';
 const _gzip = '/usr/bin/gzip';
+
+final String _windowsGit = _onPath('git.exe');
+
+/// The absolute path of the first [executable] in a directory `PATH`
+/// lists; throws a [SourceBundleException] when there is none.
+String _onPath(String executable) {
+  for (final directory in (Platform.environment['PATH'] ?? '').split(';')) {
+    if (directory.isEmpty) continue;
+    final candidate = p.join(directory, executable);
+    if (File(candidate).existsSync()) return p.normalize(candidate);
+  }
+  throw SourceBundleException('no $executable on PATH');
+}
+
+/// What a build on Windows records as the gzip and the tar that write its
+/// bundles and archive: `dart:io`'s zlib, whose output can change with the
+/// Dart release, and `tool/src/tar.dart`'s ustar writer.
+String get _dartGzip =>
+    'dart:io GZipCodec level 9, Dart ${Platform.version.split(' ').first}';
+const _dartTar = 'tool/src/tar.dart ustar';
 
 /// The first line of `--version` of each tool whose output lands in the
 /// bundles or the archive, by name: [bundleGit], which writes each bundle's
 /// tar, and `/usr/bin/gzip` and `/usr/bin/tar`, which compress the bundles
 /// and pack the archive.
+///
+/// On Windows, gzip and tar are Dart's, recorded as [_dartGzip] and
+/// [_dartTar].
 Future<Map<String, String>> packingToolVersions() async {
+  if (Platform.isWindows) {
+    final git = await Process.run(bundleGit, ['--version']);
+    if (git.exitCode != 0) {
+      throw SourceBundleException(
+        '$bundleGit --version exited ${git.exitCode}: ${git.stderr}',
+      );
+    }
+    return {
+      'git': '${git.stdout}'.trim().split('\n').first.trim(),
+      'gzip': _dartGzip,
+      'tar': _dartTar,
+    };
+  }
   final versions = <String, String>{};
   for (final (name, executable) in [
     ('git', bundleGit),
@@ -133,7 +177,9 @@ Future<Map<String, String>> packingToolVersions() async {
 /// system's configuration, with no attributes file, no line-ending
 /// conversion and a `tar.umask` of 0022; `gzip -n -9` compresses it with no
 /// name or time. The same commit therefore packs to the same bytes with the
-/// same git and gzip, whose versions [packingToolVersions] reads.
+/// same git and gzip, whose versions [packingToolVersions] reads. On
+/// Windows, `dart:io`'s zlib compresses it at level 9 instead, as
+/// [gzipCompress] does.
 /// [environment] replaces this process's environment as the one git's
 /// isolation starts from.
 Future<void> packBundle(
@@ -165,6 +211,17 @@ Future<void> packBundle(
     environment: environment,
     executable: bundleGit,
   );
+  if (Platform.isWindows) {
+    try {
+      File(bundle).writeAsBytesSync(
+        gzipCompress(File(tar).readAsBytesSync()),
+        flush: true,
+      );
+    } finally {
+      File(tar).deleteSync();
+    }
+    return;
+  }
   try {
     final gzip = await Process.start(_gzip, ['-n', '-9', '-c', tar]);
     final written = gzip.stdout.pipe(File(bundle).openWrite());
@@ -183,11 +240,22 @@ Future<void> packBundle(
 
 /// Unpacks [bundle] into [destination], which must not exist yet, without
 /// its top-level directory.
+///
+/// On Windows [unpackTarGz] unpacks it, recording each file's mode, which
+/// NTFS cannot hold, for `unpackedFiles` to read.
 Future<void> unpackBundle(String bundle, String destination) async {
   if (FileSystemEntity.typeSync(destination) != FileSystemEntityType.notFound) {
     throw SourceBundleException('$destination already exists');
   }
   Directory(destination).createSync(recursive: true);
+  if (Platform.isWindows) {
+    try {
+      await unpackTarGz(bundle, destination, stripComponents: 1);
+    } on Exception catch (error) {
+      throw SourceBundleException('could not unpack $bundle: $error');
+    }
+    return;
+  }
   final result = await Process.run(_tar, [
     '-xzf',
     bundle,
@@ -207,6 +275,10 @@ Future<void> unpackBundle(String bundle, String destination) async {
 /// when the bundle holds no such file.
 Future<String?> bundleFile(String bundle, String path) async {
   final member = '${_prefix(bundle)}/$path';
+  if (Platform.isWindows) {
+    final bytes = await tarGzFile(bundle, path);
+    return bytes == null ? null : utf8.decode(bytes);
+  }
   final result = await Process.run(_tar, [
     '-xzOf',
     bundle,
@@ -235,8 +307,10 @@ Future<String?> bundleCommit(String bundle) async {
   return await git.exitCode == 0 ? (await commit).trim() : null;
 }
 
-/// The sha256 of the file at [path].
+/// The sha256 of the file at [path]: `/usr/bin/shasum`'s on macOS, and on
+/// Windows, which has no such tool of fixed path, [dartFileSha256]'s.
 Future<String> fileSha256(String path) async {
+  if (Platform.isWindows) return dartFileSha256(path);
   final result = await Process.run('/usr/bin/shasum', ['-a', '256', path]);
   if (result.exitCode != 0) {
     throw SourceBundleException('shasum $path failed: ${result.stderr}');

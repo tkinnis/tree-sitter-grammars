@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 
 import '../tool/src/files_digest.dart';
 import '../tool/src/source_bundles.dart';
+import '../tool/src/tar.dart';
 import 'support/git_fixture.dart';
 
 void main() {
@@ -23,8 +24,18 @@ void main() {
       'bin/run': bytes('#!/bin/sh\n'),
       'z/ä.txt': bytes('umlaut\n'),
     });
-    await Process.run('/bin/chmod', ['755', p.join(upstream.path, 'bin/run')]);
-    Link(p.join(upstream.path, 'link')).createSync('src/parser.c');
+    if (Platform.isWindows) {
+      // NTFS has no execute bit for chmod to set, and a build on Windows
+      // unpacks no symbolic link, so the fixture records the bit in the
+      // index alone and commits no link.
+      await upstream.git(['update-index', '--chmod=+x', 'bin/run']);
+    } else {
+      await Process.run('/bin/chmod', [
+        '755',
+        p.join(upstream.path, 'bin/run'),
+      ]);
+      Link(p.join(upstream.path, 'link')).createSync('src/parser.c');
+    }
     await upstream.git([
       'update-index',
       '--add',
@@ -52,7 +63,7 @@ void main() {
       '100644 src/parser.c',
       '100755 bin/run',
       '100644 z/ä.txt',
-      '120000 link',
+      if (!Platform.isWindows) '120000 link',
     ]);
     check(
       await filesDigest(await unpackedFiles(tree)),
@@ -65,7 +76,12 @@ void main() {
 
     File(p.join(tree, 'src/parser.c')).writeAsStringSync('int parse(int);\n');
     final changed = await filesDigest(await unpackedFiles(tree));
-    await Process.run('/bin/chmod', ['644', p.join(tree, 'bin/run')]);
+    if (Platform.isWindows) {
+      // The bit unpackedFiles reads on Windows is the one the bundle gave.
+      unpackedModes[p.normalize(p.absolute(tree))]!['bin/run'] = 0x1a4;
+    } else {
+      await Process.run('/bin/chmod', ['644', p.join(tree, 'bin/run')]);
+    }
     final unexecutable = await filesDigest(await unpackedFiles(tree));
 
     check({original, changed, unexecutable}).length.equals(3);
@@ -84,11 +100,11 @@ void main() {
         0,
       ]);
 
-    final shasum = await Process.run('/usr/bin/shasum', [
-      '-a',
-      '256',
-      listing.path,
-    ]);
+    // Computed by another tool than the code under test: shasum on macOS,
+    // and on Windows the openssl Git for Windows carries.
+    final shasum = Platform.isWindows
+        ? await Process.run('openssl', ['dgst', '-sha256', '-r', listing.path])
+        : await Process.run('/usr/bin/shasum', ['-a', '256', listing.path]);
     check(digest).equals('${shasum.stdout}'.split(' ').first);
     check(filesDigestPattern.hasMatch(digest)).isTrue();
   });

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/toolchain.dart';
 
 Map<String, Object?> _valid() => {
@@ -56,6 +57,66 @@ void main() {
         .throws<ToolchainException>()
         .has((e) => e.message, 'message')
         .contains('differs from treeSitter.tag');
+  });
+
+  test('the committed toolchain.json pins a CLI for each Windows '
+      'architecture', () {
+    final toolchain = Toolchain.parse(
+      File('tool/toolchain.json').readAsStringSync(),
+    );
+
+    check(
+      toolchain.cliFor(BuildPlatform.macosArm64).asset,
+    ).equals('tree-sitter-macos-arm64.gz');
+    check(
+      toolchain.cliFor(BuildPlatform.windowsArm64).asset,
+    ).equals('tree-sitter-windows-arm64.gz');
+    check(
+      toolchain.cliFor(BuildPlatform.windowsX64).asset,
+    ).equals('tree-sitter-windows-x64.gz');
+    check(toolchain.cliUrlFor(BuildPlatform.windowsArm64).toString()).equals(
+      'https://github.com/tree-sitter/tree-sitter/releases/download/'
+      'v0.27.0/tree-sitter-windows-arm64.gz',
+    );
+  });
+
+  test('a toolchain.json with no windows object builds for macOS only', () {
+    final toolchain = Toolchain.parse(jsonEncode(_valid()));
+
+    check(toolchain.windowsCli).isEmpty();
+    check(
+      () => toolchain.cliFor(BuildPlatform.windowsArm64),
+    ).throws<ToolchainException>();
+  });
+
+  test('a Windows architecture no build targets is refused', () {
+    final json = _valid()
+      ..['windows'] = {
+        'arm': {
+          'cliAsset': 'tree-sitter-windows-arm.gz',
+          'cliSha256': '0' * 64,
+        },
+      };
+
+    check(() => Toolchain.parse(jsonEncode(json)))
+        .throws<ToolchainException>()
+        .has((e) => e.message, 'message')
+        .startsWith('windows.arm is no Windows architecture');
+  });
+
+  test('a Windows CLI asset of another architecture is refused', () {
+    final json = _valid()
+      ..['windows'] = {
+        'arm64': {
+          'cliAsset': 'tree-sitter-windows-x64.gz',
+          'cliSha256': '0' * 64,
+        },
+      };
+
+    check(() => Toolchain.parse(jsonEncode(json)))
+        .throws<ToolchainException>()
+        .has((e) => e.message, 'message')
+        .startsWith('windows.arm64.cliAsset');
   });
 
   test('an architecture other than arm64 is refused', () {

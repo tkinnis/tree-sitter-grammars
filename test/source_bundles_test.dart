@@ -78,15 +78,21 @@ void main() {
     );
 
     check(await bundleCommit(bundle)).equals(first);
-  });
+    // Windows has no git of fixed path: bundleGit is the git.exe on PATH.
+  }, testOn: '!windows');
 
   test('the packing tools report their versions', () async {
     final versions = await packingToolVersions();
 
     check(versions.keys).unorderedEquals(['git', 'gzip', 'tar']);
     check(versions['git']!).startsWith('git version ');
-    check(versions['gzip']!).contains('gzip');
-    check(versions['tar']!).contains('tar');
+    if (Platform.isWindows) {
+      check(versions['gzip']!).startsWith('dart:io GZipCodec level 9, Dart ');
+      check(versions['tar']!).equals('tool/src/tar.dart ustar');
+    } else {
+      check(versions['gzip']!).contains('gzip');
+      check(versions['tar']!).contains('tar');
+    }
   });
 
   test('a bundle unpacks to the commit\'s tree and names its commit', () async {

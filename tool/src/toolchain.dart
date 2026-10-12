@@ -1,9 +1,15 @@
 /// Reads `tool/toolchain.json`: the tree-sitter runtime, the tree-sitter CLI
-/// and the macOS target every build uses.
+/// and the macOS target every build uses, and the CLI each Windows
+/// architecture generates with.
 library;
 
 import 'dart:convert';
 import 'dart:io';
+
+import 'build_platform.dart';
+
+/// The tree-sitter CLI release asset one platform runs, and its sha256.
+typedef CliAsset = ({String asset, String sha256});
 
 /// Thrown when `tool/toolchain.json` is missing a field or holds a value
 /// that cannot be right.
@@ -28,6 +34,7 @@ final class Toolchain {
     required this.arch,
     required this.deploymentTarget,
     this.runtimeExtraNotices = const [],
+    this.windowsCli = const {},
   });
 
   /// Parses and checks the contents of `tool/toolchain.json`.
@@ -78,6 +85,7 @@ final class Toolchain {
         RegExp(r'^\d+\.\d+$'),
       ),
       runtimeExtraNotices: _paths(treeSitter, 'treeSitter.extraNotices'),
+      windowsCli: _windowsCli(root),
     );
     if (toolchain.runtimeVersion != toolchain.cliVersion) {
       throw ToolchainException(
@@ -124,15 +132,75 @@ final class Toolchain {
   /// `treeSitter.extraNotices`, empty when absent.
   final List<String> runtimeExtraNotices;
 
+  /// The CLI release asset each Windows architecture runs, by
+  /// [BuildPlatform.arch]: `windows.<arch>` of `toolchain.json`, empty when
+  /// it has no `windows` object. [cliVersion] is the release of each.
+  final Map<String, CliAsset> windowsCli;
+
   /// [treeSitterTag] without its leading `v`, as the runtime's Makefile
   /// declares it.
   String get runtimeVersion => treeSitterTag.substring(1);
 
   /// Where the CLI release asset is downloaded from.
-  Uri get cliUrl => Uri.parse(
+  Uri get cliUrl => _releaseAsset(cliAsset);
+
+  /// The CLI release asset a build on [platform] runs: [cliAsset] on
+  /// macOS, and the asset `windows.<arch>` names on Windows.
+  ///
+  /// Throws a [ToolchainException] for a Windows architecture
+  /// `toolchain.json` pins no CLI for.
+  CliAsset cliFor(BuildPlatform platform) {
+    if (!platform.isWindows) return (asset: cliAsset, sha256: cliSha256);
+    return windowsCli[platform.arch] ??
+        (throw ToolchainException(
+          'windows.${platform.arch} pins no CLI for ${platform.id}',
+        ));
+  }
+
+  /// Where [platform]'s CLI release asset is downloaded from.
+  Uri cliUrlFor(BuildPlatform platform) =>
+      _releaseAsset(cliFor(platform).asset);
+
+  Uri _releaseAsset(String asset) => Uri.parse(
     'https://github.com/tree-sitter/tree-sitter/'
-    'releases/download/v$cliVersion/$cliAsset',
+    'releases/download/v$cliVersion/$asset',
   );
+}
+
+/// The optional `windows` object of [root]: for each Windows architecture
+/// a build targets, the CLI release asset it generates with and its sha256.
+Map<String, CliAsset> _windowsCli(Object? root) {
+  if (root is! Map<String, Object?> || root['windows'] == null) {
+    return const {};
+  }
+  final windows = _object(root, 'windows');
+  final architectures = {
+    for (final platform in BuildPlatform.values)
+      if (platform.isWindows) platform.arch,
+  };
+  final assets = <String, CliAsset>{};
+  for (final arch in windows.keys) {
+    if (!architectures.contains(arch)) {
+      throw ToolchainException(
+        'windows.$arch is no Windows architecture a build targets; '
+        'those are ${architectures.join(', ')}',
+      );
+    }
+    final pin = _object(windows, arch);
+    assets[arch] = (
+      asset: _string(
+        pin,
+        'windows.$arch.cliAsset',
+        RegExp('^tree-sitter-windows-$arch\\.gz\$'),
+      ),
+      sha256: _string(
+        pin,
+        'windows.$arch.cliSha256',
+        RegExp(r'^[0-9a-f]{64}$'),
+      ),
+    );
+  }
+  return assets;
 }
 
 Map<String, Object?> _object(Object? root, String key) {

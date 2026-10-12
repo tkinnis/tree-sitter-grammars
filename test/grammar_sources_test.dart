@@ -210,7 +210,20 @@ void main() {
       await extractCommit(upstream.path, linked, path('out'));
 
       check(Link(path('out/src/alias.c')).targetSync()).equals('parser.c');
-    });
+    }, testOn: '!windows');
+
+    test('on Windows, refuses a committed symbolic link', () async {
+      Link(path('tree-sitter-x/src/alias.c')).createSync('parser.c');
+      final linked = await upstream.commit({});
+
+      await check(
+        extractCommit(upstream.path, linked, path('out')),
+      ).throws<GrammarSourceException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .contains('src/alias.c is a symbolic link'),
+      );
+    }, testOn: 'windows');
 
     test('refuses a destination that already exists', () async {
       Directory(path('out')).createSync();

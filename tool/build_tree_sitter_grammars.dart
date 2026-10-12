@@ -26,25 +26,27 @@
 /// what it generates is packed into `output/sources/` too; with
 /// `--sources`, it is taken from `<dir>` instead and no CLI runs. Every
 /// tree compiled, generated or not, must have the digest its pin records.
-/// Every library is compiled by Xcode's clang with the flags in
-/// `tool/src/compiler.dart`, and `output/build_info.json` records them and
-/// every bundle's sha256.
+/// Every library is compiled for the platform the build runs on (see
+/// `tool/src/build_platform.dart`): by Xcode's clang on macOS and by LLVM's
+/// clang on Windows, with the flags in `tool/src/compiler.dart`, and
+/// `output/build_info.json` records them and every bundle's sha256.
 ///
 /// `--release=vX.Y.Z` first requires a clean working tree whose `HEAD` is
 /// the annotated tag `vX.Y.Z`, and reads this repository's own files (its
 /// pins, query files, provenance and licences) from that commit's tree,
 /// extracted into `build/repository`, never from the working tree. It packs
-/// `output/` into `output/grammars-macos-arm64.tar.gz` only if `HEAD` is
-/// still that commit and the working tree still clean once every check has
-/// passed. `--dry-run` skips only the tag requirement and packs the same
-/// bytes into
-/// `output/grammars-macos-arm64.dry-run.tar.gz`, a name no release asset
+/// `output/` into `output/grammars-<platform>.tar.gz`, for example
+/// `grammars-macos-arm64.tar.gz`, only if `HEAD` is still that commit and
+/// the working tree still clean once every check has passed. `--dry-run`
+/// skips only the tag requirement and packs the same bytes into
+/// `output/grammars-<platform>.dry-run.tar.gz`, a name no release asset
 /// has. Packing also writes the archive's sha256 beside it and the release
-/// notes into `output/release-notes.md`. `--publish` then creates the
-/// GitHub release of the pushed tag with the archive, its sha256,
-/// `build_info.json` and every source and generated bundle attached; it
-/// refuses a release that exists, so an asset is never replaced, and a tag
-/// on GitHub that is not the local tag naming the built commit.
+/// notes into `output/release-notes.md`. `--publish`, on macOS only, then
+/// creates the GitHub release of the pushed tag with the archive, its
+/// sha256, `build_info.json` and every source and generated bundle
+/// attached; it refuses a release that exists, so an asset is never
+/// replaced, and a tag on GitHub that is not the local tag naming the
+/// built commit.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
 /// every check passes, so a failed build leaves no `output/`. Any failure
@@ -56,6 +58,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/build_platform.dart';
 import 'src/build_record.dart';
 import 'src/compiler.dart';
 import 'src/generated_sources.dart';
@@ -66,12 +69,14 @@ import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/manifest.dart';
 import 'src/notices.dart';
+import 'src/pe.dart';
 import 'src/pool.dart';
 import 'src/publish.dart';
 import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/release.dart';
 import 'src/release_archive.dart';
+import 'src/release_check.dart' show apiFunctions, wasmOnlyFunctions;
 import 'src/source_bundles.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
@@ -146,6 +151,22 @@ Future<void> main(List<String> args) async {
 
 Future<void> _build(String root, _Options options) async {
   final (:release, :dryRun, :publish, :sources) = options;
+  final BuildPlatform platform;
+  try {
+    platform = BuildPlatform.host;
+  } on BuildPlatformException catch (error) {
+    throw BuildException('$error');
+  }
+  if (publish && platform.isWindows) {
+    // A release is created once, with the macOS archive and the source
+    // bundles it was built from; publishing creates it, so a second
+    // platform's archive cannot be published the same way.
+    throw const BuildException(
+      '--publish creates the release from a build on macOS; a build on '
+      'Windows packs its archive with --release, and attaching it to the '
+      'release is not automated',
+    );
+  }
   final bundles = sources == null ? null : _sourcesDirectory(root, sources);
   // output/ holds only a build that passed every check: it is removed
   // before anything can fail, and the build fills build/out/ and moves it
@@ -207,6 +228,8 @@ Future<void> _build(String root, _Options options) async {
   _writeNotices(
     inputs,
     outputDirectory,
+    platform,
+    [for (final build in builds) build.name],
     NoticesInput(
       toolchain: toolchain,
       runtimeDirectory: runtimeDirectory,
@@ -226,6 +249,7 @@ Future<void> _build(String root, _Options options) async {
       ? await _generate(
           root,
           toolchain,
+          platform,
           generated,
           outputDirectory,
           languageVersions.current,
@@ -238,20 +262,39 @@ Future<void> _build(String root, _Options options) async {
           bundles,
         );
 
-  _step('Compiling the runtime and ${builds.length} grammars');
-  final compiler = await Compiler.resolve();
+  _step(
+    'Compiling the runtime and ${builds.length} grammars for ${platform.id}',
+  );
+  final compiler = await Compiler.resolve(platform);
   final flags = BuildFlags(toolchain, compiler);
   final environment = compilerEnvironment(Platform.environment);
-  print(
-    '  ${compiler.version}\n  ${compiler.path}\n'
-    '  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})',
-  );
+  print('  ${compiler.version}\n  ${compiler.path}');
+  if (platform.isWindows) {
+    print(
+      '  MSVC tools ${compiler.msvcToolsVersion}\n'
+      '  Windows SDK ${compiler.sdkVersion}',
+    );
+    // The runtime's link reads its exports from this file, written from
+    // the api.h of the runtime it compiles.
+    File(
+      p.normalize(p.join(runtimeDirectory, runtimeModuleDefinitionPath)),
+    ).writeAsStringSync(
+      runtimeModuleDefinition(
+        File(
+          p.join(runtimeDirectory, 'lib', 'include', 'tree_sitter', 'api.h'),
+        ).readAsStringSync(),
+        platform.runtimeFileName,
+      ),
+    );
+  } else {
+    print('  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
+  }
   final runtime = runtimeCommand(
     compiler: compiler,
     flags: flags,
     directory: runtimeDirectory,
     output: p.relative(
-      p.join(outputDirectory, 'libtree-sitter.dylib'),
+      p.join(outputDirectory, platform.runtimeFileName),
       from: runtimeDirectory,
     ),
     environment: environment,
@@ -280,30 +323,66 @@ Future<void> _build(String root, _Options options) async {
   );
 
   _step('Checking every library');
-  final expectations = [
-    LibraryExpectation(
-      path: p.join(outputDirectory, 'libtree-sitter.dylib'),
-      installName: '@rpath/libtree-sitter.dylib',
-      exportedSymbols: const ['_ts_parser_new', '_ts_language_abi_version'],
-    ),
-    for (final build in builds)
-      LibraryExpectation(
-        path: p.join(
-          outputDirectory,
-          build.dylibDirectory,
-          build.dylibFileName,
+  if (platform.isWindows) {
+    _requireNone('libraries', [
+      ...dllProblems(
+        DllExpectation(
+          path: p.join(outputDirectory, platform.runtimeFileName),
+          name: platform.runtimeFileName,
+          exportedSymbols: apiFunctions(
+            File(
+              p.join(
+                runtimeDirectory,
+                'lib',
+                'include',
+                'tree_sitter',
+                'api.h',
+              ),
+            ).readAsStringSync(),
+          ).where((f) => !wasmOnlyFunctions.contains(f)).toList(),
         ),
-        installName: '@rpath/${build.dylibFileName}',
-        exportedSymbols: ['_tree_sitter_${build.symbol}'],
+        platform,
       ),
-  ];
-  _requireNone('libraries', [
-    for (final problems in await pooled(
-      expectations,
-      (e) => libraryProblems(e, toolchain),
-    ))
-      ...problems,
-  ]);
+      for (final build in builds)
+        ...dllProblems(
+          DllExpectation(
+            path: p.join(
+              outputDirectory,
+              build.dylibDirectory,
+              build.libraryFileName(platform),
+            ),
+            name: build.libraryFileName(platform),
+            exportedSymbols: ['tree_sitter_${build.symbol}'],
+          ),
+          platform,
+        ),
+    ]);
+  } else {
+    final expectations = [
+      LibraryExpectation(
+        path: p.join(outputDirectory, 'libtree-sitter.dylib'),
+        installName: '@rpath/libtree-sitter.dylib',
+        exportedSymbols: const ['_ts_parser_new', '_ts_language_abi_version'],
+      ),
+      for (final build in builds)
+        LibraryExpectation(
+          path: p.join(
+            outputDirectory,
+            build.dylibDirectory,
+            build.dylibFileName,
+          ),
+          installName: '@rpath/${build.dylibFileName}',
+          exportedSymbols: ['_tree_sitter_${build.symbol}'],
+        ),
+    ];
+    _requireNone('libraries', [
+      for (final problems in await pooled(
+        expectations,
+        (e) => libraryProblems(e, toolchain),
+      ))
+        ...problems,
+    ]);
+  }
 
   _step('Writing query bundles, manifest.json and build_info.json');
   final manifest = _writeBundles(
@@ -322,7 +401,8 @@ Future<void> _build(String root, _Options options) async {
     compiler: compiler,
     flags: flags,
     grammarFlags: {
-      for (final build in builds) build.name: _grammarFlagRecord(root, build),
+      for (final build in builds)
+        build.name: _grammarFlagRecord(root, build, platform),
     },
     repositoryCommit:
         commit ?? (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
@@ -352,9 +432,10 @@ Future<void> _build(String root, _Options options) async {
   final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
 
   print(
-    '\n✓ Built libtree-sitter.dylib, ${builds.length} grammar dylibs and '
+    '\n✓ Built ${platform.runtimeFileName}, ${builds.length} grammar '
+    'libraries and '
     '${manifest.values.where((e) => e['queryOnly'] == true).length} '
-    'query-only bundles into output/',
+    'query-only bundles for ${platform.id} into output/',
   );
   if (release != null && commit != null) {
     _step('Packing $release${dryRun ? ' (dry run)' : ''}');
@@ -362,6 +443,7 @@ Future<void> _build(String root, _Options options) async {
       root,
       output.path,
       commit,
+      platform,
       dryRun: dryRun,
     );
     print('  ${archive.path}\n  sha256 ${archive.sha256}');
@@ -480,11 +562,21 @@ List<String> _provenanceProblems(
 
 /// Writes `THIRD_PARTY_NOTICES.md` into [outputDirectory] and requires the
 /// committed copy at [root] to be the same text.
-void _writeNotices(String root, String outputDirectory, NoticesInput input) {
+///
+/// The committed text names each library as macOS does; the archive of
+/// [platform] carries it with [noticesFor] naming the runtime and each of
+/// [grammarNames] as [platform] does.
+void _writeNotices(
+  String root,
+  String outputDirectory,
+  BuildPlatform platform,
+  List<String> grammarNames,
+  NoticesInput input,
+) {
   final notices = thirdPartyNotices(input);
   File(p.join(outputDirectory, noticesFileName))
     ..createSync(recursive: true)
-    ..writeAsStringSync(notices);
+    ..writeAsStringSync(noticesFor(platform, notices, grammarNames));
   final committed = File(p.join(root, noticesFileName));
   if (!committed.existsSync() || committed.readAsStringSync() != notices) {
     throw BuildException(
@@ -556,6 +648,7 @@ Future<void> _requireRuntimeSubmodule(String root, Toolchain toolchain) async {
 Future<Map<String, Map<String, Object?>>> _generate(
   String root,
   Toolchain toolchain,
+  BuildPlatform platform,
   List<GrammarBuild> generated,
   String outputDirectory,
   int abi,
@@ -565,7 +658,7 @@ Future<Map<String, Map<String, Object?>>> _generate(
     'Generating ${generated.map((b) => b.name).join(', ')} with '
     'tree-sitter ${toolchain.cliVersion}',
   );
-  final cli = await ensureCli(root, toolchain);
+  final cli = await ensureCli(root, toolchain, platform: platform);
   final records = <String, Map<String, Object?>>{};
   for (final build in generated) {
     final directory = p.join(root, build.generatedDirectory);
@@ -654,12 +747,15 @@ List<(String, String)> _grammarSources(String root, GrammarBuild build) => [
 /// The flags each of [build]'s invocations passes beyond the shared lists,
 /// as `build_info.json` records them: each source's, by file name, and the
 /// link's under `link`.
-Map<String, List<String>> _grammarFlagRecord(String root, GrammarBuild build) =>
-    {
-      for (final (source, include) in _grammarSources(root, build))
-        p.basename(source): grammarSourceFlags(include),
-      'link': grammarLinkFlags(build.name),
-    };
+Map<String, List<String>> _grammarFlagRecord(
+  String root,
+  GrammarBuild build,
+  BuildPlatform platform,
+) => {
+  for (final (source, include) in _grammarSources(root, build))
+    p.basename(source): grammarSourceFlags(include),
+  'link': grammarLinkFlags(build.name, platform: platform),
+};
 
 /// The compile of each of [build]'s sources, then its link, in order.
 List<CompileCommand> _grammarCommands(
@@ -693,7 +789,12 @@ List<CompileCommand> _grammarCommands(
       directory: root,
       libraryName: build.name,
       objects: [for (final compile in compiles) compile.output],
-      output: p.join('build', 'out', build.dylibDirectory, build.dylibFileName),
+      output: p.join(
+        'build',
+        'out',
+        build.dylibDirectory,
+        build.libraryFileName(compiler.platform),
+      ),
       environment: environment,
     ),
   ];
@@ -775,11 +876,19 @@ Future<void> _checkRecords(
   );
   _requireNone('recorded flags', problems);
   print('  every compiler invocation passed exactly the recorded flags');
-  final validation = await Process.run(Platform.resolvedExecutable, [
-    'run',
-    p.join('tool', 'validate_manifest.dart'),
-    p.join(outputDirectory, 'manifest.json'),
-  ], workingDirectory: root);
+  final validation = await Process.run(
+    Platform.resolvedExecutable,
+    [
+      'run',
+      p.join('tool', 'validate_manifest.dart'),
+      p.join(outputDirectory, 'manifest.json'),
+    ],
+    workingDirectory: root,
+    // Dart writes UTF-8 whatever the console's code page, which
+    // Process.run would otherwise decode the output by on Windows.
+    stdoutEncoding: utf8,
+    stderrEncoding: utf8,
+  );
   if (validation.exitCode != 0) {
     throw BuildException(
       'validate_manifest.dart exited '
@@ -792,11 +901,13 @@ Future<void> _checkRecords(
 /// Requires `tool/check_release.dart` to pass on [outputDirectory], in a
 /// process of its own because it loads every library it checks.
 Future<void> _checkRelease(String root, String outputDirectory) async {
-  final result = await Process.run(Platform.resolvedExecutable, [
-    'run',
-    p.join('tool', 'check_release.dart'),
-    outputDirectory,
-  ], workingDirectory: root);
+  final result = await Process.run(
+    Platform.resolvedExecutable,
+    ['run', p.join('tool', 'check_release.dart'), outputDirectory],
+    workingDirectory: root,
+    stdoutEncoding: utf8,
+    stderrEncoding: utf8,
+  );
   for (final line in '${result.stdout}'.trim().split('\n')) {
     print('  $line');
   }
@@ -828,27 +939,28 @@ Future<Map<String, String>> _releaseAssets(
   };
 }
 
-/// Packs `output/` into [releaseArchiveName], or into [dryRunArchiveName]
-/// when [dryRun], and writes its sha256 beside it; returns the archive's
-/// path and sha256.
+/// Packs `output/` into [platform]'s `releaseArchiveName`, or into its
+/// `dryRunArchiveName` when [dryRun], and writes its sha256 beside it;
+/// returns the archive's path and sha256.
 ///
-/// Every file is given mode 0644 (0755 for a dylib and a directory) and
+/// Every file is given mode 0644 (0755 for a library and a directory) and
 /// the time of [commit], the commit built, first, so the same build packs
 /// to the same bytes.
 Future<({String path, String sha256})> _createReleaseArchive(
   String root,
   String outputDirectory,
-  String commit, {
+  String commit,
+  BuildPlatform platform, {
   required bool dryRun,
 }) async {
   final archive = p.join(
     outputDirectory,
-    dryRun ? dryRunArchiveName : releaseArchiveName,
+    dryRun ? platform.dryRunArchiveName : platform.releaseArchiveName,
   );
   final epoch = int.parse(
     (await runGit(root, ['log', '-1', '--format=%ct', commit])).trim(),
   );
-  final files = archiveFiles(outputDirectory);
+  final files = archiveFiles(outputDirectory, platform: platform);
   await normalizeArchiveFiles(outputDirectory, files, epoch);
   await packArchive(outputDirectory, files, archive);
   final sha256 = await fileSha256(archive);

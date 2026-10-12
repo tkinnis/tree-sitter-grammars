@@ -1,11 +1,20 @@
 /// Packs `output/` into the release archive, byte for byte the same each
 /// time the same build is packed.
+///
+/// On macOS `/usr/bin/tar` and `/usr/bin/gzip` pack it from files whose
+/// modes and times `chmod` and `touch` have set. Windows has neither tool
+/// at a fixed path, nor modes to set, so there `tar.dart` writes the same
+/// headers from the same rules in Dart and `dart:io`'s zlib compresses
+/// them.
 library;
 
 import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+
+import 'build_platform.dart';
+import 'tar.dart';
 
 /// Thrown when the archive cannot be packed.
 final class ArchiveException implements Exception {
@@ -17,8 +26,8 @@ final class ArchiveException implements Exception {
   String toString() => message;
 }
 
-/// The top-level entries of `output/` the archive carries; `dylibs/` and
-/// `queries/` contribute every file beneath them.
+/// The top-level entries of `output/` a macOS archive carries; `dylibs/`
+/// and `queries/` contribute every file beneath them.
 const archiveEntries = [
   'libtree-sitter.dylib',
   'dylibs',
@@ -28,14 +37,24 @@ const archiveEntries = [
   'THIRD_PARTY_NOTICES.md',
 ];
 
-/// Every file the archive carries, relative to [outputDirectory], sorted by
-/// code unit.
+/// The top-level entries of `output/` the archive of [platform] carries:
+/// [archiveEntries], with the runtime as [platform] names it.
+List<String> archiveEntriesOf(BuildPlatform platform) => [
+  platform.runtimeFileName,
+  ...archiveEntries.skip(1),
+];
+
+/// Every file the archive of [platform] carries, relative to
+/// [outputDirectory], sorted by code unit.
 ///
-/// Throws an [ArchiveException] when an entry of [archiveEntries] is
+/// Throws an [ArchiveException] when an entry of [archiveEntriesOf] is
 /// missing, or when anything under it is neither a file nor a directory.
-List<String> archiveFiles(String outputDirectory) {
+List<String> archiveFiles(
+  String outputDirectory, {
+  BuildPlatform platform = BuildPlatform.macosArm64,
+}) {
   final files = <String>[];
-  for (final entry in archiveEntries) {
+  for (final entry in archiveEntriesOf(platform)) {
     final path = p.join(outputDirectory, entry);
     switch (FileSystemEntity.typeSync(path, followLinks: false)) {
       case FileSystemEntityType.file:
@@ -66,11 +85,21 @@ List<String> archiveFiles(String outputDirectory) {
 /// Gives every one of [files] and every directory holding them the mode and
 /// time the archive records: 0755 for a dylib and a directory, 0644 for
 /// anything else, and [epoch] (seconds since 1970, UTC) as the time.
+///
+/// On Windows only the files' times are set: NTFS has no modes, and
+/// [packArchive] writes each file's mode by [_archiveMode] instead.
 Future<void> normalizeArchiveFiles(
   String outputDirectory,
   List<String> files,
   int epoch,
 ) async {
+  if (Platform.isWindows) {
+    final time = DateTime.fromMillisecondsSinceEpoch(epoch * 1000, isUtc: true);
+    for (final file in files) {
+      File(p.join(outputDirectory, file)).setLastModifiedSync(time);
+    }
+    return;
+  }
   final directories = {
     for (final file in files)
       for (
@@ -141,18 +170,45 @@ const tarArguments = [
   '-',
 ];
 
+/// The mode the archive gives [file] on Windows, where the file has none
+/// of its own: 0755 for a library, as `chmod` gives a dylib on macOS, and
+/// 0644 for anything else.
+int _archiveMode(String file) =>
+    file.endsWith('.dll') || file.endsWith('.dylib')
+    ? 0x1ed /* 0755 */
+    : 0x1a4 /* 0644 */;
+
 /// Writes [files], relative to [outputDirectory], in their order into the
 /// gzip-compressed tar [archive].
 ///
 /// `/usr/bin/tar` writes the stream with [tarArguments] and
 /// `COPYFILE_DISABLE=1`, and `/usr/bin/gzip -n -9` compresses it with no
 /// name or time, so the same files with the same modes and times pack to
-/// the same bytes.
+/// the same bytes. On Windows [ustar] writes the same kind of stream, each
+/// file owned by root:wheel with its [_archiveMode] and the time
+/// [normalizeArchiveFiles] gave it, and [gzipCompress] compresses it.
 Future<void> packArchive(
   String outputDirectory,
   List<String> files,
   String archive,
 ) async {
+  if (Platform.isWindows) {
+    final stream = ustar([
+      for (final file in files)
+        (
+          path: file,
+          bytes: File(p.join(outputDirectory, file)).readAsBytesSync(),
+          mode: _archiveMode(file),
+          epoch:
+              File(
+                p.join(outputDirectory, file),
+              ).lastModifiedSync().millisecondsSinceEpoch ~/
+              1000,
+        ),
+    ]);
+    File(archive).writeAsBytesSync(gzipCompress(stream), flush: true);
+    return;
+  }
   final tar = await Process.start(
     '/usr/bin/tar',
     tarArguments,

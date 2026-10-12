@@ -73,7 +73,9 @@ void main() {
     test('is the C scanner when there is one', () {
       write('$src/scanner.c');
 
-      check(scannerSource(root, _build())).equals('$src/scanner.c');
+      check(
+        scannerSource(root, _build()),
+      ).equals(p.normalize('$src/scanner.c'));
     });
 
     test('refuses a C++ scanner', () {
@@ -90,17 +92,19 @@ void main() {
     test('is src/ when the grammar commits src/tree_sitter/', () {
       write('$src/tree_sitter/parser.h');
 
-      check(scannerIncludeDirectory(root, _build(generate: true))).equals(src);
+      check(
+        scannerIncludeDirectory(root, _build(generate: true)),
+      ).equals(p.normalize(src));
     });
 
     test('is the generated directory when it commits no headers', () {
       check(
         scannerIncludeDirectory(root, _build(generate: true)),
-      ).equals('build/gen/x');
+      ).equals(p.normalize('build/gen/x'));
     });
 
     test('is src/ for a committed parser whatever its headers', () {
-      check(scannerIncludeDirectory(root, _build())).equals(src);
+      check(scannerIncludeDirectory(root, _build())).equals(p.normalize(src));
     });
   });
 

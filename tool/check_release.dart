@@ -21,8 +21,11 @@
 ///   `tool/grammars.json` lists for it, in order, each with the sha256 of
 ///   the committed patch under `patches/`, and the `patchedSha256` the
 ///   entry records.
-/// - `libtree-sitter.dylib` exports every function the runtime's `api.h`
-///   declares, apart from the three it defines only with its wasm feature.
+/// - `build_info.json` records the platform this process runs on, whose
+///   libraries are the only ones it can load.
+/// - The runtime (`libtree-sitter.dylib` on macOS, `tree-sitter.dll` on
+///   Windows) exports every function the runtime's `api.h` declares, apart
+///   from the three it defines only with its wasm feature.
 /// - `manifest.json` holds exactly the entries `tool/grammars.json` plans,
 ///   each of the kind it plans (a compiled grammar, planned as the build
 ///   plans it from each bundle's `tree-sitter.json`, a query-only language
@@ -30,7 +33,9 @@
 ///   checks below read.
 /// - The runtime and every grammar library is a thin binary of the
 ///   toolchain's architecture with its `minos`, an `@rpath` install name
-///   and no dependency beyond `libSystem`.
+///   and no dependency beyond `libSystem`; on Windows, a DLL for the
+///   platform's machine whose export table carries its file name and
+///   which imports nothing but `KERNEL32.dll` and the Universal CRT.
 /// - `build_info.json` records the language versions the runtime's
 ///   `api.h` defines, and `ts_parser_set_language` accepts every grammar,
 ///   found through its `config.json` `symbol`, whose
@@ -70,7 +75,8 @@
 ///   and parses again after an edit, in a process of its own running
 ///   `tool/parse_input.dart`, which exits 0 within `parseProcessTimeout`: no
 ///   scanner aborts the process or crashes it on input it cannot hold.
-/// - `THIRD_PARTY_NOTICES.md` is the committed text and names the runtime,
+/// - `THIRD_PARTY_NOTICES.md` is the committed text, on Windows with each
+///   library named as Windows names it, and names the runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
 ///
@@ -116,6 +122,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/build_platform.dart';
 import 'src/build_record.dart';
 import 'src/generated_sources.dart';
 import 'src/git.dart';
@@ -125,6 +132,7 @@ import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/notices.dart';
 import 'src/parse_process.dart';
+import 'src/pe.dart';
 import 'src/pool.dart';
 import 'src/release_check.dart';
 import 'src/source_bundles.dart';
@@ -136,6 +144,10 @@ import 'src/tree_sitter_ffi.dart';
 const _usage =
     'usage: dart run tool/check_release.dart [<output>] '
     '[--against=<archive>]';
+
+/// The platform this process runs on, whose libraries are the only ones it
+/// can load: every archive it checks or compares must be built for it.
+final _platform = BuildPlatform.host;
 
 /// One compiled grammar of an archive.
 typedef _Grammar = ({
@@ -186,7 +198,7 @@ Future<void> main(List<String> args) async {
     if (against != null) {
       await _compare(
         runtime!,
-        p.join(directory, 'libtree-sitter.dylib'),
+        p.join(directory, _platform.runtimeFileName),
         grammars,
         p.normalize(p.absolute(against)),
         sourceRoot: sources,
@@ -222,6 +234,12 @@ _check(
   );
   final info = _json(p.join(output, 'build_info.json'));
   final manifest = _json(p.join(output, 'manifest.json'));
+  if (info['platform'] != _platform.id) {
+    throw BuildPlatformException(
+      'build_info.json records the platform ${info['platform']}; this '
+      'process runs on ${_platform.id} and loads only its libraries',
+    );
+  }
   problems.addAll(repositoryRecordProblems(info));
   final treeSitter = info['treeSitter']! as Map<String, Object?>;
   if (treeSitter['tag'] != toolchain.treeSitterTag ||
@@ -245,7 +263,7 @@ _check(
     unpackGrammars: unpackGrammars,
   );
 
-  final runtimePath = p.join(output, 'libtree-sitter.dylib');
+  final runtimePath = p.join(output, _platform.runtimeFileName);
   final runtime = TreeSitterRuntime.open(runtimePath);
   _checkExports(runtime, p.join(sourceRoot, 'tree-sitter'), problems);
   final languageVersions = _checkLanguageVersions(
@@ -263,7 +281,16 @@ _check(
   await _checkGenerated(output, info, plan, problems);
   _checkBundleFiles(output, toolchain, entries, plan, problems);
   final grammars = _checkManifest(output, manifest, entries, plan, problems);
-  await _checkLibraries(runtimePath, grammars, toolchain, problems);
+  if (_platform.isWindows) {
+    _checkDlls(
+      runtimePath,
+      p.join(sourceRoot, 'tree-sitter'),
+      grammars,
+      problems,
+    );
+  } else {
+    await _checkLibraries(runtimePath, grammars, toolchain, problems);
+  }
   final languages = _checkGrammars(
     runtime,
     grammars,
@@ -273,7 +300,9 @@ _check(
   _checkQueries(runtime, output, grammars, languages, problems);
   _checkQueryTests(root, runtime, grammars, languages, problems);
   await _checkCrashTests(root, runtimePath, grammars, languages, problems);
-  _checkNotices(root, output, info, problems);
+  _checkNotices(root, output, info, [
+    for (final build in plan) build.name,
+  ], problems);
   return (runtime: runtime, grammars: grammars, sources: sourceRoot);
 }
 
@@ -519,12 +548,57 @@ void _checkExports(
   final expected = declared.where((f) => !wasmOnlyFunctions.contains(f));
   final missing = expected.where((f) => !runtime.exports(f)).toList();
   for (final function in missing) {
-    problems.add('libtree-sitter.dylib does not export $function');
+    problems.add('${_platform.runtimeFileName} does not export $function');
   }
   print(
     'runtime: ${expected.length - missing.length}/${expected.length} '
     'api.h functions exported (${declared.length} declared; '
     '${declared.length - expected.length} need the wasm feature)',
+  );
+}
+
+/// [_checkLibraries] on Windows: the runtime at [runtimePath] and every
+/// grammar's DLL must be what [dllProblems] requires, the runtime
+/// exporting every function of the `api.h` under [runtimeSource] that
+/// [_checkExports] requires through `dart:ffi`.
+void _checkDlls(
+  String runtimePath,
+  String runtimeSource,
+  List<_Grammar> grammars,
+  List<String> problems,
+) {
+  final header = File(
+    p.join(runtimeSource, 'lib', 'include', 'tree_sitter', 'api.h'),
+  );
+  final expectations = [
+    DllExpectation(
+      path: runtimePath,
+      name: _platform.runtimeFileName,
+      exportedSymbols: header.existsSync()
+          ? apiFunctions(
+              header.readAsStringSync(),
+            ).where((f) => !wasmOnlyFunctions.contains(f)).toList()
+          : const ['ts_parser_new'],
+    ),
+    for (final grammar in grammars)
+      DllExpectation(
+        path: p.join(
+          grammar.directory,
+          _platform.libraryFileName(grammar.name),
+        ),
+        name: _platform.libraryFileName(grammar.name),
+        exportedSymbols: ['tree_sitter_${grammar.symbol}'],
+      ),
+  ];
+  var good = 0;
+  for (final expectation in expectations) {
+    final found = dllProblems(expectation, _platform);
+    problems.addAll(found);
+    if (found.isEmpty) good++;
+  }
+  print(
+    'libraries: $good/${expectations.length} ${_platform.id} DLLs named '
+    'as their files, KERNEL32 and the Universal CRT only',
   );
 }
 
@@ -607,7 +681,7 @@ Map<String, Pointer<Void>> _checkGrammars(
     final Pointer<Void> language;
     try {
       language = openLanguage(
-        p.join(grammar.directory, 'lib${grammar.name}.dylib'),
+        p.join(grammar.directory, _platform.libraryFileName(grammar.name)),
         grammar.symbol,
       );
     } on Object catch (error) {
@@ -955,7 +1029,7 @@ Future<void> _checkCrashTests(
       'run',
       p.join('tool', 'parse_input.dart'),
       runtimePath,
-      p.join(grammar.directory, 'lib${grammar.name}.dylib'),
+      p.join(grammar.directory, _platform.libraryFileName(grammar.name)),
       grammar.symbol,
       source,
     ], workingDirectory: root);
@@ -988,10 +1062,15 @@ int _lineAt(String source, int byteOffset) {
   return '\n'.allMatches(utf8.decode(bytes.sublist(0, end))).length + 1;
 }
 
+/// Requires the notices in [output] to be the committed text as
+/// [noticesFor] gives it for this platform, naming the runtime and each of
+/// [grammarNames] as this platform names it, and to name what the archive
+/// has to carry.
 void _checkNotices(
   String root,
   String output,
   Map<String, Object?> info,
+  List<String> grammarNames,
   List<String> problems,
 ) {
   final shipped = File(p.join(output, noticesFileName));
@@ -1002,7 +1081,8 @@ void _checkNotices(
   final text = shipped.readAsStringSync();
   final committed = File(p.join(root, noticesFileName));
   final current =
-      committed.existsSync() && committed.readAsStringSync() == text;
+      committed.existsSync() &&
+      noticesFor(_platform, committed.readAsStringSync(), grammarNames) == text;
   if (!current) {
     problems.add('$noticesFileName in $output is not the committed text');
   }
@@ -1147,7 +1227,9 @@ typedef _Pair = ({
 /// library of it.
 _Pair? _pairWith(_Grammar grammar, String archive, List<_Input> inputs) {
   final theirs = p.join(archive, 'dylibs', grammar.name);
-  if (!File(p.join(theirs, 'lib${grammar.name}.dylib')).existsSync()) {
+  if (!File(
+    p.join(theirs, _platform.libraryFileName(grammar.name)),
+  ).existsSync()) {
     return null;
   }
   final ourFiles = queryFiles(grammar.directory).toSet();
@@ -1213,7 +1295,7 @@ Future<ProcessParses> _parseThere(
     ..writeAsStringSync(
       jsonEncode({
         'runtime': runtimePath,
-        'library': p.join(pair.theirs, 'lib$name.dylib'),
+        'library': p.join(pair.theirs, _platform.libraryFileName(name)),
         'symbol': pair.symbol,
         'queries': pair.theirs,
         'files': pair.shared,
@@ -1252,11 +1334,11 @@ void _compareGrammar(
   final (:grammar, :theirs, :symbol, :onlyOurs, :onlyTheirs, :shared, :inputs) =
       pair;
   final ours = openLanguage(
-    p.join(grammar.directory, 'lib${grammar.name}.dylib'),
+    p.join(grammar.directory, _platform.libraryFileName(grammar.name)),
     grammar.symbol,
   );
   final their = openLanguage(
-    p.join(theirs, 'lib${grammar.name}.dylib'),
+    p.join(theirs, _platform.libraryFileName(grammar.name)),
     symbol,
   );
   for (final file in onlyOurs) {

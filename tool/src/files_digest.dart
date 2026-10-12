@@ -17,6 +17,7 @@ import 'dart:typed_data';
 import 'package:path/path.dart' as p;
 
 import 'git.dart';
+import 'tar.dart';
 
 /// One file of a tree: its git mode, its blob id and its path.
 typedef TreeFile = ({String mode, String blob, String path});
@@ -43,6 +44,7 @@ Future<String> filesDigest(List<TreeFile> files) async {
       ..add(utf8.encode('${file.mode} ${file.blob}\t${file.path}'))
       ..addByte(0);
   }
+  if (Platform.isWindows) return dartSha256(listing.takeBytes());
   final shasum = await Process.start('/usr/bin/shasum', ['-a', '256']);
   shasum.stdin.add(listing.takeBytes());
   await shasum.stdin.close();
@@ -98,9 +100,15 @@ String _checkedPath(String path) {
 /// record for it: a symbolic link as mode 120000 whose blob is its target,
 /// a file with its owner's execute bit as 100755, any other as 100644.
 /// Directories carry nothing of their own.
+///
+/// NTFS keeps no execute bit, so on Windows a file's bit is the one its
+/// tar header gave it when this process unpacked [directory] from a
+/// bundle, as [unpackedModes] records; a file no bundle gave, such as one
+/// the CLI generated, is 100644.
 Future<List<TreeFile>> unpackedFiles(String directory) async {
   Future<String> git(List<String> arguments, {String? input}) =>
       runIsolatedGit(Directory.systemTemp.path, arguments, input: input);
+  final modes = unpackedModes[p.normalize(p.absolute(directory))] ?? const {};
   final files = <TreeFile>[];
   final regular = <(String, String)>[];
   for (final entity in Directory(
@@ -121,7 +129,9 @@ Future<List<TreeFile>> unpackedFiles(String directory) async {
         if (path.contains('\n')) {
           throw FilesDigestException('$path: a path with a newline');
         }
-        final executable = entity.statSync().mode & 0x40 != 0;
+        final executable = Platform.isWindows
+            ? (modes[path] ?? 0) & 0x40 != 0
+            : entity.statSync().mode & 0x40 != 0;
         regular.add((path, executable ? '100755' : '100644'));
       default:
         break;

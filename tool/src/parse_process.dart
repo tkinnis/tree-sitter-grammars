@@ -31,17 +31,43 @@ const _signalNames = {
   11: 'SIGSEGV',
 };
 
+/// The names of the exceptions a parse process on Windows can end by, by
+/// the `NTSTATUS` its exit code carries. The Universal CRT's `abort`,
+/// which a failed assertion calls, ends the process by a fail-fast,
+/// `STATUS_STACK_BUFFER_OVERRUN`, or with the exit code 3.
+const _exceptionNames = {
+  0xc0000005: 'STATUS_ACCESS_VIOLATION',
+  0xc000001d: 'STATUS_ILLEGAL_INSTRUCTION',
+  0xc0000094: 'STATUS_INTEGER_DIVIDE_BY_ZERO',
+  0xc00000fd: 'STATUS_STACK_OVERFLOW',
+  0xc0000409: 'STATUS_STACK_BUFFER_OVERRUN',
+};
+
 /// What is wrong with one run of a parse process, or null when it exited 0.
 ///
 /// [exitCode] is the process's exit code as `dart:io` reports it, negative
 /// for a process ended by a signal, or null when it ran past [timeout] and
-/// was killed. [stderr] is what it wrote there, of which the first
-/// non-empty line is quoted.
+/// was killed. On Windows, where no signal ends a process, a negative code
+/// is an `NTSTATUS` of an exception that did, read as a signed 32-bit
+/// value. [stderr] is what it wrote there, of which the first non-empty
+/// line is quoted.
 String? parseProcessProblem(
   int? exitCode,
   String stderr, {
   Duration timeout = parseProcessTimeout,
 }) {
+  if (Platform.isWindows && exitCode != null && exitCode < 0) {
+    final status = exitCode & 0xffffffff;
+    final said = const LineSplitter()
+        .convert(stderr)
+        .map((line) => line.trim())
+        .where((line) => line.isNotEmpty)
+        .firstOrNull;
+    return 'the parse ended the process with '
+        '${_exceptionNames[status] ?? 'exception'} '
+        '(0x${status.toRadixString(16).toUpperCase().padLeft(8, '0')})'
+        '${said == null ? '' : ': $said'}';
+  }
   final said = const LineSplitter()
       .convert(stderr)
       .map((line) => line.trim())

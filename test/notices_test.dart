@@ -5,6 +5,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/grammar_plan.dart';
 import '../tool/src/notices.dart';
 import '../tool/src/query_headers.dart';
@@ -130,6 +131,27 @@ void main() {
     ]) {
       check(notices).contains(text);
     }
+  });
+
+  test('a Windows archive names each library as Windows does, and keeps '
+      'the rest', () {
+    final (input, _) = fixture();
+    final notices = thirdPartyNotices(input);
+
+    final windows = noticesFor(BuildPlatform.windowsArm64, notices, ['x']);
+
+    check(noticesFor(BuildPlatform.macosArm64, notices, ['x'])).equals(notices);
+    check(windows).contains(
+      '`x.dll` is compiled from https://github.com/example/tree-sitter-x '
+      'at $_pin',
+    );
+    check(windows).contains('`tree-sitter.dll` is the runtime');
+    check(windows).not((it) => it.contains('.dylib`'));
+    check(
+      windows
+          .replaceAll('`x.dll`', '`libx.dylib`')
+          .replaceAll('`tree-sitter.dll`', '`libtree-sitter.dylib`'),
+    ).equals(notices);
   });
 
   test('refuses a grammar with no licence file at its root', () {

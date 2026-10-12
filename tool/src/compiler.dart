@@ -4,10 +4,27 @@
 /// Every flag list is written once, here. The build passes these lists to
 /// the compiler and records the same lists in `build_info.json`, so the
 /// record cannot drift from what ran.
+///
+/// On macOS the compiler is the clang of the Xcode `xcrun` selects. On
+/// Windows it is LLVM's clang driving `lld-link`, targeting
+/// `*-pc-windows-msvc` against the libraries of the Visual Studio and the
+/// Windows SDK it names explicitly, rather than MSVC's `cl.exe`: it takes
+/// the same `-O3`, `-std=c11` and defines as the macOS build, so both
+/// platforms compile the same code the same way, and it compiles the C11
+/// and GNU extensions grammar scanners use, which `cl.exe` refuses or
+/// reads differently. The libraries link the Visual C++ runtime statically
+/// and the Universal CRT dynamically, so each depends on nothing but
+/// `KERNEL32.dll` and the `api-ms-win-crt-*` DLLs every Windows 10 and
+/// later carries, and they all allocate from the one heap the Universal
+/// CRT keeps.
 library;
 
 import 'dart:io';
 
+import 'package:path/path.dart' as p;
+
+import 'build_platform.dart';
+import 'release_check.dart' show apiFunctions, wasmOnlyFunctions;
 import 'toolchain.dart';
 
 /// Stands for an invocation's absolute working directory inside a recorded
@@ -24,7 +41,8 @@ final class CompilerException implements Exception {
   String toString() => message;
 }
 
-/// The Xcode clang and macOS SDK the build uses.
+/// The clang and SDK the build uses: Xcode's clang and the macOS SDK, or
+/// LLVM's clang with the MSVC tools and the Windows SDK.
 final class Compiler {
   const Compiler({
     required this.path,
@@ -32,26 +50,47 @@ final class Compiler {
     required this.sdkPath,
     required this.sdkVersion,
     required this.sdkBuildVersion,
+    this.platform = BuildPlatform.macosArm64,
+    this.msvcToolsPath,
+    this.msvcToolsVersion,
   });
 
-  /// Absolute path of the clang binary, as `xcrun --find clang` reports it.
+  /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
+  /// or on Windows the first `clang.exe` on `PATH`.
   final String path;
 
   /// The first line of `clang --version`.
   final String version;
 
-  /// The macOS SDK passed as `-isysroot`.
+  /// The macOS SDK passed as `-isysroot`, or the root of the Windows Kits
+  /// passed as `-Xmicrosoft-windows-sdk-root`.
   final String sdkPath;
 
-  /// `xcrun --sdk macosx --show-sdk-version`.
+  /// `xcrun --sdk macosx --show-sdk-version`, or the Windows SDK version
+  /// passed as `-Xmicrosoft-windows-sdk-version`.
   final String sdkVersion;
 
-  /// `xcrun --sdk macosx --show-sdk-build-version`.
+  /// `xcrun --sdk macosx --show-sdk-build-version`; on Windows, the build
+  /// number [sdkVersion] carries.
   final String sdkBuildVersion;
 
-  /// Resolves clang and the SDK through `xcrun`, which honours
-  /// `DEVELOPER_DIR`.
-  static Future<Compiler> resolve() async {
+  /// The platform every library is compiled for.
+  final BuildPlatform platform;
+
+  /// On Windows, the MSVC tools directory passed as
+  /// `-Xmicrosoft-visualc-tools-root`, whose `lib/<arch>` holds the Visual
+  /// C++ runtime the libraries link; null on macOS.
+  final String? msvcToolsPath;
+
+  /// On Windows, the version of the MSVC tools at [msvcToolsPath].
+  final String? msvcToolsVersion;
+
+  /// Resolves the compiler a build on [platform], by default the platform
+  /// this process runs on, compiles with: on macOS through `xcrun`, which
+  /// honours `DEVELOPER_DIR`, and on Windows as [_resolveWindows] does.
+  static Future<Compiler> resolve([BuildPlatform? platform]) async {
+    platform ??= BuildPlatform.host;
+    if (platform.isWindows) return _resolveWindows(platform);
     Future<String> xcrun(List<String> arguments) async {
       final result = await Process.run('xcrun', arguments);
       if (result.exitCode != 0) {
@@ -84,18 +123,213 @@ final class Compiler {
       ]),
     );
   }
+
+  /// Resolves LLVM's clang, the MSVC tools and the Windows SDK for a build
+  /// on [platform].
+  ///
+  /// clang is the first `clang.exe` on `PATH`. The MSVC tools are the
+  /// default version of the newest Visual Studio `vswhere` finds with the
+  /// tools for [platform]'s architecture, and the SDK the newest version
+  /// under the Windows Kits root the registry names that holds the
+  /// Universal CRT and the import libraries for that architecture. Each is
+  /// passed to clang by path, so no `INCLUDE`, `LIB` or developer prompt
+  /// of the user's decides what the libraries are compiled and linked
+  /// against.
+  static Future<Compiler> _resolveWindows(BuildPlatform platform) async {
+    final path = _onPath('clang.exe');
+    final version = await Process.run(
+      path,
+      ['--version'],
+      environment: compilerEnvironment(Platform.environment),
+      includeParentEnvironment: false,
+    );
+    if (version.exitCode != 0) {
+      throw CompilerException('$path --version failed: ${version.stderr}');
+    }
+    final (:msvcPath, :msvcVersion) = await _msvcTools(platform);
+    final (:sdkRoot, :sdkVersion) = await _windowsSdk(platform);
+    return Compiler(
+      path: path,
+      version: (version.stdout as String).split('\n').first.trim(),
+      sdkPath: sdkRoot,
+      sdkVersion: sdkVersion,
+      sdkBuildVersion: sdkVersion.split('.')[2],
+      platform: platform,
+      msvcToolsPath: msvcPath,
+      msvcToolsVersion: msvcVersion,
+    );
+  }
 }
+
+/// The absolute path of the first [executable] in a directory `PATH`
+/// lists; throws a [CompilerException] when there is none.
+String _onPath(String executable) {
+  for (final directory in (Platform.environment['PATH'] ?? '').split(';')) {
+    if (directory.isEmpty) continue;
+    final candidate = p.join(directory, executable);
+    if (File(candidate).existsSync()) return p.normalize(candidate);
+  }
+  throw CompilerException(
+    "no $executable on PATH; a build on Windows compiles with LLVM's clang",
+  );
+}
+
+/// The default MSVC tools of the newest Visual Studio that has them for
+/// [platform]'s architecture, as `vswhere` finds it.
+Future<({String msvcPath, String msvcVersion})> _msvcTools(
+  BuildPlatform platform,
+) async {
+  final vswhere = p.join(
+    Platform.environment['ProgramFiles(x86)'] ?? r'C:\Program Files (x86)',
+    'Microsoft Visual Studio',
+    'Installer',
+    'vswhere.exe',
+  );
+  final component = switch (platform) {
+    BuildPlatform.windowsArm64 =>
+      'Microsoft.VisualStudio.Component.VC.Tools.ARM64',
+    _ => 'Microsoft.VisualStudio.Component.VC.Tools.x86.x64',
+  };
+  final found = await Process.run(vswhere, [
+    '-latest',
+    '-products',
+    '*',
+    '-requires',
+    component,
+    '-property',
+    'installationPath',
+  ]);
+  final installation = '${found.stdout}'.trim().split('\n').first.trim();
+  if (found.exitCode != 0 || installation.isEmpty) {
+    throw CompilerException(
+      'vswhere found no Visual Studio with $component; install the MSVC '
+      '${platform.windowsLibArch} build tools',
+    );
+  }
+  final version = File(
+    p.join(
+      installation,
+      'VC',
+      'Auxiliary',
+      'Build',
+      'Microsoft.VCToolsVersion.default.txt',
+    ),
+  ).readAsStringSync().trim();
+  final tools = p.join(installation, 'VC', 'Tools', 'MSVC', version);
+  final runtime = p.join(tools, 'lib', platform.windowsLibArch, 'libcmt.lib');
+  if (!File(runtime).existsSync()) {
+    throw CompilerException('the MSVC tools $version have no $runtime');
+  }
+  return (msvcPath: tools, msvcVersion: version);
+}
+
+/// The newest Windows SDK under the Windows Kits root the registry names
+/// that holds the Universal CRT and the import libraries for [platform].
+Future<({String sdkRoot, String sdkVersion})> _windowsSdk(
+  BuildPlatform platform,
+) async {
+  String? root;
+  for (final key in const [
+    r'HKLM\SOFTWARE\Microsoft\Windows Kits\Installed Roots',
+    r'HKLM\SOFTWARE\WOW6432Node\Microsoft\Windows Kits\Installed Roots',
+  ]) {
+    final query = await Process.run('reg', ['query', key, '/v', 'KitsRoot10']);
+    final match = RegExp(
+      r'KitsRoot10\s+REG_SZ\s+(.+)$',
+      multiLine: true,
+    ).firstMatch('${query.stdout}');
+    if (query.exitCode == 0 && match != null) {
+      root = p.normalize(match.group(1)!.trim());
+      break;
+    }
+  }
+  if (root == null) {
+    throw const CompilerException(
+      'the registry names no Windows Kits root; install the Windows SDK',
+    );
+  }
+  final arch = platform.windowsLibArch;
+  final versions = [
+    for (final entity in Directory(p.join(root, 'Lib')).listSync())
+      if (entity is Directory &&
+          RegExp(r'^\d+\.\d+\.\d+\.\d+$').hasMatch(p.basename(entity.path)) &&
+          File(p.join(entity.path, 'ucrt', arch, 'ucrt.lib')).existsSync() &&
+          File(p.join(entity.path, 'um', arch, 'kernel32.lib')).existsSync())
+        p.basename(entity.path),
+  ];
+  if (versions.isEmpty) {
+    throw CompilerException(
+      '$root holds no Windows SDK with the $arch Universal CRT',
+    );
+  }
+  List<int> parts(String version) => [
+    for (final part in version.split('.')) int.parse(part),
+  ];
+  versions.sort((a, b) {
+    final (x, y) = (parts(a), parts(b));
+    for (var i = 0; i < 4; i++) {
+      if (x[i] != y[i]) return x[i] - y[i];
+    }
+    return 0;
+  });
+  return (sdkRoot: root, sdkVersion: versions.last);
+}
+
+/// The variables a compiler invocation may see on [platform].
+///
+/// On Windows a process needs `SystemRoot` to start at all, and clang
+/// writes the objects of a compile it links in the same invocation to
+/// `TEMP` or `TMP`.
+Set<String> allowedCompilerVariablesOf(BuildPlatform platform) =>
+    platform.isWindows
+    ? const {'PATH', 'SystemRoot', 'TEMP', 'TMP'}
+    : const {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
 
 /// The variables a compiler invocation inherits from [parent]; every other
 /// variable, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` among them, is left out.
 ///
 /// clang finds the SDK through the explicit `-isysroot`, and its own
-/// linker beside itself, so it needs no search path of the user's.
-Map<String, String> compilerEnvironment(Map<String, String> parent) => {
-  'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
-  for (final name in const ['TMPDIR', 'DEVELOPER_DIR'])
-    if (parent[name] case final value?) name: value,
-};
+/// linker beside itself, so it needs no search path of the user's. On
+/// Windows, where clang finds the MSVC tools and the Windows SDK through
+/// the paths its flags name, and `lld-link` beside itself, `PATH` holds
+/// only the system's own directories, and neither `INCLUDE` nor `LIB`
+/// reaches it.
+Map<String, String> compilerEnvironment(Map<String, String> parent) {
+  if (Platform.isWindows) {
+    final systemRoot = parent['SystemRoot'] ?? r'C:\Windows';
+    return {
+      'PATH': '$systemRoot\\System32;$systemRoot',
+      'SystemRoot': systemRoot,
+      for (final name in const ['TEMP', 'TMP'])
+        if (parent[name] case final value?) name: value,
+    };
+  }
+  return {
+    'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+    for (final name in const ['TMPDIR', 'DEVELOPER_DIR'])
+      if (parent[name] case final value?) name: value,
+  };
+}
+
+/// The module-definition file that makes the Windows runtime export every
+/// function [apiHeader], the text of its `api.h`, declares, apart from
+/// [wasmOnlyFunctions], under the DLL name [libraryName].
+///
+/// tree-sitter marks none of its API for export on Windows (its
+/// `TS_PUBLIC` is empty there), so without this the DLL would export
+/// nothing; the export list follows `api.h` at the pinned runtime, as the
+/// symbol visibility of the macOS build does.
+String runtimeModuleDefinition(String apiHeader, String libraryName) => [
+  'LIBRARY $libraryName',
+  'EXPORTS',
+  for (final function in apiFunctions(apiHeader))
+    if (!wasmOnlyFunctions.contains(function)) '  $function',
+  '',
+].join('\n');
+
+/// Where the Windows runtime's module-definition file is written, relative
+/// to the runtime's extracted sources, in which its link runs.
+const runtimeModuleDefinitionPath = '../../tree-sitter.def';
 
 /// The flags every build passes, by kind of invocation.
 final class BuildFlags {
@@ -104,6 +338,9 @@ final class BuildFlags {
   /// `-O3` is explicit in each list, and none defines `NDEBUG`, so
   /// tree-sitter's internal assertions stay on.
   factory BuildFlags(Toolchain toolchain, Compiler compiler) {
+    if (compiler.platform.isWindows) {
+      return BuildFlags._windows(toolchain, compiler);
+    }
     final target = [
       '-arch',
       toolchain.arch,
@@ -140,6 +377,60 @@ final class BuildFlags {
     );
   }
 
+  /// The flags of a build for Windows: those of macOS where Windows has
+  /// them (`-O3` and no `NDEBUG`, C11 and the runtime's defines, the
+  /// prefix map), with the target's triple and the MSVC tools and SDK in
+  /// place of `-arch` and `-isysroot`.
+  ///
+  /// Every link is by `lld-link`, with `/brepro` so that the same objects
+  /// link to the same bytes, `/noimplib` so that no import library lands
+  /// beside a DLL in the archive, and the Universal CRT taken dynamically in
+  /// place of the static one `libcmt` names. The runtime's link exports
+  /// what [runtimeModuleDefinition] lists and carries the runtime's version
+  /// as its image version, as its macOS link carries `-current_version`.
+  factory BuildFlags._windows(Toolchain toolchain, Compiler compiler) {
+    final target = [
+      '--target=${compiler.platform.windowsTarget}',
+      '-fms-runtime-lib=static',
+      '-Xmicrosoft-visualc-tools-root',
+      compiler.msvcToolsPath!,
+      '-Xmicrosoft-windows-sdk-root',
+      compiler.sdkPath,
+      '-Xmicrosoft-windows-sdk-version',
+      compiler.sdkVersion,
+    ];
+    const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
+    const link = [
+      '-fuse-ld=lld',
+      '-Wl,/nodefaultlib:libucrt.lib',
+      '-Wl,/defaultlib:ucrt.lib',
+      '-Wl,/brepro',
+      '-Wl,/noimplib',
+    ];
+    final [major, minor, _] = toolchain.runtimeVersion.split('.');
+    return BuildFlags._(
+      runtime: [
+        '-O3',
+        '-std=c11',
+        '-D_POSIX_C_SOURCE=200112L',
+        '-D_DEFAULT_SOURCE',
+        '-D_BSD_SOURCE',
+        '-D_DARWIN_C_SOURCE',
+        '-Ilib/src',
+        '-Ilib/src/wasm',
+        '-Ilib/include',
+        '-shared',
+        ...target,
+        prefixMap,
+        ...link,
+        '-Wl,/def:$runtimeModuleDefinitionPath',
+        '-Wl,/version:$major.$minor',
+      ],
+      grammarCompile: ['-c', '-O3', '-std=c11', ...target, prefixMap],
+      grammarLink: ['-shared', ...target, ...link],
+    );
+  }
+
   const BuildFlags._({
     required this.runtime,
     required this.grammarCompile,
@@ -167,9 +458,16 @@ List<String> grammarSourceFlags(String includeDirectory) => [
 
 /// The flags a grammar's link passes after [BuildFlags.grammarLink]: the
 /// install name of `lib<libraryName>.dylib`.
-List<String> grammarLinkFlags(String libraryName) => [
-  '-Wl,-install_name,@rpath/lib$libraryName.dylib',
-];
+///
+/// A Windows DLL has no install name: the name its export table carries is
+/// its file name, which the link's output gives it, so on [platform]
+/// Windows a grammar's link passes no flags of its own.
+List<String> grammarLinkFlags(
+  String libraryName, {
+  BuildPlatform platform = BuildPlatform.macosArm64,
+}) => platform.isWindows
+    ? const []
+    : ['-Wl,-install_name,@rpath/lib$libraryName.dylib'];
 
 /// [flags] with [workingDirectoryPlaceholder] replaced by the absolute
 /// [workingDirectory] an invocation runs in.
@@ -281,7 +579,8 @@ CompileCommand grammarCompileCommand({
 );
 
 /// Links one grammar's [objects] into [output], whose install name is
-/// `@rpath/lib<libraryName>.dylib`; paths are relative to [directory].
+/// `@rpath/lib<libraryName>.dylib` on macOS; paths are relative to
+/// [directory].
 CompileCommand grammarLinkCommand({
   required Compiler compiler,
   required BuildFlags flags,
@@ -295,7 +594,7 @@ CompileCommand grammarLinkCommand({
   arguments: [
     compiler.path,
     ...expandFlags(flags.grammarLink, directory),
-    ...grammarLinkFlags(libraryName),
+    ...grammarLinkFlags(libraryName, platform: compiler.platform),
     ...objects,
     '-o',
     output,

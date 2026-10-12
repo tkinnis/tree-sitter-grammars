@@ -7,6 +7,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
 import 'grammar_pins.dart';
 
 /// Thrown when a grammar's sources do not hold what its entry promises.
@@ -68,10 +69,16 @@ final class GrammarBuild {
 
   String get objectDirectory => p.join('build', 'obj', name);
 
-  /// The dylib's directory inside `output/`.
-  String get dylibDirectory => p.join('dylibs', name);
+  /// The library's directory inside `output/`, with `/` between its
+  /// segments on every platform, as `manifest.json` records it.
+  String get dylibDirectory => p.posix.join('dylibs', name);
 
+  /// The library's file name on macOS.
   String get dylibFileName => 'lib$name.dylib';
+
+  /// The library's file name on [platform].
+  String libraryFileName(BuildPlatform platform) =>
+      platform.libraryFileName(name);
 }
 
 /// The grammars [entries] build, in `grammars.json` order, reading each

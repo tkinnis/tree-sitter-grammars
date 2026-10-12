@@ -4,6 +4,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/toolchain.dart';
 import '../tool/src/tree_sitter_cli.dart';
 
@@ -32,7 +33,14 @@ Toolchain _toolchain(String sha256) => Toolchain(
   cliSha256: sha256,
   arch: 'arm64',
   deploymentTarget: '13.0',
+  windowsCli: {
+    'arm64': (asset: 'tree-sitter-windows-arm64.gz', sha256: sha256),
+  },
 );
+
+/// The macOS CLI, which every test but the last asks for whatever the
+/// platform it runs on.
+const _macos = BuildPlatform.macosArm64;
 
 void main() {
   late String root;
@@ -57,18 +65,42 @@ void main() {
   String cached(String name) => p.join(root, '.cache', name);
 
   test('downloads the pinned asset and decompresses it', () async {
-    final cli = await ensureCli(root, toolchain, download: serving(asset));
+    final cli = await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: _macos,
+    );
 
     check(downloads).deepEquals([toolchain.cliUrl]);
     check(File(cli).readAsStringSync()).equals(_executable);
-    check(File(cli).statSync().modeString()).equals('rwxr-xr-x');
+    // NTFS keeps no mode for chmod to set.
+    if (!Platform.isWindows) {
+      check(File(cli).statSync().modeString()).equals('rwxr-xr-x');
+    }
+  });
+
+  test('on Windows, downloads the asset its architecture pins as an '
+      '.exe', () async {
+    final cli = await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: BuildPlatform.windowsArm64,
+    );
+
+    check(
+      downloads,
+    ).deepEquals([toolchain.cliUrlFor(BuildPlatform.windowsArm64)]);
+    check(p.basename(cli)).equals('tree-sitter-0.27.0.exe');
+    check(File(cli).readAsStringSync()).equals(_executable);
   });
 
   test('refuses an asset whose sha256 is not the pinned one', () async {
     final tampered = gzip.encode('#!/bin/sh\necho evil\n'.codeUnits);
 
     await check(
-      ensureCli(root, toolchain, download: serving(tampered)),
+      ensureCli(root, toolchain, download: serving(tampered), platform: _macos),
     ).throws<CliException>(
       (it) => it
           .has((e) => e.message, 'message')
@@ -78,10 +110,20 @@ void main() {
   });
 
   test('uses a cached asset and rewrites a modified executable', () async {
-    await ensureCli(root, toolchain, download: serving(asset));
+    await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: _macos,
+    );
     File(cached('tree-sitter-0.27.0')).writeAsStringSync('modified');
 
-    final cli = await ensureCli(root, toolchain, download: serving(asset));
+    final cli = await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: _macos,
+    );
 
     check(downloads).length.equals(1);
     check(File(cli).readAsStringSync()).equals(_executable);
@@ -92,7 +134,12 @@ void main() {
       ..parent.createSync(recursive: true)
       ..writeAsBytesSync([0]);
 
-    await ensureCli(root, toolchain, download: serving(asset));
+    await ensureCli(
+      root,
+      toolchain,
+      download: serving(asset),
+      platform: _macos,
+    );
 
     check(downloads).length.equals(1);
   });

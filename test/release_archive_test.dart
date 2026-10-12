@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/release_archive.dart';
+import '../tool/src/tar.dart';
 
 /// 2026-01-01T00:00:00Z.
 const _epoch = 1767225600;
@@ -81,6 +84,53 @@ void main() {
     ).deepEquals(File(second).readAsBytesSync());
   });
 
+  test('lists the DLLs of a Windows archive, the runtime by its own '
+      'name', () {
+    File(
+      p.join(output.path, 'libtree-sitter.dylib'),
+    ).renameSync(p.join(output.path, 'tree-sitter.dll'));
+    File(
+      p.join(output.path, 'dylibs', 'c', 'libc.dylib'),
+    ).renameSync(p.join(output.path, 'dylibs', 'c', 'c.dll'));
+
+    check(
+      archiveFiles(output.path, platform: BuildPlatform.windowsArm64),
+    ).deepEquals([
+      'THIRD_PARTY_NOTICES.md',
+      'build_info.json',
+      'dylibs/c/c.dll',
+      'dylibs/c/config.json',
+      'dylibs/c/highlights.scm',
+      'manifest.json',
+      'queries/ecma/highlights.scm',
+      'tree-sitter.dll',
+    ]);
+    check(() => archiveFiles(output.path))
+        .throws<ArchiveException>()
+        .has((e) => e.message, 'message')
+        .contains('libtree-sitter.dylib');
+  });
+
+  test('on Windows, packs root:wheel, the modes and the time, files '
+      'only', () async {
+    final archive = await pack('.tar.gz');
+
+    final members = readTar(
+      Uint8List.fromList(gzip.decode(File(archive).readAsBytesSync())),
+    );
+
+    check(members.map((m) => m.path)).deepEquals(archiveFiles(output.path));
+    for (final member in members) {
+      check(member.mode).equals(member.path.endsWith('.dylib') ? 0x1ed : 0x1a4);
+    }
+    final header = gzip.decode(File(archive).readAsBytesSync()).sublist(0, 512);
+    check(String.fromCharCodes(header.sublist(265, 269))).equals('root');
+    check(String.fromCharCodes(header.sublist(297, 302))).equals('wheel');
+    check(
+      int.parse(String.fromCharCodes(header.sublist(136, 147)), radix: 8),
+    ).equals(_epoch);
+  }, testOn: 'windows');
+
   test('records root:wheel, the modes and the time, files only', () async {
     final archive = await pack('.tar.gz');
 
@@ -109,5 +159,5 @@ void main() {
       environment: {'TZ': 'UTC'},
     );
     check('${verbose.stdout}').contains('Jan  1  2026');
-  });
+  }, testOn: 'mac-os');
 }

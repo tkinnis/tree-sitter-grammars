@@ -15,6 +15,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
 import 'git.dart';
 import 'grammar_pins.dart';
 import 'grammar_plan.dart';
@@ -25,6 +26,30 @@ import 'toolchain.dart';
 
 /// The generated file's name, at the repository root and in the archive.
 const noticesFileName = 'THIRD_PARTY_NOTICES.md';
+
+/// The notices an archive for [platform] carries: [committed], the text
+/// `thirdPartyNotices` generates and the repository commits, which names
+/// each library as macOS does, with every such name, written as code,
+/// replaced by the name [platform] gives the library: the runtime's and
+/// those of [grammarNames].
+///
+/// The licences and everything else stay the committed text, so one
+/// committed file vouches for the notices of every platform's archive.
+String noticesFor(
+  BuildPlatform platform,
+  String committed,
+  Iterable<String> grammarNames,
+) {
+  if (!platform.isWindows) return committed;
+  var notices = committed;
+  for (final name in ['tree-sitter', ...grammarNames]) {
+    notices = notices.replaceAll(
+      '`${BuildPlatform.macosArm64.libraryFileName(name)}`',
+      '`${platform.libraryFileName(name)}`',
+    );
+  }
+  return notices;
+}
 
 /// The runtime's licence files, relative to its repository root.
 const runtimeLicenseFiles = ['LICENSE', 'lib/src/unicode/LICENSE'];
