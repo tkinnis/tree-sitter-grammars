@@ -243,4 +243,19 @@ void main() {
         '`swift-generated-beef.tar.gz` | `cc` |',
       );
   });
+
+  test('the notes of a Linux archive name it and the glibc it was built '
+      'against', () {
+    final notes = releaseNotes({
+      'platform': 'linux-arm64',
+      'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
+      'toolchain': {'libc': 'glibc 2.43'},
+      'sources': const <String, Object?>{},
+    }, 'aa');
+
+    check(notes)
+      ..contains('Linux on arm64 with glibc 2.43 and later')
+      ..contains('`grammars-linux-arm64.tar.gz`: sha256 `aa`')
+      ..not((it) => it.contains('macOS'));
+  });
 }

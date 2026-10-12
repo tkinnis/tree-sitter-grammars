@@ -1,11 +1,13 @@
 /// Packs `output/` into the release archive, byte for byte the same each
 /// time the same build is packed.
 ///
-/// On macOS `/usr/bin/tar` and `/usr/bin/gzip` pack it from files whose
-/// modes and times `chmod` and `touch` have set. Windows has neither tool
-/// at a fixed path, nor modes to set, so there `tar.dart` writes the same
-/// headers from the same rules in Dart and `dart:io`'s zlib compresses
-/// them.
+/// On macOS and Linux `/usr/bin/tar` and `/usr/bin/gzip` pack it from
+/// files whose modes and times `chmod` and `touch` have set: bsdtar on
+/// macOS, with [tarArguments], and GNU tar on Linux, with
+/// [gnuTarArguments], which ask each for the same ustar stream. Windows has
+/// neither tool at a fixed path, nor modes to set, so there `tar.dart`
+/// writes the same headers from the same rules in Dart and `dart:io`'s
+/// zlib compresses them.
 library;
 
 import 'dart:convert';
@@ -83,7 +85,7 @@ List<String> archiveFiles(
 }
 
 /// Gives every one of [files] and every directory holding them the mode and
-/// time the archive records: 0755 for a dylib and a directory, 0644 for
+/// time the archive records: 0755 for a library and a directory, 0644 for
 /// anything else, and [epoch] (seconds since 1970, UTC) as the time.
 ///
 /// On Windows only the files' times are set: NTFS has no modes, and
@@ -112,11 +114,11 @@ Future<void> normalizeArchiveFiles(
   final executable = [
     ...directories,
     for (final file in files)
-      if (file.endsWith('.dylib')) file,
+      if (BuildPlatform.isAnyLibrary(file)) file,
   ];
   final plain = [
     for (final file in files)
-      if (!file.endsWith('.dylib')) file,
+      if (!BuildPlatform.isAnyLibrary(file)) file,
   ];
   final stamp = _touchStamp(epoch);
   for (final (executable, arguments) in [
@@ -145,8 +147,8 @@ String _touchStamp(int epoch) {
       '${two(time.second)}';
 }
 
-/// The `tar` arguments that write [files], read from standard input, as a
-/// ustar stream owned by root:wheel with no macOS metadata, extended
+/// The bsdtar arguments that write the files read from standard input, as
+/// a ustar stream owned by root:wheel with no macOS metadata, extended
 /// attributes, ACLs or file flags.
 const tarArguments = [
   '-n',
@@ -170,19 +172,37 @@ const tarArguments = [
   '-',
 ];
 
+/// The GNU tar arguments that write the files read from standard input,
+/// each name as it is and none of a directory's contents, as the ustar
+/// stream [tarArguments] asks bsdtar for: owned by root:wheel, with no
+/// extended attributes, ACLs or SELinux contexts.
+const gnuTarArguments = [
+  '--no-recursion',
+  '--verbatim-files-from',
+  '--no-xattrs',
+  '--no-acls',
+  '--no-selinux',
+  '--owner=root:0',
+  '--group=wheel:0',
+  '--format=ustar',
+  '-cf',
+  '-',
+  '-T',
+  '-',
+];
+
 /// The mode the archive gives [file] on Windows, where the file has none
-/// of its own: 0755 for a library, as `chmod` gives a dylib on macOS, and
-/// 0644 for anything else.
+/// of its own: 0755 for a library, as `chmod` gives one on macOS and
+/// Linux, and 0644 for anything else.
 int _archiveMode(String file) =>
-    file.endsWith('.dll') || file.endsWith('.dylib')
-    ? 0x1ed /* 0755 */
-    : 0x1a4 /* 0644 */;
+    BuildPlatform.isAnyLibrary(file) ? 0x1ed /* 0755 */ : 0x1a4 /* 0644 */;
 
 /// Writes [files], relative to [outputDirectory], in their order into the
 /// gzip-compressed tar [archive].
 ///
 /// `/usr/bin/tar` writes the stream with [tarArguments] and
-/// `COPYFILE_DISABLE=1`, and `/usr/bin/gzip -n -9` compresses it with no
+/// `COPYFILE_DISABLE=1` on macOS, or [gnuTarArguments] on Linux, and
+/// `/usr/bin/gzip -n -9` compresses it with no
 /// name or time, so the same files with the same modes and times pack to
 /// the same bytes. On Windows [ustar] writes the same kind of stream, each
 /// file owned by root:wheel with its [_archiveMode] and the time
@@ -211,7 +231,7 @@ Future<void> packArchive(
   }
   final tar = await Process.start(
     '/usr/bin/tar',
-    tarArguments,
+    Platform.isMacOS ? tarArguments : gnuTarArguments,
     workingDirectory: outputDirectory,
     environment: {'COPYFILE_DISABLE': '1', 'PATH': '/usr/bin:/bin'},
     includeParentEnvironment: false,

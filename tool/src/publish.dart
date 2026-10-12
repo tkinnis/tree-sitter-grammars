@@ -197,9 +197,13 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
   ];
   final platform =
       BuildPlatform.parse(info['platform']) ?? BuildPlatform.macosArm64;
-  final runsOn = platform.isWindows
-      ? 'Windows 10 and later on ${platform.arch}'
-      : 'macOS ${info['deploymentTarget']} and later on arm64';
+  final runsOn = switch (platform.os) {
+    'windows' => 'Windows 10 and later on ${platform.arch}',
+    'linux' =>
+      'Linux on ${platform.arch} with '
+          '${(info['toolchain'] as Map?)?['libc'] ?? 'glibc'} and later',
+    _ => 'macOS ${info['deploymentTarget']} and later on arm64',
+  };
   return 'tree-sitter ${treeSitter['tag']} (${treeSitter['commit']}), '
       '$runsOn.\n\n'
       '`${platform.releaseArchiveName}`: sha256 `$archiveSha256`.\n\n'

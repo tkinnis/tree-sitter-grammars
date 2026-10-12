@@ -154,6 +154,26 @@ void main() {
     ).equals(notices);
   });
 
+  test('a Linux archive names each library as Linux does, and keeps the '
+      'rest', () {
+    final (input, _) = fixture();
+    final notices = thirdPartyNotices(input);
+
+    final linux = noticesFor(BuildPlatform.linuxArm64, notices, ['x']);
+
+    check(linux).contains(
+      '`libx.so` is compiled from https://github.com/example/tree-sitter-x '
+      'at $_pin',
+    );
+    check(linux).contains('`libtree-sitter.so` is the runtime');
+    check(linux).not((it) => it.contains('.dylib`'));
+    check(
+      linux
+          .replaceAll('`libx.so`', '`libx.dylib`')
+          .replaceAll('`libtree-sitter.so`', '`libtree-sitter.dylib`'),
+    ).equals(notices);
+  });
+
   test('refuses a grammar with no licence file at its root', () {
     final (input, _) = fixture(license: false);
 

@@ -111,8 +111,46 @@ void main() {
         .contains('libtree-sitter.dylib');
   });
 
-  test('on Windows, packs root:wheel, the modes and the time, files '
-      'only', () async {
+  test('lists the shared objects of a Linux archive, the runtime by its own '
+      'name, and packs them executable', () async {
+    File(
+      p.join(output.path, 'libtree-sitter.dylib'),
+    ).renameSync(p.join(output.path, 'libtree-sitter.so'));
+    File(
+      p.join(output.path, 'dylibs', 'c', 'libc.dylib'),
+    ).renameSync(p.join(output.path, 'dylibs', 'c', 'libc.so'));
+    final files = archiveFiles(output.path, platform: BuildPlatform.linuxArm64);
+
+    check(files).deepEquals([
+      'THIRD_PARTY_NOTICES.md',
+      'build_info.json',
+      'dylibs/c/config.json',
+      'dylibs/c/highlights.scm',
+      'dylibs/c/libc.so',
+      'libtree-sitter.so',
+      'manifest.json',
+      'queries/ecma/highlights.scm',
+    ]);
+    check(() => archiveFiles(output.path))
+        .throws<ArchiveException>()
+        .has((e) => e.message, 'message')
+        .contains('libtree-sitter.dylib');
+
+    await normalizeArchiveFiles(output.path, files, _epoch);
+    final archive = '${output.path}.tar.gz';
+    await packArchive(output.path, files, archive);
+    addTearDown(() => File(archive).deleteSync());
+    final members = readTar(
+      Uint8List.fromList(gzip.decode(File(archive).readAsBytesSync())),
+    );
+    check(members.map((m) => m.path)).deepEquals(files);
+    for (final member in members) {
+      check(member.mode).equals(member.path.endsWith('.so') ? 0x1ed : 0x1a4);
+    }
+  }, testOn: 'linux || windows');
+
+  test('on Windows and Linux, packs root:wheel, the modes and the time, '
+      'files only', () async {
     final archive = await pack('.tar.gz');
 
     final members = readTar(
@@ -129,7 +167,7 @@ void main() {
     check(
       int.parse(String.fromCharCodes(header.sublist(136, 147)), radix: 8),
     ).equals(_epoch);
-  }, testOn: 'windows');
+  }, testOn: 'linux || windows');
 
   test('records root:wheel, the modes and the time, files only', () async {
     final archive = await pack('.tar.gz');

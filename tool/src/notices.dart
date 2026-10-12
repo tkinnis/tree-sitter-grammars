@@ -40,7 +40,7 @@ String noticesFor(
   String committed,
   Iterable<String> grammarNames,
 ) {
-  if (!platform.isWindows) return committed;
+  if (platform.isMacos) return committed;
   var notices = committed;
   for (final name in ['tree-sitter', ...grammarNames]) {
     notices = notices.replaceAll(
