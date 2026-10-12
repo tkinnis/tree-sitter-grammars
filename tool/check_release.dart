@@ -124,6 +124,7 @@ import 'package:path/path.dart' as p;
 
 import 'src/build_platform.dart';
 import 'src/build_record.dart';
+import 'src/compiler.dart' show runtimeExports;
 import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
@@ -560,24 +561,20 @@ void _checkExports(
 /// [_checkLibraries] on Windows: the runtime at [runtimePath] and every
 /// grammar's DLL must be what [dllProblems] requires, the runtime
 /// exporting every function of the `api.h` under [runtimeSource] that
-/// [_checkExports] requires through `dart:ffi`.
+/// [_checkExports] requires through `dart:ffi`, and the allocator
+/// variables its `alloc.h` marks `TS_PUBLIC`.
 void _checkDlls(
   String runtimePath,
   String runtimeSource,
   List<_Grammar> grammars,
   List<String> problems,
 ) {
-  final header = File(
-    p.join(runtimeSource, 'lib', 'include', 'tree_sitter', 'api.h'),
-  );
   final expectations = [
     DllExpectation(
       path: runtimePath,
       name: _platform.runtimeFileName,
-      exportedSymbols: header.existsSync()
-          ? apiFunctions(
-              header.readAsStringSync(),
-            ).where((f) => !wasmOnlyFunctions.contains(f)).toList()
+      exportedSymbols: Directory(runtimeSource).existsSync()
+          ? runtimeExports(runtimeSource)
           : const ['ts_parser_new'],
     ),
     for (final grammar in grammars)

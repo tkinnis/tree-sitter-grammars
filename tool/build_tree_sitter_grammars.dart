@@ -76,7 +76,6 @@ import 'src/query_headers.dart';
 import 'src/query_provenance.dart';
 import 'src/release.dart';
 import 'src/release_archive.dart';
-import 'src/release_check.dart' show apiFunctions, wasmOnlyFunctions;
 import 'src/source_bundles.dart';
 import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
@@ -275,7 +274,7 @@ Future<void> _build(String root, _Options options) async {
       '  Windows SDK ${compiler.sdkVersion}',
     );
     // The runtime's link reads its exports from this file, written from
-    // the api.h of the runtime it compiles.
+    // the api.h and alloc.h of the runtime it compiles.
     File(
       p.normalize(p.join(runtimeDirectory, runtimeModuleDefinitionPath)),
     ).writeAsStringSync(
@@ -284,6 +283,9 @@ Future<void> _build(String root, _Options options) async {
           p.join(runtimeDirectory, 'lib', 'include', 'tree_sitter', 'api.h'),
         ).readAsStringSync(),
         platform.runtimeFileName,
+        allocHeader: File(
+          p.join(runtimeDirectory, 'lib', 'src', 'alloc.h'),
+        ).readAsStringSync(),
       ),
     );
   } else {
@@ -329,17 +331,7 @@ Future<void> _build(String root, _Options options) async {
         DllExpectation(
           path: p.join(outputDirectory, platform.runtimeFileName),
           name: platform.runtimeFileName,
-          exportedSymbols: apiFunctions(
-            File(
-              p.join(
-                runtimeDirectory,
-                'lib',
-                'include',
-                'tree_sitter',
-                'api.h',
-              ),
-            ).readAsStringSync(),
-          ).where((f) => !wasmOnlyFunctions.contains(f)).toList(),
+          exportedSymbols: runtimeExports(runtimeDirectory),
         ),
         platform,
       ),

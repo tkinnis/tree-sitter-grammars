@@ -613,11 +613,21 @@ void ts_parser_delete(TSParser *self);
 TSWasmStore *ts_wasm_store_new(TSWasmEngine *engine, TSWasmError *error);
 ''';
 
-      check(runtimeModuleDefinition(header, 'tree-sitter.dll')).equals(
+      const alloc = '''
+TS_PUBLIC extern void *(*ts_current_malloc)(size_t size);
+TS_PUBLIC extern void (*ts_current_free)(void *ptr);
+#define ts_free ts_current_free
+''';
+
+      check(
+        runtimeModuleDefinition(header, 'tree-sitter.dll', allocHeader: alloc),
+      ).equals(
         'LIBRARY tree-sitter.dll\n'
         'EXPORTS\n'
         '  ts_parser_delete\n'
-        '  ts_parser_new\n',
+        '  ts_parser_new\n'
+        '  ts_current_malloc DATA\n'
+        '  ts_current_free DATA\n',
       );
     });
   });

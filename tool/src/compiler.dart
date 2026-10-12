@@ -313,19 +313,54 @@ Map<String, String> compilerEnvironment(Map<String, String> parent) {
 
 /// The module-definition file that makes the Windows runtime export every
 /// function [apiHeader], the text of its `api.h`, declares, apart from
-/// [wasmOnlyFunctions], under the DLL name [libraryName].
+/// [wasmOnlyFunctions], and every allocator variable [allocHeader], the
+/// text of its `lib/src/alloc.h`, marks `TS_PUBLIC`, under the DLL name
+/// [libraryName].
 ///
 /// tree-sitter marks none of its API for export on Windows (its
 /// `TS_PUBLIC` is empty there), so without this the DLL would export
-/// nothing; the export list follows `api.h` at the pinned runtime, as the
-/// symbol visibility of the macOS build does.
-String runtimeModuleDefinition(String apiHeader, String libraryName) => [
+/// nothing; the export list follows the headers at the pinned runtime, as
+/// the symbol visibility of the macOS build does. The allocator variables
+/// are exported as data, as the macOS runtime exports them, so a caller
+/// frees what the runtime allocated for it with the runtime's own
+/// `ts_current_free`.
+String runtimeModuleDefinition(
+  String apiHeader,
+  String libraryName, {
+  String allocHeader = '',
+}) => [
   'LIBRARY $libraryName',
   'EXPORTS',
   for (final function in apiFunctions(apiHeader))
     if (!wasmOnlyFunctions.contains(function)) '  $function',
+  for (final variable in allocatorVariables(allocHeader)) '  $variable DATA',
   '',
 ].join('\n');
+
+/// Every symbol the Windows runtime compiled from the sources at
+/// [runtimeDirectory] must export: the functions and allocator variables
+/// [runtimeModuleDefinition] lists from its `api.h` and `alloc.h`.
+List<String> runtimeExports(String runtimeDirectory) => [
+  for (final function in apiFunctions(
+    File(
+      p.join(runtimeDirectory, 'lib', 'include', 'tree_sitter', 'api.h'),
+    ).readAsStringSync(),
+  ))
+    if (!wasmOnlyFunctions.contains(function)) function,
+  ...allocatorVariables(
+    File(p.join(runtimeDirectory, 'lib', 'src', 'alloc.h')).readAsStringSync(),
+  ),
+];
+
+/// The allocator variables `lib/src/alloc.h`, whose text is [allocHeader],
+/// declares `TS_PUBLIC`: the function pointers through which the runtime
+/// allocates, `ts_current_malloc` to `ts_current_free`.
+List<String> allocatorVariables(String allocHeader) => [
+  for (final match in RegExp(
+    r'TS_PUBLIC\s+extern\s[^;]*\(\s*\*\s*(ts_\w+)\s*\)',
+  ).allMatches(allocHeader))
+    match.group(1)!,
+];
 
 /// Where the Windows runtime's module-definition file is written, relative
 /// to the runtime's extracted sources, in which its link runs.

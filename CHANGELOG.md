@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - A build on Windows, for arm64 and, run by an x64 Dart, for x64: `dart run tool/build_tree_sitter_grammars.dart` compiles the runtime and every grammar with LLVM's clang for `aarch64-pc-windows-msvc` or `x86_64-pc-windows-msvc`, at `-O3` with tree-sitter's assertions on, against the MSVC tools and Windows SDK it names by path, into `tree-sitter.dll` and `dylibs/<language>/<language>.dll`, each importing nothing but `KERNEL32.dll` and the Universal CRT; `--release` packs them into `grammars-windows-<arch>.tar.gz`, laid out as the macOS archive is
-- The Windows runtime exports every `api.h` function but the three that need the wasm feature, through a module-definition file written from the pinned runtime's `api.h`
+- The Windows runtime exports every `api.h` function but the three that need the wasm feature, and the allocator variables `alloc.h` marks `TS_PUBLIC` as data, as the macOS runtime does, through a module-definition file written from the pinned runtime's `api.h`
 - `tool/src/pe.dart` checks each DLL's machine, export name, imports and exports, read from its PE headers, as `tool/src/macho.dart` checks a dylib
 - `tool/toolchain.json` pins the tree-sitter CLI release asset each Windows architecture generates latex and swift with, under `windows`
 - `.gitattributes` checks every file out as the bytes the repository holds, so a Windows checkout with `core.autocrlf` builds the same archive
