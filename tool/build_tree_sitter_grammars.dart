@@ -28,7 +28,8 @@
 /// tree compiled, generated or not, must have the digest its pin records.
 /// Every library is compiled for the platform the build runs on (see
 /// `tool/src/build_platform.dart`): by Xcode's clang on macOS and by LLVM's
-/// clang on Windows, with the flags in `tool/src/compiler.dart`, and
+/// clang on Linux and Windows, with the flags in `tool/src/compiler.dart`,
+/// and
 /// `output/build_info.json` records them and every bundle's sha256.
 ///
 /// `--release=vX.Y.Z` first requires a clean working tree whose `HEAD` is
@@ -61,6 +62,7 @@ import 'package:path/path.dart' as p;
 import 'src/build_platform.dart';
 import 'src/build_record.dart';
 import 'src/compiler.dart';
+import 'src/elf.dart';
 import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
@@ -156,16 +158,17 @@ Future<void> _build(String root, _Options options) async {
   } on BuildPlatformException catch (error) {
     throw BuildException('$error');
   }
-  if (publish && platform.isWindows) {
+  if (publish && !platform.isMacos) {
     // A release is created once, with the macOS archive and the source
     // bundles it was built from; publishing creates it, so a second
     // platform's archive cannot be published the same way. It is built
     // from the release's downloaded bundles instead, so the bundle sha256s
     // its build_info.json records are those of assets the release has.
-    throw const BuildException(
+    throw BuildException(
       '--publish creates the release from a build on macOS; a build on '
-      'Windows packs its archive with --release=<tag> --sources=<the '
-      "release's downloaded assets>, and is attached with gh release upload",
+      '${platform.osName} packs its archive with --release=<tag> '
+      "--sources=<the release's downloaded assets>, and is attached with "
+      'gh release upload',
     );
   }
   final bundles = sources == null ? null : _sourcesDirectory(root, sources);
@@ -290,6 +293,8 @@ Future<void> _build(String root, _Options options) async {
         ).readAsStringSync(),
       ),
     );
+  } else if (platform.isLinux) {
+    print('  ${compiler.libc}\n  ${compiler.libcPath}');
   } else {
     print('  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
   }
@@ -327,7 +332,31 @@ Future<void> _build(String root, _Options options) async {
   );
 
   _step('Checking every library');
-  if (platform.isWindows) {
+  if (platform.isLinux) {
+    _requireNone('libraries', [
+      ...elfProblems(
+        ElfExpectation(
+          path: p.join(outputDirectory, platform.runtimeFileName),
+          soname: platform.runtimeFileName,
+          exportedSymbols: runtimeExports(runtimeDirectory),
+        ),
+        platform,
+      ),
+      for (final build in builds)
+        ...elfProblems(
+          ElfExpectation(
+            path: p.join(
+              outputDirectory,
+              build.dylibDirectory,
+              build.libraryFileName(platform),
+            ),
+            soname: build.libraryFileName(platform),
+            exportedSymbols: ['tree_sitter_${build.symbol}'],
+          ),
+          platform,
+        ),
+    ]);
+  } else if (platform.isWindows) {
     _requireNone('libraries', [
       ...dllProblems(
         DllExpectation(

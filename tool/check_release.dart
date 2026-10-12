@@ -23,9 +23,10 @@
 ///   entry records.
 /// - `build_info.json` records the platform this process runs on, whose
 ///   libraries are the only ones it can load.
-/// - The runtime (`libtree-sitter.dylib` on macOS, `tree-sitter.dll` on
-///   Windows) exports every function the runtime's `api.h` declares, apart
-///   from the three it defines only with its wasm feature.
+/// - The runtime (`libtree-sitter.dylib` on macOS, `libtree-sitter.so` on
+///   Linux, `tree-sitter.dll` on Windows) exports every function the
+///   runtime's `api.h` declares, apart from the three it defines only with
+///   its wasm feature.
 /// - `manifest.json` holds exactly the entries `tool/grammars.json` plans,
 ///   each of the kind it plans (a compiled grammar, planned as the build
 ///   plans it from each bundle's `tree-sitter.json`, a query-only language
@@ -33,9 +34,12 @@
 ///   checks below read.
 /// - The runtime and every grammar library is a thin binary of the
 ///   toolchain's architecture with its `minos`, an `@rpath` install name
-///   and no dependency beyond `libSystem`; on Windows, a DLL for the
-///   platform's machine whose export table carries its file name and
-///   which imports nothing but `KERNEL32.dll` and the Universal CRT.
+///   and no dependency beyond `libSystem`; on Linux, a shared object for
+///   the platform's machine whose soname is its file name, which needs
+///   nothing but `libc.so.6` and has no text relocations; on Windows, a
+///   DLL for the platform's machine whose export table carries its file
+///   name and which imports nothing but `KERNEL32.dll` and the Universal
+///   CRT.
 /// - `build_info.json` records the language versions the runtime's
 ///   `api.h` defines, and `ts_parser_set_language` accepts every grammar,
 ///   found through its `config.json` `symbol`, whose
@@ -75,8 +79,9 @@
 ///   and parses again after an edit, in a process of its own running
 ///   `tool/parse_input.dart`, which exits 0 within `parseProcessTimeout`: no
 ///   scanner aborts the process or crashes it on input it cannot hold.
-/// - `THIRD_PARTY_NOTICES.md` is the committed text, on Windows with each
-///   library named as Windows names it, and names the runtime,
+/// - `THIRD_PARTY_NOTICES.md` is the committed text, on Linux and Windows
+///   with each library named as that platform names it, and names the
+///   runtime,
 ///   every source bundle's commit, every shipped query file and the
 ///   licences the archive has to carry.
 ///
@@ -125,6 +130,7 @@ import 'package:path/path.dart' as p;
 import 'src/build_platform.dart';
 import 'src/build_record.dart';
 import 'src/compiler.dart' show runtimeExports;
+import 'src/elf.dart';
 import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
@@ -282,7 +288,14 @@ _check(
   await _checkGenerated(output, info, plan, problems);
   _checkBundleFiles(output, toolchain, entries, plan, problems);
   final grammars = _checkManifest(output, manifest, entries, plan, problems);
-  if (_platform.isWindows) {
+  if (_platform.isLinux) {
+    _checkElfLibraries(
+      runtimePath,
+      p.join(sourceRoot, 'tree-sitter'),
+      grammars,
+      problems,
+    );
+  } else if (_platform.isWindows) {
     _checkDlls(
       runtimePath,
       p.join(sourceRoot, 'tree-sitter'),
@@ -596,6 +609,47 @@ void _checkDlls(
   print(
     'libraries: $good/${expectations.length} ${_platform.id} DLLs named '
     'as their files, KERNEL32 and the Universal CRT only',
+  );
+}
+
+/// [_checkLibraries] on Linux: the runtime at [runtimePath] and every
+/// grammar's shared object must be what [elfProblems] requires, the
+/// runtime exporting every function of the `api.h` under [runtimeSource]
+/// that [_checkExports] requires through `dart:ffi`, and the allocator
+/// variables its `alloc.h` marks `TS_PUBLIC`.
+void _checkElfLibraries(
+  String runtimePath,
+  String runtimeSource,
+  List<_Grammar> grammars,
+  List<String> problems,
+) {
+  final expectations = [
+    ElfExpectation(
+      path: runtimePath,
+      soname: _platform.runtimeFileName,
+      exportedSymbols: Directory(runtimeSource).existsSync()
+          ? runtimeExports(runtimeSource)
+          : const ['ts_parser_new'],
+    ),
+    for (final grammar in grammars)
+      ElfExpectation(
+        path: p.join(
+          grammar.directory,
+          _platform.libraryFileName(grammar.name),
+        ),
+        soname: _platform.libraryFileName(grammar.name),
+        exportedSymbols: ['tree_sitter_${grammar.symbol}'],
+      ),
+  ];
+  var good = 0;
+  for (final expectation in expectations) {
+    final found = elfProblems(expectation, _platform);
+    problems.addAll(found);
+    if (found.isEmpty) good++;
+  }
+  print(
+    'libraries: $good/${expectations.length} ${_platform.id} shared '
+    'objects named as their files, position-independent, libc only',
   );
 }
 
