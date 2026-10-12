@@ -294,7 +294,7 @@ Future<void> _build(String root, _Options options) async {
       ),
     );
   } else if (platform.isLinux) {
-    print('  ${compiler.libc}\n  ${compiler.libcPath}');
+    print('  ${compiler.hostLibc}\n  ${compiler.hostLibcPath}');
   } else {
     print('  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
   }

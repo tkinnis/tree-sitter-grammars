@@ -57,8 +57,8 @@ final class Compiler {
     this.platform = BuildPlatform.macosArm64,
     this.msvcToolsPath,
     this.msvcToolsVersion,
-    this.libc,
-    this.libcPath,
+    this.hostLibc,
+    this.hostLibcPath,
   });
 
   /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
@@ -92,14 +92,15 @@ final class Compiler {
   /// On Windows, the version of the MSVC tools at [msvcToolsPath].
   final String? msvcToolsVersion;
 
-  /// On Linux, the C library every library links against, as
-  /// `getconf GNU_LIBC_VERSION` names it, for example `glibc 2.43`; null on
-  /// macOS and Windows.
-  final String? libc;
+  /// On Linux, the build host's C library, which every library links
+  /// against, as `getconf GNU_LIBC_VERSION` names it, for example
+  /// `glibc 2.43`; null on macOS and Windows. It is not the glibc a library
+  /// needs, which is the highest `GLIBC_` version its symbols name.
+  final String? hostLibc;
 
-  /// On Linux, the `libc.so.6` clang links against, as
+  /// On Linux, the build host's `libc.so.6` clang links against, as
   /// `clang -print-file-name=libc.so.6` finds it for the platform's target.
-  final String? libcPath;
+  final String? hostLibcPath;
 
   /// Resolves the compiler a build on [platform], by default the platform
   /// this process runs on, compiles with: on macOS through `xcrun`, which
@@ -145,9 +146,8 @@ final class Compiler {
   /// Resolves clang and the C library for a build on [platform].
   ///
   /// clang is the first `clang` on `PATH`; the C library is the
-  /// `libc.so.6` it links against for [platform]'s target, and its version
-  /// what `getconf GNU_LIBC_VERSION` reports, the glibc every library
-  /// requires at least.
+  /// host's `libc.so.6` it links against for [platform]'s target, and its
+  /// version what `getconf GNU_LIBC_VERSION` reports.
   static Future<Compiler> _resolveLinux(BuildPlatform platform) async {
     final path = _onPath('clang', platform);
     final environment = compilerEnvironment(Platform.environment);
@@ -187,8 +187,8 @@ final class Compiler {
       path: path,
       version: (await run(path, ['--version'])).split('\n').first.trim(),
       platform: platform,
-      libc: libc,
-      libcPath: p.normalize(libcPath),
+      hostLibc: libc,
+      hostLibcPath: p.normalize(libcPath),
     );
   }
 

@@ -27,9 +27,9 @@ const repositoryUrl = 'https://github.com/tkinnis/tree-sitter-grammars';
 /// bundles and the archive.
 ///
 /// A macOS build records its deployment target and Xcode's clang and SDK;
-/// a Linux build records its clang and the C library it links against; a
-/// Windows build records LLVM's clang, the MSVC tools and the Windows SDK;
-/// each with its path.
+/// a Linux build records its clang and the build host's C library it links
+/// against; a Windows build records LLVM's clang, the MSVC tools and the
+/// Windows SDK; each with its path.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -74,7 +74,10 @@ Map<String, Object?> buildInfo({
         'sdk': compiler.sdkVersion,
         'sdkPath': compiler.sdkPath,
       },
-      'linux' => {'libc': compiler.libc, 'libcPath': compiler.libcPath},
+      'linux' => {
+        'hostLibc': compiler.hostLibc,
+        'hostLibcPath': compiler.hostLibcPath,
+      },
       _ => {
         'sdk': compiler.sdkVersion,
         'sdkBuild': compiler.sdkBuildVersion,

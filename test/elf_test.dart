@@ -105,9 +105,9 @@ void main() {
   }
 
   test('the compiler records the C library it links against', () {
-    check(compiler.libc).isNotNull().startsWith('glibc ');
-    check(compiler.libcPath).isNotNull().endsWith('libc.so.6');
-    check(p.isAbsolute(compiler.libcPath!)).isTrue();
+    check(compiler.hostLibc).isNotNull().startsWith('glibc ');
+    check(compiler.hostLibcPath).isNotNull().endsWith('libc.so.6');
+    check(p.isAbsolute(compiler.hostLibcPath!)).isTrue();
     check(compiler.sdkPath).isNull();
   });
 

@@ -249,7 +249,7 @@ void main() {
     final notes = releaseNotes({
       'platform': 'linux-arm64',
       'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
-      'toolchain': {'libc': 'glibc 2.43'},
+      'toolchain': {'hostLibc': 'glibc 2.43'},
       'sources': const <String, Object?>{},
     }, 'aa');
 

@@ -442,8 +442,8 @@ void main() {
       path: '/usr/bin/clang',
       version: 'Ubuntu clang version 21.1.8 (6ubuntu1)',
       platform: BuildPlatform.linuxArm64,
-      libc: 'glibc 2.43',
-      libcPath: '/lib/aarch64-linux-gnu/libc.so.6',
+      hostLibc: 'glibc 2.43',
+      hostLibcPath: '/lib/aarch64-linux-gnu/libc.so.6',
     );
     const toolchain = Toolchain(
       treeSitterTag: 'v0.27.0',
@@ -593,8 +593,8 @@ void main() {
       ).equals(toolchain.cliPins['linux']!['arm64']!.sha256);
       check(tools['clang']).equals('Ubuntu clang version 21.1.8 (6ubuntu1)');
       check(tools['clangPath']).equals('/usr/bin/clang');
-      check(tools['libc']).equals('glibc 2.43');
-      check(tools['libcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
+      check(tools['hostLibc']).equals('glibc 2.43');
+      check(tools['hostLibcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
       for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
         check(tools.containsKey(key)).isFalse();
       }

@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - `build_info.json` of a Windows build records its platform, LLVM's clang, the MSVC tools and the Windows SDK in place of the deployment target, Xcode's clang and the macOS SDK; a macOS build records what it did
-- `build_info.json` of a Linux build records its platform, clang and the glibc it links against, with the path of each, in place of the deployment target, Xcode's clang and the macOS SDK
+- `build_info.json` of a Linux build records its platform, clang and the build host's glibc it links against (`toolchain.hostLibc`), with the path of each, in place of the deployment target, Xcode's clang and the macOS SDK
 - `manifest.json` spells `dylib_dir` with `/` on every platform
 
 ## [1.4.0] - 2026-10-08
