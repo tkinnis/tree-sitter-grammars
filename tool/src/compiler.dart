@@ -6,6 +6,9 @@
 /// record cannot drift from what ran.
 ///
 /// On macOS the compiler is the clang of the Xcode `xcrun` selects. On
+/// Linux it is the first `clang` on `PATH`, targeting the platform's GNU
+/// triple and linking with the system's linker against the system's C
+/// library, which `build_info.json` records as macOS records its SDK. On
 /// Windows it is LLVM's clang driving `lld-link`, targeting
 /// `*-pc-windows-msvc` against the libraries of the Visual Studio and the
 /// Windows SDK it names explicitly, rather than MSVC's `cl.exe`: it takes
@@ -41,38 +44,42 @@ final class CompilerException implements Exception {
   String toString() => message;
 }
 
-/// The clang and SDK the build uses: Xcode's clang and the macOS SDK, or
-/// LLVM's clang with the MSVC tools and the Windows SDK.
+/// The clang and SDK the build uses: Xcode's clang and the macOS SDK,
+/// clang and the C library on Linux, or LLVM's clang with the MSVC tools
+/// and the Windows SDK.
 final class Compiler {
   const Compiler({
     required this.path,
     required this.version,
-    required this.sdkPath,
-    required this.sdkVersion,
-    required this.sdkBuildVersion,
+    this.sdkPath,
+    this.sdkVersion,
+    this.sdkBuildVersion,
     this.platform = BuildPlatform.macosArm64,
     this.msvcToolsPath,
     this.msvcToolsVersion,
+    this.libc,
+    this.libcPath,
   });
 
   /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
-  /// or on Windows the first `clang.exe` on `PATH`.
+  /// or on Linux and Windows the first `clang` or `clang.exe` on `PATH`.
   final String path;
 
   /// The first line of `clang --version`.
   final String version;
 
   /// The macOS SDK passed as `-isysroot`, or the root of the Windows Kits
-  /// passed as `-Xmicrosoft-windows-sdk-root`.
-  final String sdkPath;
+  /// passed as `-Xmicrosoft-windows-sdk-root`; null on Linux, which builds
+  /// against the system's own headers and C library.
+  final String? sdkPath;
 
   /// `xcrun --sdk macosx --show-sdk-version`, or the Windows SDK version
-  /// passed as `-Xmicrosoft-windows-sdk-version`.
-  final String sdkVersion;
+  /// passed as `-Xmicrosoft-windows-sdk-version`; null on Linux.
+  final String? sdkVersion;
 
   /// `xcrun --sdk macosx --show-sdk-build-version`; on Windows, the build
-  /// number [sdkVersion] carries.
-  final String sdkBuildVersion;
+  /// number [sdkVersion] carries; null on Linux.
+  final String? sdkBuildVersion;
 
   /// The platform every library is compiled for.
   final BuildPlatform platform;
@@ -85,12 +92,23 @@ final class Compiler {
   /// On Windows, the version of the MSVC tools at [msvcToolsPath].
   final String? msvcToolsVersion;
 
+  /// On Linux, the C library every library links against, as
+  /// `getconf GNU_LIBC_VERSION` names it, for example `glibc 2.43`; null on
+  /// macOS and Windows.
+  final String? libc;
+
+  /// On Linux, the `libc.so.6` clang links against, as
+  /// `clang -print-file-name=libc.so.6` finds it for the platform's target.
+  final String? libcPath;
+
   /// Resolves the compiler a build on [platform], by default the platform
   /// this process runs on, compiles with: on macOS through `xcrun`, which
-  /// honours `DEVELOPER_DIR`, and on Windows as [_resolveWindows] does.
+  /// honours `DEVELOPER_DIR`, on Linux as [_resolveLinux] does, and on
+  /// Windows as [_resolveWindows] does.
   static Future<Compiler> resolve([BuildPlatform? platform]) async {
     platform ??= BuildPlatform.host;
     if (platform.isWindows) return _resolveWindows(platform);
+    if (platform.isLinux) return _resolveLinux(platform);
     Future<String> xcrun(List<String> arguments) async {
       final result = await Process.run('xcrun', arguments);
       if (result.exitCode != 0) {
@@ -124,6 +142,56 @@ final class Compiler {
     );
   }
 
+  /// Resolves clang and the C library for a build on [platform].
+  ///
+  /// clang is the first `clang` on `PATH`; the C library is the
+  /// `libc.so.6` it links against for [platform]'s target, and its version
+  /// what `getconf GNU_LIBC_VERSION` reports, the glibc every library
+  /// requires at least.
+  static Future<Compiler> _resolveLinux(BuildPlatform platform) async {
+    final path = _onPath('clang', platform);
+    final environment = compilerEnvironment(Platform.environment);
+    Future<String> run(String executable, List<String> arguments) async {
+      final result = await Process.run(
+        executable,
+        arguments,
+        environment: environment,
+        includeParentEnvironment: false,
+      );
+      if (result.exitCode != 0) {
+        throw CompilerException(
+          '$executable ${arguments.join(' ')} failed: ${result.stderr}',
+        );
+      }
+      return (result.stdout as String).trim();
+    }
+
+    final libcPath = await run(path, [
+      '--target=${platform.linuxTarget}',
+      '-print-file-name=libc.so.6',
+    ]);
+    if (!p.isAbsolute(libcPath)) {
+      throw CompilerException(
+        '$path finds no libc.so.6 for ${platform.linuxTarget}; install the '
+        'C library for that target',
+      );
+    }
+    final libc = await run('getconf', ['GNU_LIBC_VERSION']);
+    if (!RegExp(r'^glibc \d+\.\d+').hasMatch(libc)) {
+      throw CompilerException(
+        'getconf GNU_LIBC_VERSION reports $libc; a build on Linux links '
+        'against glibc',
+      );
+    }
+    return Compiler(
+      path: path,
+      version: (await run(path, ['--version'])).split('\n').first.trim(),
+      platform: platform,
+      libc: libc,
+      libcPath: p.normalize(libcPath),
+    );
+  }
+
   /// Resolves LLVM's clang, the MSVC tools and the Windows SDK for a build
   /// on [platform].
   ///
@@ -136,7 +204,7 @@ final class Compiler {
   /// of the user's decides what the libraries are compiled and linked
   /// against.
   static Future<Compiler> _resolveWindows(BuildPlatform platform) async {
-    final path = _onPath('clang.exe');
+    final path = _onPath('clang.exe', platform);
     final version = await Process.run(
       path,
       ['--version'],
@@ -162,15 +230,20 @@ final class Compiler {
 }
 
 /// The absolute path of the first [executable] in a directory `PATH`
-/// lists; throws a [CompilerException] when there is none.
-String _onPath(String executable) {
-  for (final directory in (Platform.environment['PATH'] ?? '').split(';')) {
+/// lists, which a build on [platform] compiles with; throws a
+/// [CompilerException] when there is none.
+String _onPath(String executable, BuildPlatform platform) {
+  final separator = Platform.isWindows ? ';' : ':';
+  for (final directory in (Platform.environment['PATH'] ?? '').split(
+    separator,
+  )) {
     if (directory.isEmpty) continue;
     final candidate = p.join(directory, executable);
     if (File(candidate).existsSync()) return p.normalize(candidate);
   }
   throw CompilerException(
-    "no $executable on PATH; a build on Windows compiles with LLVM's clang",
+    'no $executable on PATH; a build on ${platform.osName} compiles with '
+    "LLVM's clang",
   );
 }
 
@@ -275,21 +348,29 @@ Future<({String sdkRoot, String sdkVersion})> _windowsSdk(
   return (sdkRoot: root, sdkVersion: versions.last);
 }
 
-/// The variables a compiler invocation may see on [platform].
+/// The variables a compiler invocation may see, by [BuildPlatform.os].
 ///
-/// On Windows a process needs `SystemRoot` to start at all, and clang
-/// writes the objects of a compile it links in the same invocation to
-/// `TEMP` or `TMP`.
+/// On macOS `DEVELOPER_DIR` selects the Xcode whose clang runs. On Windows
+/// a process needs `SystemRoot` to start at all, and clang writes the
+/// objects of a compile it links in the same invocation to `TEMP` or
+/// `TMP`, as it does to `TMPDIR` on macOS and Linux.
+const _compilerVariables = {
+  'macos': {'PATH', 'TMPDIR', 'DEVELOPER_DIR'},
+  'linux': {'PATH', 'TMPDIR'},
+  'windows': {'PATH', 'SystemRoot', 'TEMP', 'TMP'},
+};
+
+/// The variables a compiler invocation may see on [platform].
 Set<String> allowedCompilerVariablesOf(BuildPlatform platform) =>
-    platform.isWindows
-    ? const {'PATH', 'SystemRoot', 'TEMP', 'TMP'}
-    : const {'PATH', 'TMPDIR', 'DEVELOPER_DIR'};
+    _compilerVariables[platform.os]!;
 
 /// The variables a compiler invocation inherits from [parent]; every other
 /// variable, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` among them, is left out.
 ///
 /// clang finds the SDK through the explicit `-isysroot`, and its own
-/// linker beside itself, so it needs no search path of the user's. On
+/// linker beside itself, so it needs no search path of the user's; on
+/// Linux it finds the system's headers, C library and linker under `/usr`,
+/// which is where `PATH` points. On
 /// Windows, where clang finds the MSVC tools and the Windows SDK through
 /// the paths its flags name, and `lld-link` beside itself, `PATH` holds
 /// only the system's own directories, and neither `INCLUDE` nor `LIB`
@@ -306,8 +387,9 @@ Map<String, String> compilerEnvironment(Map<String, String> parent) {
   }
   return {
     'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
-    for (final name in const ['TMPDIR', 'DEVELOPER_DIR'])
-      if (parent[name] case final value?) name: value,
+    for (final name in _compilerVariables[Platform.operatingSystem] ?? const {})
+      if (name != 'PATH')
+        if (parent[name] case final value?) name: value,
   };
 }
 
@@ -376,12 +458,13 @@ final class BuildFlags {
     if (compiler.platform.isWindows) {
       return BuildFlags._windows(toolchain, compiler);
     }
+    if (compiler.platform.isLinux) return BuildFlags._linux(compiler);
     final target = [
       '-arch',
       toolchain.arch,
       '-mmacosx-version-min=${toolchain.deploymentTarget}',
       '-isysroot',
-      compiler.sdkPath,
+      compiler.sdkPath!,
     ];
     const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
     const linkerHeaderPad = '-Wl,-headerpad_max_install_names';
@@ -430,9 +513,9 @@ final class BuildFlags {
       '-Xmicrosoft-visualc-tools-root',
       compiler.msvcToolsPath!,
       '-Xmicrosoft-windows-sdk-root',
-      compiler.sdkPath,
+      compiler.sdkPath!,
       '-Xmicrosoft-windows-sdk-version',
-      compiler.sdkVersion,
+      compiler.sdkVersion!,
     ];
     const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
     const link = [
@@ -466,6 +549,45 @@ final class BuildFlags {
     );
   }
 
+  /// The flags of a build for Linux: those of macOS (`-O3` and no
+  /// `NDEBUG`, C11, `-fPIC`, the runtime's hidden visibility and its
+  /// POSIX and default-source defines, the prefix map) with the
+  /// platform's target triple in place of `-arch` and no SDK, since clang
+  /// compiles against the system's headers and C library.
+  ///
+  /// Every library is linked `-shared` with its file name as its soname,
+  /// as the macOS link gives each its install name, and with `-z defs`, so
+  /// a symbol nothing defines fails the link, as it does on macOS and
+  /// Windows, rather than the first load. The runtime takes none of the
+  /// Darwin defines, which glibc does not read.
+  factory BuildFlags._linux(Compiler compiler) {
+    final platform = compiler.platform;
+    final target = ['--target=${platform.linuxTarget}'];
+    const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
+    const link = ['-Wl,-z,defs'];
+    return BuildFlags._(
+      runtime: [
+        '-O3',
+        '-std=c11',
+        '-fPIC',
+        '-fvisibility=hidden',
+        '-D_POSIX_C_SOURCE=200112L',
+        '-D_DEFAULT_SOURCE',
+        '-D_BSD_SOURCE',
+        '-Ilib/src',
+        '-Ilib/src/wasm',
+        '-Ilib/include',
+        '-shared',
+        ...target,
+        prefixMap,
+        ...link,
+        ...libraryNameFlags(platform.runtimeFileName, platform),
+      ],
+      grammarCompile: ['-c', '-O3', '-std=c11', '-fPIC', ...target, prefixMap],
+      grammarLink: ['-shared', ...target, ...link],
+    );
+  }
+
   const BuildFlags._({
     required this.runtime,
     required this.grammarCompile,
@@ -491,18 +613,27 @@ List<String> grammarSourceFlags(String includeDirectory) => [
   includeDirectory,
 ];
 
-/// The flags a grammar's link passes after [BuildFlags.grammarLink]: the
-/// install name of `lib<libraryName>.dylib`.
-///
-/// A Windows DLL has no install name: the name its export table carries is
-/// its file name, which the link's output gives it, so on [platform]
-/// Windows a grammar's link passes no flags of its own.
+/// The flags a grammar's link passes after [BuildFlags.grammarLink]: those
+/// [libraryNameFlags] gives its library, `lib<libraryName>.dylib` on
+/// macOS and as [platform] names it elsewhere.
 List<String> grammarLinkFlags(
   String libraryName, {
   BuildPlatform platform = BuildPlatform.macosArm64,
-}) => platform.isWindows
-    ? const []
-    : ['-Wl,-install_name,@rpath/lib$libraryName.dylib'];
+}) => libraryNameFlags(platform.libraryFileName(libraryName), platform);
+
+/// The flags that give the library [fileName] of [platform] the name it is
+/// loaded by: on macOS its install name, `@rpath/<fileName>`, and on
+/// Linux its soname, `<fileName>`.
+///
+/// A Windows DLL has no install name: the name its export table carries is
+/// its file name, which the link's output gives it, so on Windows a link
+/// passes no flags for it.
+List<String> libraryNameFlags(String fileName, BuildPlatform platform) =>
+    switch (platform) {
+      BuildPlatform.macosArm64 => ['-Wl,-install_name,@rpath/$fileName'],
+      BuildPlatform.linuxArm64 => ['-Wl,-soname,$fileName'],
+      BuildPlatform.windowsArm64 || BuildPlatform.windowsX64 => const [],
+    };
 
 /// [flags] with [workingDirectoryPlaceholder] replaced by the absolute
 /// [workingDirectory] an invocation runs in.
@@ -614,8 +745,8 @@ CompileCommand grammarCompileCommand({
 );
 
 /// Links one grammar's [objects] into [output], whose install name is
-/// `@rpath/lib<libraryName>.dylib` on macOS; paths are relative to
-/// [directory].
+/// `@rpath/lib<libraryName>.dylib` on macOS and whose soname is
+/// `lib<libraryName>.so` on Linux; paths are relative to [directory].
 CompileCommand grammarLinkCommand({
   required Compiler compiler,
   required BuildFlags flags,

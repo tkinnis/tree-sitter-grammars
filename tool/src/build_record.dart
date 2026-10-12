@@ -27,8 +27,9 @@ const repositoryUrl = 'https://github.com/tkinnis/tree-sitter-grammars';
 /// bundles and the archive.
 ///
 /// A macOS build records its deployment target and Xcode's clang and SDK;
-/// a Windows build records LLVM's clang, the MSVC tools and the Windows
-/// SDK, each with its path, in their place.
+/// a Linux build records its clang and the C library it links against; a
+/// Windows build records LLVM's clang, the MSVC tools and the Windows SDK;
+/// each with its path.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -44,11 +45,10 @@ Map<String, Object?> buildInfo({
   required Map<String, String> packingTools,
 }) => {
   'release': release,
-  'platform': compiler.platform.isWindows
-      ? compiler.platform.id
-      : 'macos-${toolchain.arch}',
-  if (!compiler.platform.isWindows)
-    'deploymentTarget': toolchain.deploymentTarget,
+  'platform': compiler.platform.isMacos
+      ? 'macos-${toolchain.arch}'
+      : compiler.platform.id,
+  if (compiler.platform.isMacos) 'deploymentTarget': toolchain.deploymentTarget,
   'repository': {
     'url': repositoryUrl,
     'commit': repositoryCommit,
@@ -67,15 +67,19 @@ Map<String, Object?> buildInfo({
   'toolchain': {
     'clang': compiler.version,
     'clangPath': compiler.path,
-    if (compiler.platform.isWindows) ...{
-      'msvcTools': compiler.msvcToolsVersion,
-      'msvcToolsPath': compiler.msvcToolsPath,
-      'sdk': compiler.sdkVersion,
-      'sdkPath': compiler.sdkPath,
-    } else ...{
-      'sdk': compiler.sdkVersion,
-      'sdkBuild': compiler.sdkBuildVersion,
-      'sdkPath': compiler.sdkPath,
+    ...switch (compiler.platform.os) {
+      'windows' => {
+        'msvcTools': compiler.msvcToolsVersion,
+        'msvcToolsPath': compiler.msvcToolsPath,
+        'sdk': compiler.sdkVersion,
+        'sdkPath': compiler.sdkPath,
+      },
+      'linux' => {'libc': compiler.libc, 'libcPath': compiler.libcPath},
+      _ => {
+        'sdk': compiler.sdkVersion,
+        'sdkBuild': compiler.sdkBuildVersion,
+        'sdkPath': compiler.sdkPath,
+      },
     },
     'git': packingTools['git'],
     'gzip': packingTools['gzip'],
@@ -319,7 +323,8 @@ String? _compileTailProblem(List<String> tail, String output, String source) =>
     : 'unexpected arguments ${tail.join(' ')}';
 
 /// Whether a link passing [own] flags and then [tail] writes [output]
-/// under its own install name from objects only; the problem, or null.
+/// under its own install name, or soname on Linux, from objects only; the
+/// problem, or null.
 ///
 /// A Windows DLL has no install name to check: its export table carries
 /// the file name its link writes.
@@ -329,12 +334,13 @@ String? _linkTailProblem(
   String output,
   BuildPlatform platform,
 ) {
-  final installName = '-Wl,-install_name,@rpath/${p.basename(output)}';
   final objects = tail.length < 3
       ? const <String>[]
       : tail.sublist(0, tail.length - 2);
-  if (!platform.isWindows && !own.contains(installName)) {
-    return 'its recorded flags name no install name $installName';
+  for (final name in libraryNameFlags(p.basename(output), platform)) {
+    if (!own.contains(name)) {
+      return 'its recorded flags name no install name $name';
+    }
   }
   return tail.length >= 3 &&
           objects.every((object) => object.endsWith('.o')) &&

@@ -1,4 +1,4 @@
-@TestOn('mac-os')
+@TestOn('mac-os || linux')
 library;
 
 import 'dart:io';
@@ -38,8 +38,8 @@ void main() {
     scratch = Directory.systemTemp.createTempSync('compiler_test').path;
     File(p.join(scratch, 'probe.c')).writeAsStringSync(_probe);
     probe = p.join(scratch, 'probe');
-    final result = await Process.run('xcrun', [
-      'clang',
+    final result = await Process.run(Platform.isMacOS ? 'xcrun' : 'clang', [
+      if (Platform.isMacOS) 'clang',
       p.join(scratch, 'probe.c'),
       '-o',
       probe,

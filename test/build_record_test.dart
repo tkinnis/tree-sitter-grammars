@@ -419,6 +419,244 @@ void main() {
     });
   }, testOn: 'windows');
 
+  test('the compiler environment on Linux keeps only the system PATH and '
+      'TMPDIR', () {
+    final environment = compilerEnvironment({
+      'PATH': '/opt/llvm/bin:/usr/bin',
+      'TMPDIR': '/tmp/x/',
+      'DEVELOPER_DIR': '/Applications/Xcode.app',
+      'CFLAGS': '-O0',
+      'LDFLAGS': '-Wl,-x',
+      'LD_LIBRARY_PATH': '/elsewhere',
+      'CCC_OVERRIDE_OPTIONS': '+-O0',
+    });
+
+    check(environment).deepEquals({
+      'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+      'TMPDIR': '/tmp/x/',
+    });
+  }, testOn: 'linux');
+
+  group('a Linux build', () {
+    const compiler = Compiler(
+      path: '/usr/bin/clang',
+      version: 'Ubuntu clang version 21.1.8 (6ubuntu1)',
+      platform: BuildPlatform.linuxArm64,
+      libc: 'glibc 2.43',
+      libcPath: '/lib/aarch64-linux-gnu/libc.so.6',
+    );
+    const toolchain = Toolchain(
+      treeSitterTag: 'v0.27.0',
+      treeSitterCommit: '6070dbfefd326bd735e5683eb128cc1b57dad0c0',
+      treeSitterFilesSha256:
+          '8284859e50207152e5df621e49086ea169020c47ef342489f5f8c06b7082f2ea',
+      cliVersion: '0.27.0',
+      cliAsset: 'tree-sitter-macos-arm64.gz',
+      cliSha256:
+          '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e',
+      arch: 'arm64',
+      deploymentTarget: '13.0',
+      cliPins: {
+        'linux': {
+          'arm64': (
+            asset: 'tree-sitter-linux-arm64.gz',
+            sha256:
+                '3a35a2dd961ad842384e982c75daf792c01d1a67e442fc3914d4de37bd8a59cb',
+          ),
+        },
+      },
+    );
+    const environment = {
+      'PATH': '/usr/bin:/bin:/usr/sbin:/sbin',
+      'TMPDIR': '/tmp/x/',
+    };
+    final linuxFlags = BuildFlags(toolchain, compiler);
+
+    List<CompileCommand> commands() {
+      final compile = grammarCompileCommand(
+        compiler: compiler,
+        flags: linuxFlags,
+        directory: '/clone',
+        includeDirectory: 'build/src/tree-sitter-json/src',
+        source: 'build/src/tree-sitter-json/src/parser.c',
+        object: 'build/obj/json/parser.o',
+        environment: environment,
+      );
+      return [
+        runtimeCommand(
+          compiler: compiler,
+          flags: linuxFlags,
+          directory: '/clone/build/src/tree-sitter',
+          output: '../../../output/libtree-sitter.so',
+          environment: environment,
+        ),
+        compile,
+        grammarLinkCommand(
+          compiler: compiler,
+          flags: linuxFlags,
+          directory: '/clone',
+          libraryName: 'json',
+          objects: [compile.output],
+          output: 'output/dylibs/json/libjson.so',
+          environment: environment,
+        ),
+      ];
+    }
+
+    Map<String, Object?> info({Map<String, List<String>>? json}) =>
+        jsonDecode(
+              encodeBuildInfo(
+                buildInfo(
+                  release: null,
+                  toolchain: toolchain,
+                  compiler: compiler,
+                  flags: linuxFlags,
+                  grammarFlags: {
+                    'json':
+                        json ??
+                        {
+                          'parser.c': grammarSourceFlags(
+                            'build/src/tree-sitter-json/src',
+                          ),
+                          'link': grammarLinkFlags(
+                            'json',
+                            platform: BuildPlatform.linuxArm64,
+                          ),
+                        },
+                  },
+                  repositoryCommit: '77ac13625d220bcf955cb12f697e438238c774e0',
+                  repositoryDirty: false,
+                  languageVersion: 15,
+                  minCompatibleLanguageVersion: 13,
+                  sources: const {},
+                  generated: const {},
+                  packingTools: const {
+                    'git': 'git version 2.51.0',
+                    'gzip': 'gzip 1.13',
+                    'tar': 'tar (GNU tar) 1.35',
+                  },
+                ),
+              ),
+            )
+            as Map<String, Object?>;
+
+    test('passes -O3 and -fPIC to every compile, defines no NDEBUG and no '
+        'Darwin source, and names no SDK', () {
+      for (final list in [linuxFlags.runtime, linuxFlags.grammarCompile]) {
+        check(list.where((flag) => flag.startsWith('-O'))).deepEquals(['-O3']);
+        check(list).contains('-std=c11');
+        check(list).contains('-fPIC');
+      }
+      check(linuxFlags.grammarLink.where((f) => f.startsWith('-O'))).isEmpty();
+      for (final list in [
+        linuxFlags.runtime,
+        linuxFlags.grammarCompile,
+        linuxFlags.grammarLink,
+      ]) {
+        check(list.where((flag) => flag.contains('NDEBUG'))).isEmpty();
+        check(list).contains('--target=aarch64-linux-gnu');
+        for (final foreign in [
+          '-isysroot',
+          '-arch',
+          '-dynamiclib',
+          '-D_DARWIN_C_SOURCE',
+          '-fuse-ld=lld',
+          '-mmacosx-version-min=13.0',
+        ]) {
+          check(list).not((it) => it.contains(foreign));
+        }
+      }
+      check(linuxFlags.runtime).containsEqualInOrder([
+        '-fvisibility=hidden',
+        '-D_POSIX_C_SOURCE=200112L',
+        '-D_DEFAULT_SOURCE',
+      ]);
+      for (final list in [linuxFlags.runtime, linuxFlags.grammarLink]) {
+        check(list).contains('-shared');
+        check(list).contains('-Wl,-z,defs');
+      }
+      check(linuxFlags.runtime).contains('-Wl,-soname,libtree-sitter.so');
+      check(
+        grammarLinkFlags('json', platform: BuildPlatform.linuxArm64),
+      ).deepEquals(['-Wl,-soname,libjson.so']);
+    });
+
+    test('records the platform, the compiler, the C library and the CLI it '
+        'runs', () {
+      final record = info();
+      final tools = record['toolchain']! as Map<String, Object?>;
+
+      check(record['platform']).equals('linux-arm64');
+      check(record.containsKey('deploymentTarget')).isFalse();
+      check(
+        (record['treeSitterCli']! as Map)['sha256'],
+      ).equals(toolchain.cliPins['linux']!['arm64']!.sha256);
+      check(tools['clang']).equals('Ubuntu clang version 21.1.8 (6ubuntu1)');
+      check(tools['clangPath']).equals('/usr/bin/clang');
+      check(tools['libc']).equals('glibc 2.43');
+      check(tools['libcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
+      for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
+        check(tools.containsKey(key)).isFalse();
+      }
+      check(
+        ((tools['flags']! as Map)['grammars']! as Map)['json'],
+      ).isA<Map<String, Object?>>().deepEquals({
+        'parser.c': ['-I', 'build/src/tree-sitter-json/src'],
+        'link': ['-Wl,-soname,libjson.so'],
+      });
+    });
+
+    test('invocations built from the flags match what build_info records', () {
+      check(
+        buildFlagProblems(info(), _roundTrip(commands()), {'json'}),
+      ).isEmpty();
+    });
+
+    test('a link whose recorded flags name no soname is reported', () {
+      check(
+        buildFlagProblems(
+          info(
+            json: {
+              'parser.c': grammarSourceFlags('build/src/tree-sitter-json/src'),
+              'link': const [],
+            },
+          ),
+          _roundTrip(commands()),
+          {'json'},
+        ),
+      ).deepEquals([
+        'output/dylibs/json/libjson.so: its recorded flags name no install '
+            'name -Wl,-soname,libjson.so',
+      ]);
+    });
+
+    test('an environment carrying a variable of macOS is reported', () {
+      final [runtime, ...rest] = commands();
+      final leaky = CompileCommand(
+        directory: runtime.directory,
+        arguments: runtime.arguments,
+        output: runtime.output,
+        environment: {...runtime.environment, 'DEVELOPER_DIR': '/xcode'},
+      );
+
+      check(buildFlagProblems(info(), [leaky, ...rest], {'json'})).deepEquals([
+        '../../../output/libtree-sitter.so: environment has DEVELOPER_DIR',
+      ]);
+    });
+
+    test('a grammar whose shared object was never linked is reported', () {
+      final [runtime, compile, _] = commands();
+
+      check(
+        buildFlagProblems(info(), [runtime, compile], {'json'}),
+      ).deepEquals([
+        'json: no invocation passed its link flags',
+        'json: never linked',
+        '0 links for 1 grammars',
+      ]);
+    });
+  });
+
   group('a Windows build', () {
     const compiler = Compiler(
       path: r'C:\llvm\bin\clang.exe',
