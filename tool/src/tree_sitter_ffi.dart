@@ -226,6 +226,12 @@ final class TreeSitterRuntime {
             Bool Function(Pointer<TSTreeCursor>),
             bool Function(Pointer<TSTreeCursor>)
           >('ts_tree_cursor_goto_parent'),
+      _runtimeFree = library
+          .lookup<Pointer<NativeFunction<Void Function(Pointer<Void>)>>>(
+            'ts_current_free',
+          )
+          .value
+          .asFunction<void Function(Pointer<Void>)>(),
       _nodeString = library
           .lookupFunction<
             Pointer<Utf8> Function(TSNode),
@@ -337,6 +343,13 @@ final class TreeSitterRuntime {
   final bool Function(Pointer<TSTreeCursor>) _cursorFirstChild;
   final bool Function(Pointer<TSTreeCursor>) _cursorNextSibling;
   final bool Function(Pointer<TSTreeCursor>) _cursorParent;
+
+  /// The `free` the runtime allocates with, read from the
+  /// `ts_current_free` variable it exports, for memory it hands back to
+  /// be freed: on Windows `package:ffi`'s `malloc.free` is
+  /// `CoTaskMemFree`, which must not free what the Universal CRT's
+  /// `malloc` returned.
+  final void Function(Pointer<Void>) _runtimeFree;
   final Pointer<Utf8> Function(TSNode) _nodeString;
   final int Function(TSNode) _nodeStartByte;
   final int Function(TSNode) _nodeEndByte;
@@ -559,7 +572,7 @@ final class TreeSitterRuntime {
     try {
       return string.toDartString();
     } finally {
-      malloc.free(string);
+      _runtimeFree(string.cast());
     }
   }
 
