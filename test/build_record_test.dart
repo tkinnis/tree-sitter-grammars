@@ -696,7 +696,7 @@ void main() {
       check(
         tools['gccRuntimePath'],
       ).equals('/usr/lib/gcc/aarch64-linux-gnu/15/crtbeginS.o');
-      check(tools.keys.take(13)).deepEquals([
+      check(tools.keys).deepEquals([
         'clang',
         'clangPath',
         'linker',
@@ -710,10 +710,11 @@ void main() {
         'hostLibcDevPath',
         'gccRuntime',
         'gccRuntimePath',
+        'git',
+        'gzip',
+        'tar',
+        'flags',
       ]);
-      for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
-        check(tools.containsKey(key)).isFalse();
-      }
       check(linuxToolchainRecordProblems(record)).isEmpty();
       check(
         ((tools['flags']! as Map)['grammars']! as Map)['json'],
@@ -971,7 +972,18 @@ void main() {
       check(tools['msvcTools']).equals('14.44.35207');
       check(tools['msvcToolsPath']).equals(compiler.msvcToolsPath);
       check(tools['sdk']).equals('10.0.26100.0');
-      check(tools.containsKey('sdkBuild')).isFalse();
+      check(tools.keys).deepEquals([
+        'clang',
+        'clangPath',
+        'msvcTools',
+        'msvcToolsPath',
+        'sdk',
+        'sdkPath',
+        'git',
+        'gzip',
+        'tar',
+        'flags',
+      ]);
       check(
         ((tools['flags']! as Map)['grammars']! as Map)['json'],
       ).isA<Map<String, Object?>>().deepEquals({

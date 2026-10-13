@@ -644,6 +644,33 @@ void main() {
       ).equals(p.join(scratch.path, 'bin', 'clang'));
     });
 
+    test('takes a file with an execute bit for anyone, and passes over one '
+        'with none', () {
+      for (final (mode, runnable) in [
+        ('0755', true),
+        ('0744', true),
+        ('0700', true),
+        ('0711', true),
+        ('0610', true),
+        ('0601', true),
+        ('0644', false),
+        ('0666', false),
+        ('0600', false),
+      ]) {
+        final file = File(p.join(scratch.path, mode, 'clang'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('#!/bin/sh\n');
+        Process.runSync('/bin/chmod', [mode, file.path]);
+        String found() => onPath('clang', _platform, path: path([mode]));
+
+        if (runnable) {
+          check(because: mode, found()).equals(file.path);
+        } else {
+          check(because: mode, found).throws<CompilerException>();
+        }
+      }
+    });
+
     test('finds none when nothing of the name can be run', () {
       make('plain', executable: false);
 

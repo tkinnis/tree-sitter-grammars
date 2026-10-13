@@ -424,6 +424,9 @@ void main() {
       final dynamicAt = ByteData.sublistView(
         whole,
       ).getUint64(dynamicHeader + 24, Endian.little).toInt();
+      final stringsSize = ByteData.sublistView(
+        whole,
+      ).getUint64(_sectionHeader(whole, 1) + 32, Endian.little).toInt();
       for (final (what, image, problem) in [
         // 0xfff...f0 reads in Dart as -16.
         (
@@ -454,6 +457,13 @@ void main() {
           'a soname past 2^63 in its table',
           _with(whole, dynamicAt + 8, -16),
           'string -16 outside its table',
+        ),
+        // The first byte past the table, which the bytes after it in the
+        // file would otherwise be read from.
+        (
+          'a soname just past its table',
+          _with(whole, dynamicAt + 8, stringsSize),
+          'string $stringsSize outside its table',
         ),
       ]) {
         check(because: what, () => readElf(image))
