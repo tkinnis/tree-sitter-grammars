@@ -3,33 +3,13 @@
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
 import 'build_platform.dart';
+import 'github.dart';
 
-/// The GitHub repository releases are published to.
-const releaseRepository = 'tkinnis/tree-sitter-grammars';
-
-/// Runs [executable] with [arguments] and returns its result.
-///
-/// A typedef so tests can answer `gh` without the network.
-typedef ProcessRunner =
-    Future<ProcessResult> Function(String executable, List<String> arguments);
-
-Future<ProcessResult> _run(String executable, List<String> arguments) =>
-    Process.run(executable, arguments);
-
-/// Thrown when a release cannot be, or was not, published as packed.
-final class PublishException implements Exception {
-  const PublishException(this.message);
-
-  final String message;
-
-  @override
-  String toString() => message;
-}
+export 'github.dart' show PublishException, ProcessRunner, releaseRepository;
 
 /// Creates the GitHub release [tag] of [releaseRepository] with [assets],
 /// whose sha256 digests are the values of the map, and the notes in
@@ -49,56 +29,16 @@ Future<void> publishRelease({
   required String commit,
   required Map<String, String> assets,
   required String notesFile,
-  ProcessRunner run = _run,
+  ProcessRunner run = runProcess,
 }) async {
-  Future<ProcessResult> gh(List<String> arguments) async {
-    try {
-      return await run('gh', arguments);
-    } on ProcessException catch (error) {
-      throw PublishException('gh could not run: ${error.message}');
-    }
-  }
-
-  /// Requires [tag] on GitHub to be [tagObject], naming [commit].
-  Future<void> requirePushedTag(String when) async {
-    Future<(String, String)> object(String path) async {
-      final result = await gh([
-        'api',
-        'repos/$releaseRepository/$path',
-        '--jq',
-        '.object.type + " " + .object.sha',
-      ]);
-      if (result.exitCode != 0) {
-        throw PublishException(
-          '$when, GitHub could not resolve $tag: '
-          '${'${result.stderr}'.trim()}; push it with git push origin $tag',
-        );
-      }
-      final [type, sha] = '${result.stdout}'.trim().split(' ');
-      return (type, sha);
-    }
-
-    final (type, sha) = await object('git/ref/tags/$tag');
-    if (type != 'tag') {
-      throw PublishException(
-        '$when, $tag on GitHub is a lightweight tag of $sha; a release tag '
-        'is annotated',
-      );
-    }
-    if (sha != tagObject) {
-      throw PublishException(
-        '$when, $tag on GitHub is the tag object $sha, not the local tag '
-        '$tagObject the build checked',
-      );
-    }
-    final (targetType, target) = await object('git/tags/$sha');
-    if (targetType != 'commit' || target != commit) {
-      throw PublishException(
-        '$when, $tag on GitHub names $targetType $target, not the built '
-        'commit $commit',
-      );
-    }
-  }
+  final gh = githubCli(run);
+  Future<void> requireTag(String when) => requirePushedTag(
+    gh,
+    tag: tag,
+    tagObject: tagObject,
+    commit: commit,
+    when: when,
+  );
 
   final existing = await gh([
     'release',
@@ -120,7 +60,7 @@ Future<void> publishRelease({
       'gh release view $tag failed: ${'${existing.stderr}'.trim()}',
     );
   }
-  await requirePushedTag('before publishing');
+  await requireTag('before publishing');
   final created = await gh([
     'release',
     'create',
@@ -139,7 +79,7 @@ Future<void> publishRelease({
       'gh release create $tag failed: ${'${created.stderr}'.trim()}',
     );
   }
-  await requirePushedTag('after publishing');
+  await requireTag('after publishing');
   final listed = await gh([
     'api',
     'repos/$releaseRepository/releases/tags/$tag',
@@ -153,7 +93,7 @@ Future<void> publishRelease({
     );
   }
   final published = {
-    for (final asset in jsonDecode('${listed.stdout}') as List)
+    for (final asset in jsonDecode(outputText(listed.stdout)) as List)
       (asset as Map<String, Object?>)['name']: asset['digest'],
   };
   final problems = [
