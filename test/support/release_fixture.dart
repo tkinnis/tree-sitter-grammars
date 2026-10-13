@@ -71,7 +71,7 @@ Map<String, Object?> releaseJson({
   String tag = 'v1.1.0',
   bool draft = true,
   bool immutable = false,
-  String target = 'main',
+  String target = fixtureCommit,
   int id = fixtureReleaseId,
   String body = 'notes',
   List<Map<String, Object?>> assets = const [],

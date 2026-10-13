@@ -53,6 +53,8 @@ Future<void> publishRelease({
     '--repo',
     releaseRepository,
     '--draft',
+    '--target',
+    commit,
     '--verify-tag',
     '--title',
     tag,

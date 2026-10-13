@@ -270,6 +270,14 @@ void main() {
       );
     });
 
+    test('a draft targeting a branch', () {
+      return refuses(
+        'branch',
+        (d) => _Attach(d, listed: [releaseJson(target: 'main')]),
+        'finding the draft: v1.1.0 targets main, not $fixtureCommit',
+      );
+    });
+
     test('a draft targeting another commit', () {
       return refuses(
         'target',

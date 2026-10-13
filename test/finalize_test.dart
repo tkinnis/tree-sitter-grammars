@@ -248,6 +248,13 @@ void main() {
       );
     });
 
+    test('a draft targeting a branch', () {
+      return _refusesToPublish(
+        _Finalize(listed: [releaseJson(target: 'main')]),
+        'finding the draft: v1.1.0 targets main, not $fixtureCommit',
+      );
+    });
+
     test('a release GitHub reports as immutable', () {
       return _refusesToPublish(
         _Finalize(listed: [releaseJson(immutable: true)]),

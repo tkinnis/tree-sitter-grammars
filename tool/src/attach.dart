@@ -86,12 +86,12 @@ void requireSameBundles(
 }
 
 /// Finds the one release of [tag], a draft nobody has published, whose
-/// target is not another commit than [commit].
+/// target is [commit] itself.
 ///
 /// Throws a [PublishException] naming `finding the draft` when there is
 /// none, more than one, or it is published, immutable or targeted
-/// elsewhere. A target that is not a commit id is a branch, which the tag
-/// check outranks: the tag names the commit.
+/// elsewhere. `--publish` creates the draft with `--target` set to the
+/// built commit, so a branch name as the target is refused too.
 Future<GitHubRelease> findDraft(GitHubCli gh, String tag, String commit) async {
   final releases = await releasesOfTag(gh, tag);
   String refusal(String reason) => 'finding the draft: $reason';
@@ -115,8 +115,7 @@ Future<GitHubRelease> findDraft(GitHubCli gh, String tag, String commit) async {
   if (release.immutable) {
     throw PublishException(refusal('$tag is immutable'));
   }
-  if (RegExp(r'^[0-9a-f]{40}$').hasMatch(release.target) &&
-      release.target != commit) {
+  if (release.target != commit) {
     throw PublishException(
       refusal('$tag targets ${release.target}, not $commit'),
     );

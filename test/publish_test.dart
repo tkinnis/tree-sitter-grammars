@@ -119,6 +119,8 @@ void main() {
       '--repo',
       releaseRepository,
       '--draft',
+      '--target',
+      _commit,
       '--verify-tag',
       '--title',
       'v1.1.0',
