@@ -87,8 +87,8 @@ ProcessResult _result(int exitCode, {String stdout = '', String stderr = ''}) =>
 final _noReleases = _releases([]);
 
 String _digests(Map<String, String> digests) => jsonEncode([
-  for (final MapEntry(:key, :value) in digests.entries)
-    {'name': key, 'digest': 'sha256:$value'},
+  for (final (index, MapEntry(:key, :value)) in digests.entries.indexed)
+    {'id': index + 1, 'name': key, 'digest': 'sha256:$value'},
 ]);
 
 void main() {
