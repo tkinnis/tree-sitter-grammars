@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 import '../tool/src/build_platform.dart';
 import '../tool/src/build_record.dart';
 import '../tool/src/compiler.dart';
+import '../tool/src/recorded_build.dart';
 import '../tool/src/toolchain.dart';
 
 const _toolchain = Toolchain(
@@ -713,12 +714,53 @@ void main() {
       for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
         check(tools.containsKey(key)).isFalse();
       }
+      check(linuxToolchainRecordProblems(record)).isEmpty();
       check(
         ((tools['flags']! as Map)['grammars']! as Map)['json'],
       ).isA<Map<String, Object?>>().deepEquals({
         'parser.c': ['-I', 'build/src/tree-sitter-json/src'],
         'link': ['-Wl,-soname,libjson.so'],
       });
+    });
+
+    test('a record lacking a toolchain field of Linux, or holding an '
+        'empty one or one that is no string, is refused', () {
+      check(linuxToolchainKeys).deepEquals([
+        'linker',
+        'linkerPackage',
+        'linkerPath',
+        'linkerResolvedPath',
+        'hostLibc',
+        'hostLibcBanner',
+        'hostLibcPath',
+        'hostLibcDev',
+        'hostLibcDevPath',
+        'gccRuntime',
+        'gccRuntimePath',
+      ]);
+      for (final key in linuxToolchainKeys) {
+        for (final (what, value) in [
+          ('lacking', null),
+          ('empty', ''),
+          ('a number', 2),
+        ]) {
+          final record = info();
+          final tools = record['toolchain']! as Map<String, Object?>;
+          if (value == null) {
+            tools.remove(key);
+          } else {
+            tools[key] = value;
+          }
+
+          check(
+            because: '$key $what',
+            linuxToolchainRecordProblems(record, source: 'its build_info.json'),
+          ).deepEquals(['its build_info.json records no toolchain.$key']);
+        }
+      }
+      check(
+        linuxToolchainRecordProblems({...info()}..remove('toolchain')),
+      ).deepEquals(['build_info.json records no toolchain']);
     });
 
     test('invocations built from the flags match what build_info records', () {

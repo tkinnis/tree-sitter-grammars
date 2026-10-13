@@ -17,7 +17,8 @@ import 'recorded_build.dart';
 import 'tar.dart';
 
 /// Requires the `build_info.json` [info], read from [source], to record
-/// the build of [release] at [commit]; when [platform] is given, for it.
+/// the build of [release] at [commit]; when [platform] is given, for it,
+/// and for Linux with every toolchain field of its linker and C library.
 ///
 /// Throws a [PublishException] naming every problem
 /// [buildRecordProblems] finds.

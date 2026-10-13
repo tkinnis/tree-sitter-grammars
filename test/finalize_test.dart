@@ -548,6 +548,25 @@ void main() {
         );
       });
 
+      if (platform.isLinux) {
+        test('${platform.id} archive whose record lacks a toolchain field '
+            'of Linux', () {
+          return _refusesToPublish(
+            _Finalize(
+              embedded: {
+                platform: buildInfoJson(
+                  platform: platform.id,
+                  glibc: '2.17',
+                  toolchain: {...fixtureLinuxToolchain, 'hostLibcBanner': ''},
+                ),
+              },
+            ),
+            'checking the archives: ${platform.releaseArchiveName}: its '
+            'build_info.json records no toolchain.hostLibcBanner',
+          );
+        });
+      }
+
       test('${platform.id} archive built from other bundles', () {
         return _refusesToPublish(
           _Finalize(

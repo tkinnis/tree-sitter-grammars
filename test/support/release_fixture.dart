@@ -120,8 +120,27 @@ ProcessResult listing(List<Map<String, Object?>> releases) => ghResult(
   ]),
 );
 
+/// The toolchain fields a Linux build records of its linker, its C
+/// library and GCC's runtime.
+const fixtureLinuxToolchain = {
+  'linker': 'GNU ld (GNU Binutils for Ubuntu) 2.46',
+  'linkerPackage': 'binutils-aarch64-linux-gnu 2.46-3ubuntu2',
+  'linkerPath': '/usr/bin/ld.bfd',
+  'linkerResolvedPath': '/usr/bin/aarch64-linux-gnu-ld.bfd',
+  'hostLibc': 'glibc 2.43',
+  'hostLibcBanner':
+      'GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2.4) stable release version '
+      '2.43',
+  'hostLibcPath': '/lib/aarch64-linux-gnu/libc.so.6',
+  'hostLibcDev': 'libc6-dev 2.43-2ubuntu2.4',
+  'hostLibcDevPath': '/usr/lib/aarch64-linux-gnu/crti.o',
+  'gccRuntime': 'libgcc-15-dev 15.2.0-16ubuntu1',
+  'gccRuntimePath': '/usr/lib/gcc/aarch64-linux-gnu/15/crtbeginS.o',
+};
+
 /// The `build_info.json` of a build: its [platform], [release], commit and
-/// the sha256 of its bundles.
+/// the sha256 of its bundles, and of a Linux build its [toolchain], by
+/// default [fixtureLinuxToolchain].
 Map<String, Object?> buildInfoJson({
   String platform = 'macos-arm64',
   String? release = 'v1.1.0',
@@ -129,10 +148,14 @@ Map<String, Object?> buildInfoJson({
   Map<String, String> sources = const {'tree-sitter': 'bb', 'latex': 'b2'},
   Map<String, String> generated = const {'swift': 'cc'},
   String? glibc,
+  Map<String, Object?>? toolchain,
 }) => {
   'release': release,
   'platform': platform,
   'glibcRequirement': ?glibc,
+  'toolchain':
+      ?(toolchain ??
+      (platform.startsWith('linux-') ? fixtureLinuxToolchain : null)),
   'repository': {'url': 'u', 'commit': commit, 'dirty': false},
   'sources': {
     for (final MapEntry(:key, :value) in sources.entries)

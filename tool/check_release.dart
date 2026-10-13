@@ -8,7 +8,9 @@
 /// ```
 ///
 /// `<output>` defaults to `output/`. Every one of these must hold, or the
-/// check exits 1 after listing each failure:
+/// check exits 1 after listing each failure; when `build_info.json` fails
+/// the first or the fourth, nothing else is checked, since every other
+/// check reads the build it records:
 ///
 /// - `build_info.json` names this repository at a 40-hex commit and, when
 ///   it records a release, a clean working tree.
@@ -22,7 +24,9 @@
 ///   the committed patch under `patches/`, and the `patchedSha256` the
 ///   entry records.
 /// - `build_info.json` records the platform this process runs on, whose
-///   libraries are the only ones it can load.
+///   libraries are the only ones it can load, and on Linux every field of
+///   the linker, C library and GCC runtime a build there records under
+///   `toolchain`.
 /// - The runtime (`libtree-sitter.dylib` on macOS, `libtree-sitter.so` on
 ///   Linux, `tree-sitter.dll` on Windows) exports every function the
 ///   runtime's `api.h` declares, apart from the three it defines only with
@@ -143,6 +147,7 @@ import 'src/notices.dart';
 import 'src/parse_process.dart';
 import 'src/pe.dart';
 import 'src/pool.dart';
+import 'src/recorded_build.dart';
 import 'src/release_check.dart';
 import 'src/source_bundles.dart';
 import 'src/source_patches.dart';
@@ -228,7 +233,9 @@ Map<String, Object?> _json(String path) =>
 
 /// Runs every check on [output], adding each failure to [problems], and
 /// returns the opened runtime, the compiled grammars and the directory the
-/// grammar bundles were unpacked into under [scratch].
+/// grammar bundles were unpacked into under [scratch]; when
+/// `build_info.json` records another build than the one there or not all
+/// of it, adds only those problems and opens no runtime.
 Future<({TreeSitterRuntime? runtime, List<_Grammar> grammars, String sources})>
 _check(
   String root,
@@ -250,6 +257,16 @@ _check(
     );
   }
   problems.addAll(repositoryRecordProblems(info));
+  if (_platform.isLinux) problems.addAll(linuxToolchainRecordProblems(info));
+  // What follows reads the build the record names: a record that names
+  // another, or not all of it, is listed alone.
+  if (problems.isNotEmpty) {
+    return (
+      runtime: null,
+      grammars: const <_Grammar>[],
+      sources: p.join(scratch, 'src'),
+    );
+  }
   final treeSitter = info['treeSitter']! as Map<String, Object?>;
   if (treeSitter['tag'] != toolchain.treeSitterTag ||
       treeSitter['commit'] != toolchain.treeSitterCommit) {

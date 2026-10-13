@@ -445,6 +445,22 @@ void main() {
       );
     });
 
+    test('an archive whose record lacks a toolchain field of Linux', () {
+      return refuses(
+        'toolchain',
+        (d) => _Attach(
+          d,
+          embedded: buildInfoJson(
+            platform: 'linux-arm64',
+            glibc: '2.17',
+            toolchain: {...fixtureLinuxToolchain}..remove('linkerPackage'),
+          ),
+        ),
+        'checking the archive: its build_info.json records no '
+            'toolchain.linkerPackage',
+      );
+    });
+
     test('an archive built for another platform', () {
       return refuses(
         'platform',
