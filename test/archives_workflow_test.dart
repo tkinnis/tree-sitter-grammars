@@ -119,7 +119,7 @@ List<String> workflowProblems(String source) {
     }
     if (!run.contains(r'GITHUB_PATH') ||
         !run.contains(r'dart --version') ||
-        !run.contains(r'$DART_SDK_VERSION')) {
+        !run.contains(r'Dart SDK version: $DART_SDK_VERSION')) {
       problems.add(
         'job $name does not add the SDK to the path and assert '
         'its version',
