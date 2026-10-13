@@ -5,6 +5,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/files_digest.dart';
 import '../tool/src/grammar_sources.dart';
 import '../tool/src/recorded_build.dart';
@@ -194,6 +195,65 @@ void main() {
       (it) =>
           it.has((e) => e.message, 'message').contains('no build_info.json'),
     );
+  });
+
+  group('a build_info.json of a platform', () {
+    Map<String, Object?> info(BuildPlatform platform) => {
+      'release': 'v1.1.0',
+      'repository': {'commit': _commit},
+      'platform': platform.id,
+      'toolchain': {'clang': 'clang version 21.1.8'},
+    };
+
+    test('of macOS or Windows is never asked for the toolchain fields of '
+        'Linux', () {
+      for (final platform in [
+        BuildPlatform.macosArm64,
+        BuildPlatform.windowsArm64,
+        BuildPlatform.windowsX64,
+      ]) {
+        check(
+          because: platform.id,
+          buildRecordProblems(
+            info(platform),
+            release: 'v1.1.0',
+            commit: _commit,
+            source: 'build_info.json',
+            platform: platform,
+          ),
+        ).isEmpty();
+      }
+    });
+
+    test('of Linux lacking the toolchain fields of Linux is refused', () {
+      check(
+        buildRecordProblems(
+          info(BuildPlatform.linuxArm64),
+          release: 'v1.1.0',
+          commit: _commit,
+          source: 'build_info.json',
+          platform: BuildPlatform.linuxArm64,
+        ),
+      ).deepEquals([
+        for (final key in linuxToolchainKeys)
+          'build_info.json records no toolchain.$key',
+      ]);
+    });
+
+    test('of another platform than a Linux build reads is refused for its '
+        'platform alone', () {
+      check(
+        buildRecordProblems(
+          info(BuildPlatform.macosArm64),
+          release: 'v1.1.0',
+          commit: _commit,
+          source: 'build_info.json',
+          platform: BuildPlatform.linuxArm64,
+        ),
+      ).deepEquals([
+        'build_info.json records the platform macos-arm64, not linux-arm64',
+      ]);
+    });
   });
 
   group('a release\'s build_info.json', () {
