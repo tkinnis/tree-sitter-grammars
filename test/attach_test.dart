@@ -219,7 +219,6 @@ void main() {
     });
 
     test('but not when an asset with the right digest never completes', () {
-      final holder = _Attach(directory);
       return _refuses(
         _Attach(
           directory,
