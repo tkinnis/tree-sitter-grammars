@@ -297,3 +297,29 @@ List<String> assetProblems(
         'reading back: ${asset.name} is an asset nobody uploaded',
   ].nonNulls.toList();
 }
+
+/// Requires the `build_info.json` in [bundles], the directory `--sources`
+/// names, to record the build of [release] at [commit].
+///
+/// Checked before anything compiles: bundles of another release, or of
+/// another commit than the one the archive is built at, are never packed
+/// into an archive that is then attached to [release].
+void requireSourcesRecord(String bundles, String release, String commit) {
+  final file = File(p.join(bundles, 'build_info.json'));
+  if (!file.existsSync()) {
+    throw PublishException(
+      'checking --sources: $bundles holds no build_info.json; download the '
+      'assets of the draft into one directory',
+    );
+  }
+  try {
+    requireBuildRecord(
+      parseBuildInfo(file.readAsBytesSync(), file.path),
+      release: release,
+      commit: commit,
+      source: file.path,
+    );
+  } on PublishException catch (error) {
+    throw PublishException('checking --sources: $error');
+  }
+}

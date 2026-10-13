@@ -427,4 +427,67 @@ void main() {
       );
     });
   });
+
+  group('the --sources build_info.json', () {
+    void write(Map<String, Object?> info) => File(
+      '${directory.path}/build_info.json',
+    ).writeAsStringSync(jsonEncode(info));
+
+    test('of the release and commit is accepted', () {
+      write(buildInfoJson());
+
+      requireSourcesRecord(directory.path, 'v1.1.0', fixtureCommit);
+    });
+
+    for (final (label, info, message) in [
+      (
+        'another release',
+        buildInfoJson(release: 'v1.0.0'),
+        'records the release v1.0.0, not v1.1.0',
+      ),
+      (
+        'no release',
+        buildInfoJson(release: null),
+        'records the release null, not v1.1.0',
+      ),
+      (
+        'another commit',
+        buildInfoJson(commit: fixtureOtherCommit),
+        'records the commit $fixtureOtherCommit, not $fixtureCommit',
+      ),
+      (
+        'no commit',
+        {...buildInfoJson(), 'repository': null},
+        'records the commit null, not $fixtureCommit',
+      ),
+    ]) {
+      test('naming $label is refused', () {
+        write(info);
+
+        check(
+            () => requireSourcesRecord(directory.path, 'v1.1.0', fixtureCommit),
+          ).throws<PublishException>().has((e) => e.message, 'message')
+          ..contains('checking --sources')
+          ..contains(message);
+      });
+    }
+
+    test('missing is refused', () {
+      check(() => requireSourcesRecord(directory.path, 'v1.1.0', fixtureCommit))
+          .throws<PublishException>()
+          .has((e) => e.message, 'message')
+          .contains(
+            'checking --sources: ${directory.path} holds no build_info.json',
+          );
+    });
+
+    test('that is not JSON is refused', () {
+      File('${directory.path}/build_info.json').writeAsStringSync('[');
+
+      check(() => requireSourcesRecord(directory.path, 'v1.1.0', fixtureCommit))
+          .throws<PublishException>()
+          .has((e) => e.message, 'message')
+          .contains('checking --sources');
+    });
+  });
 }
