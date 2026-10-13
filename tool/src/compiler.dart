@@ -385,7 +385,7 @@ Future<Compiler> resolveLinuxCompiler(
       'GNU ld',
     );
   }
-  final linkerPackage = await _packageOf(linkerResolved, run);
+  final linkerPackage = await packageOf(linkerResolved, run);
   if (linkerPackage == null) {
     throw CompilerException(
       'no package database names the one package that installed '
@@ -433,7 +433,7 @@ Future<Compiler> resolveLinuxCompiler(
 
 /// The one file named [name] that [link], the command `clang -###` would
 /// run, takes, with every symbolic link resolved, and the package that
-/// installed it, as [_packageOf] names it.
+/// installed it, as [packageOf] names it.
 ///
 /// Throws a [CompilerException] when [link] names no one such file by an
 /// absolute path, saying to install [install] for [platform], or when no
@@ -455,7 +455,7 @@ Future<({String path, String package})> _startupPackage(
       if (p.basename(argument) == name) _resolvedFile(argument),
   ];
   if (named case [final String path]) {
-    final package = await _packageOf(path, run);
+    final package = await packageOf(path, run);
     if (package == null) {
       throw CompilerException(
         'no package database names the one package that installed $path; '
@@ -542,7 +542,39 @@ List<List<String>> driverCommands(String output) => [
 /// The package that installed [path] and its full version, its name and
 /// version apart by a space, as dpkg names it or, where dpkg cannot be
 /// asked, rpm; null when neither names exactly one package.
-Future<String?> _packageOf(String path, ToolRunner run) async {
+///
+/// [path] has every symbolic link resolved, so on a host with merged
+/// `/usr` it names a file under `/usr/lib`, `/usr/bin` or `/usr/sbin`. A
+/// package database that predates the merge knows such a file by its
+/// `/lib`, `/bin` or `/sbin` name instead, which is asked for when
+/// neither names a package of [path], and only when that name, [resolve]d
+/// as [path] was, is [path] itself: on a host without merged `/usr` it is
+/// another file, which another package may have installed.
+Future<String?> packageOf(
+  String path,
+  ToolRunner run, {
+  String? Function(String path) resolve = _resolvedFile,
+}) async {
+  final package = await _packageNaming(path, run);
+  if (package != null) return package;
+  final alias = _withoutUsr(path);
+  if (alias == null || resolve(alias) != path) return null;
+  return _packageNaming(alias, run);
+}
+
+/// The `/lib`, `/bin` or `/sbin` name of [path], a file under `/usr/lib`,
+/// `/usr/bin` or `/usr/sbin`; null for any other path.
+String? _withoutUsr(String path) {
+  final parts = p.posix.split(path);
+  if (parts case ['/', 'usr', 'lib' || 'bin' || 'sbin', _, ...]) {
+    return p.posix.joinAll(['/', ...parts.skip(2)]);
+  }
+  return null;
+}
+
+/// The package that installed the file dpkg or rpm knows by [path], as
+/// [packageOf] names it, asking for that one name.
+Future<String?> _packageNaming(String path, ToolRunner run) async {
   try {
     final owners = [
       for (final line in (await run('/usr/bin/dpkg-query', [

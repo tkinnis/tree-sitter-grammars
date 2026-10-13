@@ -18,6 +18,25 @@ const _ldPackage = 'binutils-aarch64-linux-gnu';
 const _devPackage = 'libc6-dev:arm64';
 const _gccPackage = 'libgcc-15-dev:arm64';
 
+/// [path] with every symbolic link resolved on a host with merged `/usr`,
+/// where `/lib`, `/bin` and `/sbin` link to their directories under `/usr`.
+String _merged(String path) => switch (p.posix.split(path)) {
+  ['/', 'lib' || 'bin' || 'sbin', ...] => p.posix.join(
+    '/usr',
+    path.substring(1),
+  ),
+  _ => path,
+};
+
+/// Whether `/bin` on this host is a symbolic link to `/usr/bin`.
+final _mergedUsr = (() {
+  try {
+    return Directory('/bin').resolveSymbolicLinksSync() == '/usr/bin';
+  } on FileSystemException {
+    return false;
+  }
+})();
+
 /// The bytes of a `libc.so.6` whose banner names [release], among others.
 List<int> _libc(String release) => latin1.encode(
   '\x7fELF\x00\x00padding\x00GNU C Library (Ubuntu GLIBC $release-2ubuntu2) '
@@ -569,6 +588,187 @@ void main() {
             .has((e) => e.message, 'message')
             .startsWith('$ld --version reports LLD 21.1.8'),
       );
+    });
+  });
+
+  group('packageOf', () {
+    late List<List<String>> asked;
+
+    setUp(() => asked = []);
+
+    /// A [ToolRunner] answering as dpkg answers on a host whose package
+    /// database names files by [owners], each path to the line `dpkg-query
+    /// -S` writes for it, and each package to its name and version; a
+    /// path or package it does not hold fails, as dpkg does. rpm is not
+    /// there unless [rpm] answers for the paths it names.
+    ToolRunner dpkg(Map<String, String> owners, {Map<String, String>? rpm}) =>
+        (executable, arguments, {standardError = false}) async {
+          asked.add([executable, ...arguments]);
+          final key = arguments.last;
+          final answer = switch (executable) {
+            _dpkg => owners[key],
+            _rpm =>
+              rpm == null
+                  ? throw CompilerException('$_rpm: not found')
+                  : rpm[key],
+            _ => null,
+          };
+          if (answer == null) {
+            throw CompilerException('$executable: no path found matching $key');
+          }
+          return answer;
+        };
+
+    test('asks for the /lib, /bin or /sbin name of a file under /usr that '
+        'no package database names by its own, the same file on a host '
+        'with merged /usr', () async {
+      for (final (directory, package) in [
+        ('lib/aarch64-linux-gnu', 'libc6-dev:arm64'),
+        ('bin', 'binutils'),
+        ('sbin', 'ldconfig'),
+      ]) {
+        asked = [];
+        final path = '/usr/$directory/file';
+        final alias = '/$directory/file';
+        final run = dpkg({
+          alias: '$package: $alias',
+          package: '$package 1.0-1',
+        });
+
+        check(
+          because: path,
+          await packageOf(path, run, resolve: _merged),
+        ).equals('$package 1.0-1');
+        check(because: path, asked).deepEquals([
+          [_dpkg, '-S', path],
+          [_rpm, '-qf', '--queryformat', '%{NAME} %{EVR}', path],
+          [_dpkg, '-S', alias],
+          [_dpkg, '-W', r'--showformat=${Package} ${Version}', package],
+        ]);
+      }
+    });
+
+    test('asks rpm for the /usr-less name where there is no dpkg', () async {
+      final run = dpkg(const {}, rpm: {'/lib/crti.o': 'glibc-devel 2.17-1'});
+
+      check(
+        await packageOf('/usr/lib/crti.o', run, resolve: _merged),
+      ).equals('glibc-devel 2.17-1');
+      check(asked.map((it) => it.last)).deepEquals([
+        '/usr/lib/crti.o',
+        '/usr/lib/crti.o',
+        '/lib/crti.o',
+        '/lib/crti.o',
+      ]);
+    });
+
+    test('asks for no other name of a file its own name is known by', () async {
+      const path = '/usr/bin/ld.bfd';
+      final run = dpkg({
+        path: 'binutils: $path',
+        '/bin/ld.bfd': 'other: /bin/ld.bfd',
+        'binutils': 'binutils 2.46-3',
+      });
+
+      check(
+        await packageOf(path, run, resolve: _merged),
+      ).equals('binutils 2.46-3');
+      check(asked.map((it) => it.last)).deepEquals([path, 'binutils']);
+    });
+
+    test('asks for no other name of a file outside /usr/lib, /usr/bin and '
+        '/usr/sbin', () async {
+      for (final path in [
+        '/opt/llvm/bin/ld.lld',
+        '/usr/libexec/gcc/ld',
+        '/usr/lib64/crti.o',
+        '/usr/local/bin/ld',
+        '/usr/ld',
+        '/usr',
+      ]) {
+        asked = [];
+        final run = dpkg({
+          for (final alias in ['/libexec/gcc/ld', '/lib64/crti.o', '/ld'])
+            alias: 'other: $alias',
+          'other': 'other 1.0-1',
+        });
+
+        check(
+          because: path,
+          await packageOf(path, run, resolve: _merged),
+        ).isNull();
+        check(
+          because: path,
+          asked.map((it) => it.last),
+        ).deepEquals([path, path]);
+      }
+    });
+
+    test('asks for the /bin name of a file under /usr/bin on this host with '
+        'merged /usr', () async {
+      // A file /usr/bin holds itself, no symbolic link.
+      final path = Directory(
+        '/usr/bin',
+      ).listSync(followLinks: false).whereType<File>().first.path;
+      final alias = '/bin/${p.basename(path)}';
+      final run = dpkg({alias: 'other: $alias', 'other': 'other 1.0-1'});
+
+      check(await packageOf(path, run)).equals('other 1.0-1');
+      check(
+        asked.map((it) => it.last),
+      ).deepEquals([path, path, alias, 'other']);
+    }, skip: _mergedUsr ? false : 'this host has no merged /usr');
+
+    test('names no package of a file by a /lib, /bin or /sbin name that is '
+        'no file', () async {
+      // Neither name is a file on any host the tests run on.
+      const path = '/usr/bin/zz-tree-sitter-grammars-no-such-file';
+      const alias = '/bin/zz-tree-sitter-grammars-no-such-file';
+      final run = dpkg({alias: 'other: $alias', 'other': 'other 1.0-1'});
+
+      check(await packageOf(path, run)).isNull();
+      check(asked.map((it) => it.last)).deepEquals([path, path]);
+    });
+
+    test('names no package of a file by a /lib, /bin or /sbin name that is '
+        'another file, as on a host without merged /usr', () async {
+      for (final (because, resolved) in [
+        ('another file', '/lib/crti.o'),
+        ('another file under /usr', '/usr/lib/other/crti.o'),
+        ('no file', null),
+      ]) {
+        asked = [];
+        final run = dpkg({
+          '/lib/crti.o': 'other: /lib/crti.o',
+          'other': 'other 1.0-1',
+        });
+
+        check(
+          because: because,
+          await packageOf(
+            '/usr/lib/crti.o',
+            run,
+            resolve: (it) => it == '/lib/crti.o' ? resolved : it,
+          ),
+        ).isNull();
+        check(
+          because: because,
+          asked.map((it) => it.last),
+        ).deepEquals(['/usr/lib/crti.o', '/usr/lib/crti.o']);
+      }
+    });
+
+    test('names no package of a file no package database names by either '
+        'name', () async {
+      check(
+        await packageOf('/usr/lib/crti.o', dpkg(const {}), resolve: _merged),
+      ).isNull();
+      check(asked.map((it) => it.last)).deepEquals([
+        '/usr/lib/crti.o',
+        '/usr/lib/crti.o',
+        '/lib/crti.o',
+        '/lib/crti.o',
+      ]);
     });
   });
 
