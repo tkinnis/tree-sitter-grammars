@@ -378,7 +378,7 @@ Each language has a `config.json` with metadata and editor settings:
 
 ## Creating Releases
 
-A release is built, packed and published on a Mac by the local commands below; its Linux and Windows archives are built afterwards from the assets it published (step 4).
+A release is a draft until every platform's archive is attached to it, because a published GitHub release is immutable and never gains an asset. A Mac builds, packs and creates the draft, Linux and Windows add their archives to it (step 4), and the Mac publishes it (step 5). Every command that changes GitHub needs the GitHub CLI, signed in with write access to the repository.
 
 1. Tag a clean `HEAD` with an annotated tag:
 
@@ -400,24 +400,35 @@ The archive's sha256 identifies a build of one commit: `build_info.json`, which 
 
 It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, every repository's pinned commit with its source bundle and that bundle's sha256, and each bundle of generated sources with its sha256.
 
-3. Push the tag, then build again with `--publish`:
+3. Push the tag, then build again with `--publish`, which creates a draft:
 
 ```bash
 git push origin v1.1.0
 dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --publish
 ```
 
-`--publish` runs on macOS only, since it creates the release with the source bundles the macOS build packed; a build on Linux or Windows attaches its archive to that release instead (step 4). `--publish` first resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the GitHub release of that tag (`gh release create --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the release back, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one. It refuses a release that already exists, so a published asset is never replaced. It needs the GitHub CLI, signed in with write access to the repository.
+`--publish` runs on macOS only, since it creates the draft with the source bundles the macOS build packed. It first lists the repository's releases, every page of them, and refuses when any release, draft or published, carries the tag. It resolves the tag on GitHub and refuses unless it is the annotated tag object the build checked locally and names the commit that was built, so a tag re-created or moved after the push never carries assets built from another commit. It then creates the draft (`gh release create --draft --verify-tag`) with those notes, attaching the archive, its `.sha256`, `build_info.json`, every source bundle and every bundle of generated sources, resolves the tag again, and reads the draft back by its id, failing unless the tag still names the built commit and GitHub reports each asset's sha256 digest as the local one.
 
-4. On Linux and on Windows, build the same tag from the release's own assets, then attach the archive and its `.sha256` to the release (on Linux, `grammars-linux-arm64.tar.gz`):
+4. On Linux and on Windows, attach the platform's archive and its `.sha256` to the draft (on Linux, `grammars-linux-arm64.tar.gz`). Download the draft's assets, check out the tag, then build from them and attach:
 
 ```bash
 gh release download v1.1.0 --repo tkinnis/tree-sitter-grammars --dir ../v1.1.0-assets
-dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets
-gh release upload v1.1.0 --repo tkinnis/tree-sitter-grammars output/grammars-windows-arm64.tar.gz output/grammars-windows-arm64.tar.gz.sha256
+dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --sources=../v1.1.0-assets --attach
 ```
 
-A build on Windows that packs its own source bundles compresses them with `dart:io`'s zlib rather than macOS's `/usr/bin/gzip -n -9`, so their sha256s, which its `build_info.json` records and its archive carries, are not those of the bundles the release attaches. With `--sources` it copies the release's bundles byte for byte into `output/sources/` and records their sha256s, so the Windows archive's `build_info.json` names assets the release has. A build on Linux compresses its own bundles with its own `/usr/bin/gzip`, whose bytes need not be macOS's, and is built from the release's assets for the same reason. Attaching it is a step of its own, since `--publish` creates a release and this one already exists.
+`--attach` runs on Linux and Windows only, and cannot be combined with `--publish` or `--dry-run`. Before it compiles anything, it requires the `build_info.json` in `--sources` to name the release `v1.1.0` and, as `repository.commit`, the commit the tag names. After the build packs, it resolves the tag on GitHub as `--publish` does, then finds the draft by listing the releases and refuses unless there is exactly one release of the tag, it is a draft, GitHub does not report it immutable, and its target is not another commit. It refuses when the draft already holds either asset, requires the `.sha256` to hold the archive's sha256 and the `build_info.json` inside the archive to name the release, the commit and the platform, and requires the bundle sha256s in that file to be those of the draft's own `build_info.json`. It uploads with `gh release upload`, never with `--clobber`, resolves the tag again, and reads the draft back: GitHub must report both new assets with the local sha256 as their digest and every asset that was there before unchanged.
+
+A CI runner attaches an archive it built with no compile of its own: `--attach-built=<output dir>` runs the same checks and the same upload on an `output/` built earlier, with the tag checked out and `--release` naming it. The owner dispatches the `archives.yml` workflow with the release tag to have the Linux and Windows runners build their archives and attach them this way.
+
+A build on Windows that packs its own source bundles compresses them with `dart:io`'s zlib rather than macOS's `/usr/bin/gzip -n -9`, so their sha256s, which its `build_info.json` records and its archive carries, are not those of the bundles the draft attaches. With `--sources` it copies the draft's bundles byte for byte into `output/sources/` and records their sha256s, so the Windows archive's `build_info.json` names assets the draft has. A build on Linux compresses its own bundles with its own `/usr/bin/gzip`, whose bytes need not be macOS's, and is built from the draft's assets for the same reason.
+
+5. On the Mac, with the tag checked out, publish the draft once every platform's archive is attached:
+
+```bash
+dart run tool/build_tree_sitter_grammars.dart --release=v1.1.0 --finalize --require=macos-arm64,linux-arm64,windows-arm64,windows-x64
+```
+
+`--finalize` resolves the tag on GitHub and requires the release to be a draft. It requires the draft to hold the archive and the `.sha256` of every platform `--require` names, `build_info.json` and the bundles it records, and no other asset, and requires GitHub's digest of each archive to be the sha256 in its `.sha256`, of each `.sha256` to be that of its own content, and of each bundle to be the one `build_info.json` records. It reads the glibc a Linux archive needs from the `build_info.json` inside the archive, as GitHub serves it, after checking the downloaded bytes against that sha256. It appends a table of the archives (platform, sha256 and, for Linux, the glibc) to the release notes and publishes the draft in the same request (`gh api -X PATCH`, `draft=false`), resolves the tag again, and reads the release back: it must be reported immutable, with the assets it had and their digests. It then prints the sha256 of each archive as a JSON object keyed by platform id, the `sha256` map of finch's `hook/grammars_config.json`.
 
 ### Rebuilding a Release from Its Source Bundles
 
