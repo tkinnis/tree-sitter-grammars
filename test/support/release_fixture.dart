@@ -21,8 +21,16 @@ const fixtureById = 'api repos/$releaseRepository/releases/$fixtureReleaseId';
 String fixtureAsset(int id) =>
     'api repos/$releaseRepository/releases/assets/$id';
 
-/// The id of the asset [name] in the fixture release.
-int fixtureAssetId(String name) => name.hashCode & 0xffff;
+/// The key under which the fake answers the request that publishes the
+/// fixture release.
+const fixturePatch =
+    'PATCH repos/$releaseRepository/releases/$fixtureReleaseId';
+
+final _assetIds = <String, int>{};
+
+/// The id of the asset [name] in the fixture release: one per name.
+int fixtureAssetId(String name) =>
+    _assetIds.putIfAbsent(name, () => 1000 + _assetIds.length);
 
 /// A `gh` result.
 ProcessResult ghResult(
@@ -46,7 +54,13 @@ ProcessRunner fakeGh(Map<String, Object> answers, List<List<String>> calls) {
   return (executable, arguments) async {
     check(executable).equals('gh');
     calls.add(arguments);
-    final key = arguments.take(2).join(' ');
+    final key = arguments.contains('PATCH')
+        ? 'PATCH ${arguments[1]}'
+        : arguments.take(2).join(' ');
+    if (key == fixtureListing) {
+      // The listing is paginated and slurped into one array of pages.
+      check(arguments).containsEqualInOrder(['--paginate', '--slurp']);
+    }
     return switch (answers[key]) {
       final ProcessResult result => result,
       final List<ProcessResult> results =>
@@ -60,10 +74,18 @@ ProcessRunner fakeGh(Map<String, Object> answers, List<List<String>> calls) {
 }
 
 /// A release asset in the REST API's spelling.
-Map<String, Object?> assetJson(String name, String? sha256) => {
+///
+/// A [sha256] of null is a digest GitHub has not computed yet, which it
+/// spells `"digest": null`.
+Map<String, Object?> assetJson(
+  String name,
+  String? sha256, {
+  String? state = 'uploaded',
+}) => {
   'id': fixtureAssetId(name),
   'name': name,
-  'digest': ?(sha256 == null ? null : 'sha256:$sha256'),
+  'state': state,
+  'digest': sha256 == null ? null : 'sha256:$sha256',
 };
 
 /// A release in the REST API's spelling.
@@ -85,9 +107,14 @@ Map<String, Object?> releaseJson({
   'assets': assets,
 };
 
-/// A paginated listing, `gh api --paginate --slurp` style, of [releases].
-ProcessResult listing(List<Map<String, Object?>> releases) =>
-    ghResult(0, stdout: jsonEncode([releases]));
+/// A paginated listing, `gh api --paginate --slurp` style, of [releases],
+/// one to a page.
+ProcessResult listing(List<Map<String, Object?>> releases) => ghResult(
+  0,
+  stdout: jsonEncode([
+    for (final release in releases) [release],
+  ]),
+);
 
 /// The `build_info.json` of a build: its [platform], [release], commit and
 /// the sha256 of its bundles.

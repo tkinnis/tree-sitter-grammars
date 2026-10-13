@@ -89,8 +89,13 @@ Future<void> requirePushedTag(
         'push it with git push origin $tag',
       );
     }
-    final [type, sha] = outputText(result.stdout).trim().split(' ');
-    return (type, sha);
+    final answer = outputText(result.stdout).trim();
+    return switch (answer.split(' ')) {
+      [final type, final sha] => (type, sha),
+      _ => throw PublishException(
+        '$when, GitHub answered "$answer" for $tag, not "<type> <sha>"',
+      ),
+    };
   }
 
   final (type, sha) = await object('git/ref/tags/$tag');
@@ -116,7 +121,10 @@ Future<void> requirePushedTag(
 }
 
 /// One asset of a GitHub release.
-typedef ReleaseAsset = ({int id, String name, String? digest});
+///
+/// [state] is `uploaded` once the asset is complete; [digest] is null until
+/// GitHub has computed it.
+typedef ReleaseAsset = ({int id, String name, String? digest, String? state});
 
 /// A GitHub release as the REST API describes it.
 final class GitHubRelease {
@@ -147,6 +155,7 @@ final class GitHubRelease {
           id: (asset as Map<String, Object?>)['id'] as int? ?? 0,
           name: '${asset['name']}',
           digest: asset['digest'] as String?,
+          state: asset['state'] as String?,
         ),
     ],
   );

@@ -114,7 +114,8 @@ class _Finalize {
       ...fixturePushed,
       fixtureListing: listing(listed ?? [releaseJson(assets: assets)]),
       ..._downloads,
-      fixtureById: [ghResult(0, stdout: '{}'), _published],
+      fixturePatch: ghResult(0, stdout: '{}'),
+      fixtureById: _published,
       ...extra,
     }, calls),
   );
@@ -409,11 +410,7 @@ void main() {
 
   test('fails when the publication fails', () {
     return _refuses(
-      _Finalize(
-        extra: {
-          fixtureById: [ghResult(1, stderr: 'HTTP 422')],
-        },
-      ),
+      _Finalize(extra: {fixturePatch: ghResult(1, stderr: 'HTTP 422')}),
       'publishing: gh api PATCH v1.1.0 failed: HTTP 422',
     );
   });
@@ -439,11 +436,7 @@ void main() {
     ) {
       final finalize = _Finalize();
       return _refuses(
-        _Finalize(
-          extra: {
-            fixtureById: [ghResult(0, stdout: '{}'), readBack(finalize)],
-          },
-        ),
+        _Finalize(extra: {fixtureById: readBack(finalize)}),
         message,
       );
     }
