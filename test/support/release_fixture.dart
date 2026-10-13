@@ -147,7 +147,7 @@ String writeArchive(
   String directory,
   String platform,
   Map<String, Object?> info, {
-  String? sidecar,
+  String Function(String sha256, String name)? sidecar,
 }) {
   final name = 'grammars-$platform.tar.gz';
   final bytes = gzipCompress(
@@ -163,6 +163,8 @@ String writeArchive(
   final path = p.join(directory, name);
   File(path).writeAsBytesSync(bytes);
   final sha256 = dartSha256(bytes);
-  File('$path.sha256').writeAsStringSync(sidecar ?? '$sha256  $name\n');
+  File(
+    '$path.sha256',
+  ).writeAsStringSync(sidecar?.call(sha256, name) ?? '$sha256  $name\n');
   return sha256;
 }

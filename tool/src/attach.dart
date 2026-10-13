@@ -95,17 +95,14 @@ void requireSameBundles(
 Future<GitHubRelease> findDraft(GitHubCli gh, String tag, String commit) async {
   final releases = await releasesOfTag(gh, tag);
   String refusal(String reason) => 'finding the draft: $reason';
-  if (releases.isEmpty) {
+  if (releases.length != 1) {
     throw PublishException(
       refusal(
-        'no release of $tag on $releaseRepository; create it with '
-        '--publish on macOS',
+        releases.isEmpty
+            ? 'no release of $tag on $releaseRepository; create it with '
+                  '--publish on macOS'
+            : '${releases.length} releases of $tag exist; there is one',
       ),
-    );
-  }
-  if (releases.length > 1) {
-    throw PublishException(
-      refusal('${releases.length} releases of $tag exist; there is one'),
     );
   }
   final release = releases.single;
@@ -142,6 +139,8 @@ Future<void> attachArchive({
   required BuildPlatform platform,
   required String outputDirectory,
   ProcessRunner run = runProcess,
+  Duration pollDelay = const Duration(seconds: 2),
+  int pollTries = 5,
 }) async {
   if (platform.isMacos) {
     throw const PublishException(
@@ -150,6 +149,12 @@ Future<void> attachArchive({
     );
   }
   final gh = githubCli(run);
+  if (outputDirectory.contains('#')) {
+    throw PublishException(
+      'checking the archive: $outputDirectory holds #, which gh release '
+      'upload reads as the start of an asset label',
+    );
+  }
   final archive = p.join(outputDirectory, platform.releaseArchiveName);
   final sidecar = '$archive.sha256';
   final uploaded = {
@@ -167,13 +172,29 @@ Future<void> attachArchive({
 
   await requireTag('before attaching');
   final draft = await findDraft(gh, tag, commit);
-  for (final path in [archive, sidecar]) {
-    if (draft.asset(p.basename(path)) != null) {
+  if (uploaded.keys.any((name) => draft.asset(name) != null)) {
+    final settled = await _settled(
+      gh,
+      draft,
+      uploaded.keys,
+      pollTries,
+      pollDelay,
+    );
+    if (!uploaded.keys.every(
+      (name) => _isUploaded(settled.asset(name), uploaded[name]!),
+    )) {
+      final held = [
+        for (final name in uploaded.keys)
+          if (settled.asset(name) != null) name,
+      ];
       throw PublishException(
-        'finding the draft: $tag holds ${p.basename(path)} already; an '
-        'asset is never replaced',
+        'finding the draft: $tag holds ${held.join(' and ')}, which is not '
+        'the local file, complete with its digest; remove it with '
+        '${held.map((name) => deleteAssetCommand(tag, name)).join(' and ')}',
       );
     }
+    await requireTag('after attaching');
+    return;
   }
   final recorded = draft.asset('build_info.json');
   if (recorded == null) {
@@ -204,8 +225,72 @@ Future<void> attachArchive({
     );
   }
   await requireTag('after attaching');
-  await _readBack(gh, draft, uploaded);
+  final after = await _settled(
+    gh,
+    draft,
+    uploaded.keys,
+    pollTries,
+    pollDelay,
+    allowAbsent: false,
+  );
+  final problems = assetProblems(
+    draft.assets,
+    after,
+    uploaded: uploaded,
+    tolerated: (name) => _otherPlatformAsset(name, platform),
+  );
+  if (problems.isNotEmpty) throw PublishException(problems.join('\n'));
 }
+
+/// The `gh release delete-asset` command that removes the asset [name] of
+/// the draft [tag].
+String deleteAssetCommand(String tag, String name) =>
+    'gh release delete-asset $tag $name --repo $releaseRepository';
+
+/// Whether [asset] is complete and has GitHub's digest [sha256].
+bool _isUploaded(ReleaseAsset? asset, String sha256) =>
+    asset != null &&
+    asset.state == 'uploaded' &&
+    asset.digest == 'sha256:$sha256';
+
+/// Whether [asset] is complete and has a digest: GitHub computes the
+/// digest a moment after an upload.
+bool _isSettled(ReleaseAsset? asset) =>
+    asset != null && asset.state == 'uploaded' && asset.digest != null;
+
+/// [release], read again up to [tries] times, [delay] apart, until each
+/// asset in [names] is complete with a digest; assets absent from the
+/// release count as settled when [allowAbsent].
+Future<GitHubRelease> _settled(
+  GitHubCli gh,
+  GitHubRelease release,
+  Iterable<String> names,
+  int tries,
+  Duration delay, {
+  bool allowAbsent = true,
+}) async {
+  var current = release;
+  for (var attempt = 1; attempt <= tries; attempt++) {
+    final settled = names.every((name) {
+      final asset = current.asset(name);
+      return asset == null ? allowAbsent : _isSettled(asset);
+    });
+    if (settled || attempt == tries) return current;
+    await Future<void>.delayed(delay);
+    current = await readRelease(gh, release.id);
+  }
+  return current;
+}
+
+/// Whether [name] is the archive or `.sha256` of a platform other than
+/// [platform], which may be attached while this one is.
+bool _otherPlatformAsset(String name, BuildPlatform platform) => [
+  for (final other in BuildPlatform.values)
+    if (other != platform) ...[
+      other.releaseArchiveName,
+      '${other.releaseArchiveName}.sha256',
+    ],
+].contains(name);
 
 /// The sha256 of [archive], which its [sidecar] must name.
 Future<String> _checkedArchive(String archive, String sidecar) async {
@@ -216,12 +301,12 @@ Future<String> _checkedArchive(String archive, String sidecar) async {
     );
   }
   final sha256 = await dartFileSha256(archive);
-  final expected = '$sha256  ${p.basename(archive)}';
-  final held = File(sidecar).readAsStringSync().trim();
+  final expected = '$sha256  ${p.basename(archive)}\n';
+  final held = File(sidecar).readAsStringSync();
   if (held != expected) {
     throw PublishException(
-      'checking the archive: ${p.basename(sidecar)} holds "$held", '
-      'not "$expected"',
+      'checking the archive: ${p.basename(sidecar)} holds ${jsonEncode(held)}, '
+      'not ${jsonEncode(expected)}',
     );
   }
   return sha256;
@@ -256,18 +341,6 @@ Future<Map<String, Object?>> _embeddedInfo(
   return info;
 }
 
-/// Reads [draft] back and requires each of [uploaded] to have the digest
-/// GitHub reports, and every asset [draft] held to be unchanged.
-Future<void> _readBack(
-  GitHubCli gh,
-  GitHubRelease draft,
-  Map<String, String> uploaded,
-) async {
-  final after = await readRelease(gh, draft.id);
-  final problems = assetProblems(draft.assets, after, uploaded: uploaded);
-  if (problems.isNotEmpty) throw PublishException(problems.join('\n'));
-}
-
 /// Every way [after] differs from [before] plus [uploaded], the sha256 of
 /// each asset added by name: an asset that changed, went or came, or an
 /// uploaded one whose digest GitHub reports as another.
@@ -275,6 +348,7 @@ List<String> assetProblems(
   List<ReleaseAsset> before,
   GitHubRelease after, {
   Map<String, String> uploaded = const {},
+  bool Function(String name) tolerated = _none,
 }) {
   ReleaseAsset? earlier(String name) =>
       before.where((asset) => asset.name == name).firstOrNull;
@@ -282,20 +356,26 @@ List<String> assetProblems(
     for (final MapEntry(key: name, value: sha256) in uploaded.entries)
       if (after.asset(name)?.digest != 'sha256:$sha256')
         'reading back: $name: GitHub reports ${after.asset(name)?.digest}, '
-            'the local file is sha256:$sha256',
+            'the local file is sha256:$sha256'
+      else if (after.asset(name)?.state != 'uploaded')
+        'reading back: $name is in the state ${after.asset(name)?.state}',
     for (final asset in before)
       switch (after.asset(asset.name)) {
         null => 'reading back: ${asset.name} is gone',
-        final now when now.digest != asset.digest =>
+        final now when now.digest != asset.digest || now.id != asset.id =>
           'reading back: ${asset.name} was ${asset.digest}, GitHub reports '
               '${now.digest}',
         _ => null,
       },
     for (final asset in after.assets)
-      if (earlier(asset.name) == null && !uploaded.containsKey(asset.name))
+      if (earlier(asset.name) == null &&
+          !uploaded.containsKey(asset.name) &&
+          !tolerated(asset.name))
         'reading back: ${asset.name} is an asset nobody uploaded',
   ].nonNulls.toList();
 }
+
+bool _none(String name) => false;
 
 /// Requires the `build_info.json` in [bundles], the directory `--sources`
 /// names, to record the build of [release] at [commit].

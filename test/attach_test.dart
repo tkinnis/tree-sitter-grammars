@@ -32,8 +32,9 @@ class _Attach {
     this.directory, {
     Map<String, Object?>? embedded,
     Map<String, Object?>? published,
-    String? sidecar,
+    String Function(String, String)? sidecar,
     this.listed,
+    this.alreadyHeld,
     this.platform = BuildPlatform.linuxArm64,
     this.afterUpload,
     this.extra = const {},
@@ -53,20 +54,32 @@ class _Attach {
   afterUpload;
   final Map<String, Object> extra;
   final List<Map<String, Object?>>? listed;
+  final List<Map<String, Object?>> Function(String archive, String sidecar)?
+  alreadyHeld;
   final calls = <List<String>>[];
   late final String sha256;
   late final String releaseInfo;
+
+  /// The sha256 of the `.sha256` file, the digest GitHub reports of it.
+  String get sidecarSha256 => dartSha256(utf8.encode(_sidecar));
+
+  /// The two assets of this platform, as GitHub reports them once
+  /// uploaded.
+  List<Map<String, Object?>> get ownAssets => [
+    assetJson(_archiveName, sha256),
+    assetJson('$_archiveName.sha256', sidecarSha256),
+  ];
+
+  /// The draft's release object holding [assets].
+  ProcessResult releaseWith(List<Map<String, Object?>> assets) =>
+      ghResult(0, stdout: jsonEncode(releaseJson(assets: assets)));
 
   String get _infoSha256 => dartSha256(utf8.encode(releaseInfo));
 
   /// The draft after the upload: its assets, and the two new ones, which
   /// [afterUpload] may alter.
   ProcessResult get _readBack {
-    final assets = [
-      ..._draftAssets(_infoSha256),
-      assetJson(_archiveName, sha256),
-      assetJson('$_archiveName.sha256', dartSha256(utf8.encode(_sidecar))),
-    ];
+    final assets = [..._draftAssets(_infoSha256), ...ownAssets];
     return ghResult(
       0,
       stdout: jsonEncode(
@@ -84,17 +97,32 @@ class _Attach {
     commit: fixtureCommit,
     platform: platform,
     outputDirectory: directory.path,
+    pollDelay: Duration.zero,
+    pollTries: 3,
     run: fakeGh({
       ...fixturePushed,
       fixtureListing: listing(
-        listed ?? [releaseJson(assets: _draftAssets(_infoSha256))],
+        listed ??
+            [
+              releaseJson(
+                assets: [
+                  ..._draftAssets(_infoSha256),
+                  ...?alreadyHeld?.call(sha256, sidecarSha256),
+                ],
+              ),
+            ],
       ),
       fixtureAsset(fixtureAssetId('build_info.json')): ghResult(
         0,
         stdout: releaseInfo,
       ),
       'release upload': ghResult(0),
-      fixtureById: _readBack,
+      fixtureById: alreadyHeld == null
+          ? _readBack
+          : releaseWith([
+              ..._draftAssets(_infoSha256),
+              ...alreadyHeld!(sha256, sidecarSha256),
+            ]),
       ...extra,
     }, calls),
   );
@@ -161,6 +189,163 @@ void main() {
     await other.run();
   });
 
+  group('is idempotent', () {
+    test('when both assets are already attached with the local digests, '
+        'uploading nothing', () async {
+      final attach = _Attach(
+        directory,
+        alreadyHeld: (a, s) => [
+          assetJson(_archiveName, a),
+          assetJson('$_archiveName.sha256', s),
+        ],
+      );
+
+      await attach.run();
+
+      check(attach.steps).not((it) => it.contains('release upload'));
+      check(attach.steps.last).equals(fixtureTag);
+    });
+
+    test('when GitHub has not yet computed a digest, waiting for it', () async {
+      final attach = _Attach(
+        directory,
+        alreadyHeld: (a, s) => [
+          assetJson(_archiveName, a),
+          assetJson('$_archiveName.sha256', null),
+        ],
+      );
+      final settled = attach.releaseWith([
+        ..._draftAssets(attach._infoSha256),
+        ...attach.ownAssets,
+      ]);
+
+      await _Attach(
+        directory,
+        alreadyHeld: (a, s) => [
+          assetJson(_archiveName, a),
+          assetJson('$_archiveName.sha256', null),
+        ],
+        extra: {fixtureById: settled},
+      ).run();
+    });
+
+    test('but not when a digest stays uncomputed', () {
+      return _refuses(
+        _Attach(
+          directory,
+          alreadyHeld: (a, s) => [
+            assetJson(_archiveName, a),
+            assetJson('$_archiveName.sha256', null),
+          ],
+        ),
+        'gh release delete-asset v1.1.0 $_archiveName.sha256 --repo '
+        '$releaseRepository',
+      );
+    });
+  });
+
+  test('tolerates another platform attaching while it uploads', () async {
+    await _Attach(
+      directory,
+      afterUpload: (assets) => [
+        ...assets,
+        assetJson('grammars-windows-x64.tar.gz', 'w1'),
+        assetJson('grammars-windows-x64.tar.gz.sha256', 'w2'),
+      ],
+    ).run();
+  });
+
+  test('refuses a .tar.gz of this platform it did not upload', () {
+    return _refuses(
+      _Attach(
+        directory,
+        afterUpload: (assets) => [
+          ...assets,
+          assetJson('grammars-linux-arm64.dry-run.tar.gz', 'w1'),
+        ],
+      ),
+      'reading back: grammars-linux-arm64.dry-run.tar.gz is an asset nobody '
+      'uploaded',
+    );
+  });
+
+  test('waits for the digest of what it uploaded', () async {
+    final attach = _Attach(directory);
+    final pending = attach.releaseWith([
+      ..._draftAssets(attach._infoSha256),
+      assetJson(_archiveName, null),
+      assetJson('$_archiveName.sha256', null),
+    ]);
+
+    await _Attach(
+      directory,
+      extra: {
+        fixtureById: [pending, attach._readBack],
+      },
+    ).run();
+  });
+
+  test('refuses an upload whose digest never arrives', () {
+    return _refuses(
+      _Attach(
+        directory,
+        afterUpload: (assets) => [
+          for (final asset in assets)
+            asset['name'] == _archiveName
+                ? assetJson(_archiveName, null)
+                : asset,
+        ],
+      ),
+      'reading back: $_archiveName: GitHub reports null',
+    );
+  });
+
+  test('refuses an upload GitHub leaves in a state other than uploaded', () {
+    return _refuses(
+      _Attach(
+        directory,
+        afterUpload: (assets) => [
+          for (final asset in assets)
+            asset['name'] == _archiveName
+                ? assetJson(
+                    _archiveName,
+                    (asset['digest']! as String).substring(7),
+                    state: 'open',
+                  )
+                : asset,
+        ],
+      ),
+      'reading back: $_archiveName is in the state open',
+    );
+  });
+
+  test('refuses an output directory whose path holds #, which gh reads as a '
+      'label', () async {
+    final labelled = Directory('${directory.path}/a#b')..createSync();
+    final attach = _Attach(labelled);
+
+    await _refuses(attach, 'checking the archive: ${labelled.path} holds #');
+    check(attach.calls).isEmpty();
+  });
+
+  for (final (label, sidecar) in [
+    ('no trailing newline', (String sha, String name) => '$sha  $name'),
+    ('two trailing newlines', (String sha, String name) => '$sha  $name\n\n'),
+    ('a CRLF', (String sha, String name) => '$sha  $name\r\n'),
+    ('one space', (String sha, String name) => '$sha $name\n'),
+    (
+      'uppercase hex',
+      (String sha, String name) => '${sha.toUpperCase()}  $name\n',
+    ),
+  ]) {
+    test('refuses a .sha256 with $label', () {
+      return _refuses(
+        _Attach(directory, sidecar: sidecar),
+        'checking the archive: $_archiveName.sha256 holds',
+      );
+    });
+  }
+
   group('refuses, uploading nothing,', () {
     Future<void> refuses(
       String label,
@@ -183,7 +368,7 @@ void main() {
     test('a .sha256 that is not the archive\'s', () {
       return refuses(
         'sidecar',
-        (d) => _Attach(d, sidecar: '${'0' * 64}  $_archiveName\n'),
+        (d) => _Attach(d, sidecar: (_, name) => '${'0' * 64}  $name\n'),
         'checking the archive: $_archiveName.sha256 holds',
       );
     });
@@ -288,24 +473,62 @@ void main() {
     });
 
     for (final name in [_archiveName, '$_archiveName.sha256']) {
-      test('a draft that holds $name already', () {
+      final remedy =
+          'gh release delete-asset v1.1.0 $name --repo $releaseRepository';
+
+      test('a draft that holds $name with another digest', () {
         return refuses(
           'present',
+          (d) => _Attach(d, alreadyHeld: (_, _) => [assetJson(name, 'ee')]),
+          'finding the draft: v1.1.0 holds $name, which is not the local '
+              'file, complete with its digest; remove it with $remedy',
+        );
+      });
+
+      test('a draft that holds $name in a state other than uploaded', () {
+        return refuses(
+          'state',
           (d) => _Attach(
             d,
-            listed: [
-              releaseJson(
-                assets: [
-                  assetJson('build_info.json', 'aa'),
-                  assetJson(name, 'ee'),
-                ],
+            alreadyHeld: (archive, sidecar) => [
+              assetJson(
+                name,
+                name == _archiveName ? archive : sidecar,
+                state: 'starter',
               ),
             ],
           ),
-          'finding the draft: v1.1.0 holds $name already',
+          'remove it with $remedy',
+        );
+      });
+
+      test('a draft that holds only $name, the other asset missing', () {
+        return refuses(
+          'partial',
+          (d) => _Attach(
+            d,
+            alreadyHeld: (archive, sidecar) => [
+              assetJson(name, name == _archiveName ? archive : sidecar),
+            ],
+          ),
+          'remove it with $remedy',
         );
       });
     }
+
+    test('a draft that holds both assets, one with another digest, names '
+        'each one to delete', () async {
+      final attach = _Attach(
+        directory,
+        alreadyHeld: (archive, sidecar) => [
+          assetJson(_archiveName, archive),
+          assetJson('$_archiveName.sha256', 'ee'),
+        ],
+      );
+
+      await _refuses(attach, '$_archiveName.sha256 --repo $releaseRepository');
+      check(attach.steps).not((it) => it.contains('release upload'));
+    });
 
     test('a draft without a build_info.json', () {
       return refuses(
