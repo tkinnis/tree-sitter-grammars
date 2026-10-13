@@ -7,8 +7,10 @@
 ///
 /// On macOS the compiler is the clang of the Xcode `xcrun` selects. On
 /// Linux it is the first `clang` on `PATH`, targeting the platform's GNU
-/// triple and linking with the system's linker against the system's C
-/// library, which `build_info.json` records as macOS records its SDK. On
+/// triple and linking with GNU ld (`-fuse-ld=bfd`) against the system's C
+/// library; `build_info.json` records the linker's version and the
+/// package and revision that installed it, and the C library's release and
+/// banner, each with its path, as macOS records its SDK. On
 /// Windows it is LLVM's clang driving `lld-link`, targeting
 /// `*-pc-windows-msvc` against the libraries of the Visual Studio and the
 /// Windows SDK it names explicitly, rather than MSVC's `cl.exe`: it takes
@@ -22,6 +24,7 @@
 /// CRT keeps.
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -58,7 +61,11 @@ final class Compiler {
     this.msvcToolsPath,
     this.msvcToolsVersion,
     this.hostLibc,
+    this.hostLibcBanner,
     this.hostLibcPath,
+    this.linker,
+    this.linkerPackage,
+    this.linkerPath,
   });
 
   /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
@@ -92,15 +99,40 @@ final class Compiler {
   /// On Windows, the version of the MSVC tools at [msvcToolsPath].
   final String? msvcToolsVersion;
 
-  /// On Linux, the build host's C library, which every library links
-  /// against, as `getconf GNU_LIBC_VERSION` names it, for example
-  /// `glibc 2.43`; null on macOS and Windows. It is not the glibc a library
-  /// needs, which is the highest `GLIBC_` version its symbols name.
+  /// On Linux, the release of the C library at [hostLibcPath], which every
+  /// library links against, as [glibcRelease] reads it from that file, for
+  /// example `glibc 2.43`; null on macOS and Windows. It is not the glibc a
+  /// library needs, which is the highest `GLIBC_` version its symbols name.
   final String? hostLibc;
+
+  /// On Linux, the banner of the C library at [hostLibcPath], as
+  /// [glibcBanner] reads it, which names the distribution's build of it
+  /// with its revision, for example `GNU C Library (Ubuntu GLIBC
+  /// 2.43-2ubuntu2.4) stable release version 2.43`; null on macOS and
+  /// Windows. The startup files and static parts of glibc every library
+  /// links come from that same build, which [hostLibc] alone does not name.
+  final String? hostLibcBanner;
 
   /// On Linux, the build host's `libc.so.6` clang links against, as
   /// `clang -print-file-name=libc.so.6` finds it for the platform's target.
   final String? hostLibcPath;
+
+  /// On Linux, the first line of `--version` of the linker at
+  /// [linkerPath], for example `GNU ld (GNU Binutils for Ubuntu) 2.46`;
+  /// null on macOS and Windows. The linker writes every library's bytes as
+  /// much as clang does, so two builds with the same clang and glibc but
+  /// another binutils record that they differ.
+  final String? linker;
+
+  /// On Linux, the package that installed the linker at [linkerPath] and
+  /// its version with the distribution's revision, for example
+  /// `binutils-aarch64-linux-gnu 2.46-3ubuntu2`, which [linker] leaves
+  /// out; null on macOS and Windows.
+  final String? linkerPackage;
+
+  /// On Linux, the GNU ld every link runs, as
+  /// `clang -print-prog-name=ld.bfd` finds it for the platform's target.
+  final String? linkerPath;
 
   /// Resolves the compiler a build on [platform], by default the platform
   /// this process runs on, compiles with: on macOS through `xcrun`, which
@@ -143,52 +175,35 @@ final class Compiler {
     );
   }
 
-  /// Resolves clang and the C library for a build on [platform].
-  ///
-  /// clang is the first `clang` on `PATH`; the C library is the
-  /// host's `libc.so.6` it links against for [platform]'s target, and its
-  /// version what `getconf GNU_LIBC_VERSION` reports.
+  /// Resolves clang, the linker and the C library for a build on
+  /// [platform], as [resolveLinuxCompiler] does with the first `clang` on
+  /// `PATH`, every tool run with the [compilerEnvironment] each compiler
+  /// invocation sees.
   static Future<Compiler> _resolveLinux(BuildPlatform platform) async {
-    final path = _onPath('clang', platform);
     final environment = compilerEnvironment(Platform.environment);
-    Future<String> run(String executable, List<String> arguments) async {
-      final result = await Process.run(
-        executable,
-        arguments,
-        environment: environment,
-        includeParentEnvironment: false,
-      );
-      if (result.exitCode != 0) {
-        throw CompilerException(
-          '$executable ${arguments.join(' ')} failed: ${result.stderr}',
-        );
-      }
-      return (result.stdout as String).trim();
-    }
-
-    final libcPath = await run(path, [
-      '--target=${platform.linuxTarget}',
-      '-print-file-name=libc.so.6',
-    ]);
-    if (!p.isAbsolute(libcPath)) {
-      throw CompilerException(
-        '$path finds no libc.so.6 for ${platform.linuxTarget}; install the '
-        'C library for that target',
-      );
-    }
-    final libc = await run('getconf', ['GNU_LIBC_VERSION']);
-    if (!RegExp(r'^glibc \d+\.\d+').hasMatch(libc)) {
-      throw CompilerException(
-        'getconf GNU_LIBC_VERSION reports $libc; a build on Linux links '
-        'against glibc',
-      );
-    }
-    return Compiler(
-      path: path,
-      version: (await run(path, ['--version'])).split('\n').first.trim(),
-      platform: platform,
-      hostLibc: libc,
-      hostLibcPath: p.normalize(libcPath),
+    return resolveLinuxCompiler(
+      platform,
+      clang: onPath('clang', platform),
+      run: (executable, arguments) async {
+        final ProcessResult result;
+        try {
+          result = await Process.run(
+            executable,
+            arguments,
+            environment: environment,
+            includeParentEnvironment: false,
+          );
+        } on ProcessException catch (e) {
+          // A tool that is not installed, such as dpkg where there is rpm.
+          throw CompilerException('$executable cannot be run: ${e.message}');
+        }
+        if (result.exitCode != 0) {
+          throw CompilerException(
+            '$executable ${arguments.join(' ')} failed: ${result.stderr}',
+          );
+        }
+        return (result.stdout as String).trim();
+      },
     );
   }
 
@@ -204,7 +219,7 @@ final class Compiler {
   /// of the user's decides what the libraries are compiled and linked
   /// against.
   static Future<Compiler> _resolveWindows(BuildPlatform platform) async {
-    final path = _onPath('clang.exe', platform);
+    final path = onPath('clang.exe', platform);
     final version = await Process.run(
       path,
       ['--version'],
@@ -229,17 +244,169 @@ final class Compiler {
   }
 }
 
-/// The absolute path of the first [executable] in a directory `PATH`
-/// lists, which a build on [platform] compiles with; throws a
-/// [CompilerException] when there is none.
-String _onPath(String executable, BuildPlatform platform) {
+/// Runs [executable] with [arguments] in the environment a compiler
+/// invocation sees and returns its standard output, trimmed; throws a
+/// [CompilerException] when it fails.
+typedef ToolRunner =
+    Future<String> Function(String executable, List<String> arguments);
+
+/// The [Compiler] of a build on the Linux [platform] that compiles with
+/// the clang at [clang], asking it through [run] what it links with.
+///
+/// clang is the user's: the first on `PATH`, so that an LLVM of their
+/// choosing can compile. What clang runs and links against it finds
+/// beside itself or on the `PATH` of [compilerEnvironment], not the
+/// user's, so [run] runs it in that environment, as every compiler
+/// invocation is, and its answers are what `build_info.json` records:
+///
+/// - the linker, GNU ld, which every link selects with `-fuse-ld=bfd` and
+///   clang finds as `ld.bfd` for [platform]'s target, with the first line
+///   of its `--version`, since two linkers write the same objects to
+///   different bytes;
+/// - the package that installed that linker, with its version and the
+///   distribution's revision, which `--version` leaves out, as dpkg or,
+///   where there is none, rpm names it;
+/// - the C library, the `libc.so.6` clang finds for that target, with the
+///   release [glibcRelease] reads from that same file and the whole
+///   banner [glibcBanner] reads, which names the distribution's build, so
+///   what is recorded is the library linked against, not whatever glibc
+///   this process runs on.
+///
+/// Throws a [CompilerException] when clang finds either by no absolute
+/// path, which it answers when it finds none, when the C library names no
+/// glibc release, when the linker is not GNU ld, or when no package
+/// database names the one package that installed it.
+Future<Compiler> resolveLinuxCompiler(
+  BuildPlatform platform, {
+  required String clang,
+  required ToolRunner run,
+}) async {
+  final target = '--target=${platform.linuxTarget}';
+  final libcPath = await run(clang, [target, '-print-file-name=libc.so.6']);
+  if (!p.isAbsolute(libcPath) || !File(libcPath).existsSync()) {
+    throw CompilerException(
+      '$clang finds no libc.so.6 for ${platform.linuxTarget}; install the '
+      'C library for that target',
+    );
+  }
+  final libcBytes = File(libcPath).readAsBytesSync();
+  final libc = glibcRelease(libcBytes);
+  final banner = glibcBanner(libcBytes);
+  if (libc == null || banner == null) {
+    throw CompilerException(
+      '$libcPath names no glibc release; a build on Linux links against '
+      'glibc',
+    );
+  }
+  final linkerPath = await run(clang, [target, '-print-prog-name=ld.bfd']);
+  if (!p.isAbsolute(linkerPath)) {
+    throw CompilerException(
+      '$clang finds no ld.bfd for ${platform.linuxTarget}; install GNU '
+      'binutils for that target',
+    );
+  }
+  final linker = (await run(linkerPath, ['--version'])).split('\n').first;
+  if (!linker.startsWith('GNU ld ')) {
+    throw CompilerException(
+      '$linkerPath --version reports $linker; a build on Linux links with '
+      'GNU ld',
+    );
+  }
+  final linkerPackage = await _packageOf(linkerPath, run);
+  if (linkerPackage == null) {
+    throw CompilerException(
+      'no package database names the one package that installed '
+      '$linkerPath; a build on Linux records the binutils package and '
+      'revision it links with',
+    );
+  }
+  return Compiler(
+    path: clang,
+    version: (await run(clang, ['--version'])).split('\n').first.trim(),
+    platform: platform,
+    hostLibc: libc,
+    hostLibcBanner: banner,
+    hostLibcPath: p.normalize(libcPath),
+    linker: linker.trim(),
+    linkerPackage: linkerPackage,
+    linkerPath: p.normalize(linkerPath),
+  );
+}
+
+/// The package that installed [path] and its full version, its name and
+/// version apart by a space, as dpkg names it or, where dpkg cannot be
+/// asked, rpm; null when neither names exactly one package.
+Future<String?> _packageOf(String path, ToolRunner run) async {
+  try {
+    final owners = [
+      for (final line in (await run('/usr/bin/dpkg-query', [
+        '-S',
+        path,
+      ])).split('\n'))
+        // A diversion of the path is listed as well, and is no owner.
+        if (!line.startsWith('diversion by ') && line.endsWith(': $path'))
+          line.substring(0, line.length - ': $path'.length),
+    ];
+    if (owners.length != 1 || owners.single.contains(', ')) return null;
+    final package = await run('/usr/bin/dpkg-query', [
+      '-W',
+      r'--showformat=${Package} ${Version}',
+      owners.single,
+    ]);
+    return package.contains(' ') ? package : null;
+  } on CompilerException {
+    // No dpkg, or dpkg knows nothing of the path: ask rpm.
+  }
+  try {
+    final package = await run('/usr/bin/rpm', [
+      '-qf',
+      '--queryformat',
+      '%{NAME} %{EVR}',
+      path,
+    ]);
+    return package.contains(' ') && !package.contains('\n') ? package : null;
+  } on CompilerException {
+    return null;
+  }
+}
+
+/// The release of the GNU C library whose `libc.so.6` holds [bytes], as
+/// its banner (`GNU C Library (...) stable release version 2.43.`) names
+/// it, written as `getconf GNU_LIBC_VERSION` writes it, `glibc 2.43`; null
+/// when the file holds no such banner.
+String? glibcRelease(List<int> bytes) {
+  final banner = glibcBanner(bytes);
+  if (banner == null) return null;
+  return 'glibc ${banner.substring(banner.lastIndexOf(' ') + 1)}';
+}
+
+/// The banner of the GNU C library whose `libc.so.6` holds [bytes], with
+/// no final full stop, for example `GNU C Library (Ubuntu GLIBC
+/// 2.43-2ubuntu2.4) stable release version 2.43`; null when the file holds
+/// no banner that names a release.
+String? glibcBanner(List<int> bytes) => RegExp(
+  r'GNU C Library [^\n\x00]*? release version \d+\.\d+(?:\.\d+)?',
+).firstMatch(latin1.decode(bytes))?.group(0);
+
+/// The absolute path of the first [executable] in a directory [path], by
+/// default `PATH`, lists, which a build on [platform] compiles with;
+/// throws a [CompilerException] when there is none.
+///
+/// A file of that name that cannot be run, such as one with no execute
+/// permission off Windows, is passed over, as a shell passes it over.
+String onPath(String executable, BuildPlatform platform, {String? path}) {
   final separator = Platform.isWindows ? ';' : ':';
-  for (final directory in (Platform.environment['PATH'] ?? '').split(
+  for (final directory in (path ?? Platform.environment['PATH'] ?? '').split(
     separator,
   )) {
     if (directory.isEmpty) continue;
     final candidate = p.join(directory, executable);
-    if (File(candidate).existsSync()) return p.normalize(candidate);
+    final stat = FileStat.statSync(candidate);
+    if (stat.type != FileSystemEntityType.file) continue;
+    // A file with no execute bit cannot be run. Windows keeps no such
+    // bits, and runs a file by its name.
+    if (!Platform.isWindows && stat.mode & 0x49 /* 0111 */ == 0) continue;
+    return p.normalize(candidate);
   }
   throw CompilerException(
     'no $executable on PATH; a build on ${platform.osName} compiles with '
@@ -368,9 +535,11 @@ Set<String> allowedCompilerVariablesOf(BuildPlatform platform) =>
 /// variable, `CFLAGS`, `CPPFLAGS` and `LDFLAGS` among them, is left out.
 ///
 /// clang finds the SDK through the explicit `-isysroot`, and its own
-/// linker beside itself, so it needs no search path of the user's; on
-/// Linux it finds the system's headers, C library and linker under `/usr`,
-/// which is where `PATH` points. On
+/// linker beside itself, so it needs no search path of the user's. On
+/// Linux it finds the system's headers and C library under `/usr`, and
+/// GNU ld beside itself or on this `PATH`, not the user's, so
+/// [resolveLinuxCompiler] asks it for both with this environment and
+/// `build_info.json` records what it answered. On
 /// Windows, where clang finds the MSVC tools and the Windows SDK through
 /// the paths its flags name, and `lld-link` beside itself, `PATH` holds
 /// only the system's own directories, and neither `INCLUDE` nor `LIB`
@@ -555,16 +724,18 @@ final class BuildFlags {
   /// platform's target triple in place of `-arch` and no SDK, since clang
   /// compiles against the system's headers and C library.
   ///
-  /// Every library is linked `-shared` with its file name as its soname,
-  /// as the macOS link gives each its install name, and with `-z defs`, so
-  /// a symbol nothing defines fails the link, as it does on macOS and
-  /// Windows, rather than the first load. The runtime takes none of the
-  /// Darwin defines, which glibc does not read.
+  /// Every library is linked `-shared` by GNU ld, which `-fuse-ld=bfd`
+  /// names rather than leaving the choice to how clang was configured, so
+  /// the linker is the one [Compiler.linker] records; with its file name as
+  /// its soname, as the macOS link gives each its install name; and with
+  /// `-z defs`, so a symbol nothing defines fails the link, as it does on
+  /// macOS and Windows, rather than the first load. The runtime takes none
+  /// of the Darwin defines, which glibc does not read.
   factory BuildFlags._linux(Compiler compiler) {
     final platform = compiler.platform;
     final target = ['--target=${platform.linuxTarget}'];
     const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
-    const link = ['-Wl,-z,defs'];
+    const link = ['-fuse-ld=bfd', '-Wl,-z,defs'];
     return BuildFlags._(
       runtime: [
         '-O3',

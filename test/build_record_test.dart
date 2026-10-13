@@ -170,6 +170,30 @@ void main() {
     check(commands[1].arguments).contains('-ffile-prefix-map=/clone=.');
   });
 
+  test('a build_info.json naming no platform a build targets is refused, '
+      'not checked as macOS', () {
+    final commands = _roundTrip(_commands(flags));
+    for (final platform in ['linux-x64', 'macos-x64', '', null]) {
+      final info = {..._info(flags), 'platform': platform};
+
+      check(
+            because: 'platform $platform',
+            () => buildFlagProblems(info, commands, {'json'}),
+          )
+          .throws<FormatException>()
+          .has((e) => e.message, 'message')
+          .equals(
+            'build_info.json records the platform $platform, which no build '
+            'targets',
+          );
+    }
+    check(
+      () => buildFlagProblems({..._info(flags)}..remove('platform'), commands, {
+        'json',
+      }),
+    ).throws<FormatException>();
+  });
+
   test('an invocation passing a flag the record lacks is reported', () {
     final commands = _commands(flags);
     final compile = commands[1];
@@ -472,7 +496,13 @@ void main() {
       version: 'Ubuntu clang version 21.1.8 (6ubuntu1)',
       platform: BuildPlatform.linuxArm64,
       hostLibc: 'glibc 2.43',
+      hostLibcBanner:
+          'GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2.4) stable release '
+          'version 2.43',
       hostLibcPath: '/lib/aarch64-linux-gnu/libc.so.6',
+      linker: 'GNU ld (GNU Binutils for Ubuntu) 2.46',
+      linkerPackage: 'binutils-aarch64-linux-gnu 2.46-3ubuntu2',
+      linkerPath: '/usr/bin/aarch64-linux-gnu-ld.bfd',
     );
     const toolchain = Toolchain(
       treeSitterTag: 'v0.27.0',
@@ -604,7 +634,11 @@ void main() {
       for (final list in [linuxFlags.runtime, linuxFlags.grammarLink]) {
         check(list).contains('-shared');
         check(list).contains('-Wl,-z,defs');
+        // GNU ld, whose version build_info records, whatever linker clang
+        // was configured to choose.
+        check(list).contains('-fuse-ld=bfd');
       }
+      check(linuxFlags.grammarCompile).not((it) => it.contains('-fuse-ld=bfd'));
       check(linuxFlags.runtime).contains('-Wl,-soname,libtree-sitter.so');
       check(
         grammarLinkFlags('json', platform: BuildPlatform.linuxArm64),
@@ -612,7 +646,7 @@ void main() {
     });
 
     test('records the platform, the glibc its libraries need, the compiler, '
-        'the build host\'s C library and the CLI it runs', () {
+        'the linker, the build host\'s C library and the CLI it runs', () {
       final record = info();
       final tools = record['toolchain']! as Map<String, Object?>;
 
@@ -634,8 +668,27 @@ void main() {
       ).equals(toolchain.cliPins['linux']!['arm64']!.sha256);
       check(tools['clang']).equals('Ubuntu clang version 21.1.8 (6ubuntu1)');
       check(tools['clangPath']).equals('/usr/bin/clang');
+      check(tools['linker']).equals('GNU ld (GNU Binutils for Ubuntu) 2.46');
+      check(
+        tools['linkerPackage'],
+      ).equals('binutils-aarch64-linux-gnu 2.46-3ubuntu2');
+      check(tools['linkerPath']).equals('/usr/bin/aarch64-linux-gnu-ld.bfd');
       check(tools['hostLibc']).equals('glibc 2.43');
+      check(tools['hostLibcBanner']).equals(
+        'GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2.4) stable release version '
+        '2.43',
+      );
       check(tools['hostLibcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
+      check(tools.keys.take(8)).deepEquals([
+        'clang',
+        'clangPath',
+        'linker',
+        'linkerPackage',
+        'linkerPath',
+        'hostLibc',
+        'hostLibcBanner',
+        'hostLibcPath',
+      ]);
       for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
         check(tools.containsKey(key)).isFalse();
       }

@@ -28,9 +28,9 @@ const repositoryUrl = 'https://github.com/tkinnis/tree-sitter-grammars';
 ///
 /// A macOS build records its deployment target and Xcode's clang and SDK;
 /// a Linux build records [glibcRequirement], the glibc its libraries need,
-/// and its clang and the build host's C library it links against; a
-/// Windows build records LLVM's clang, the MSVC tools and the Windows SDK;
-/// each with its path.
+/// and its clang, its linker and the build host's C library it links
+/// against; a Windows build records LLVM's clang, the MSVC tools and the
+/// Windows SDK; each with its path.
 Map<String, Object?> buildInfo({
   required String? release,
   required Toolchain toolchain,
@@ -78,7 +78,11 @@ Map<String, Object?> buildInfo({
         'sdkPath': compiler.sdkPath,
       },
       'linux' => {
+        'linker': compiler.linker,
+        'linkerPackage': compiler.linkerPackage,
+        'linkerPath': compiler.linkerPath,
         'hostLibc': compiler.hostLibc,
+        'hostLibcBanner': compiler.hostLibcBanner,
         'hostLibcPath': compiler.hostLibcPath,
       },
       _ => {
@@ -159,14 +163,22 @@ List<CompileCommand> parseCompileCommands(String json) => [
 /// passed. The runtime must have one invocation and each of [grammarNames]
 /// one link, every object a link names must have been compiled, and no
 /// invocation may see a variable outside [allowedCompilerVariablesOf] the
-/// platform [info] records, macOS when it records none.
+/// platform [info] records.
+///
+/// Throws a [FormatException] when [info] records no platform a build
+/// targets: every build this checks has just written its own record, which
+/// names its platform, so a missing or unknown one is never read as macOS.
 List<String> buildFlagProblems(
   Map<String, Object?> info,
   List<CompileCommand> commands,
   Set<String> grammarNames,
 ) {
   final platform =
-      BuildPlatform.parse(info['platform']) ?? BuildPlatform.macosArm64;
+      BuildPlatform.parse(info['platform']) ??
+      (throw FormatException(
+        'build_info.json records the platform ${info['platform']}, which no '
+        'build targets',
+      ));
   final allowed = allowedCompilerVariablesOf(platform);
   String kindOf(String output) => _kind(output, platform);
   final toolchain = info['toolchain']! as Map<String, Object?>;
