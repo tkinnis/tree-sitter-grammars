@@ -332,6 +332,17 @@ void main() {
       );
     });
 
+    test('a .sha256 that holds no sha256', () {
+      return _refusesToPublish(
+        _Finalize(
+          sidecars: {
+            'grammars-macos-arm64.tar.gz': 'zz  grammars-macos-arm64.tar.gz\n',
+          },
+        ),
+        'checking the digests: grammars-macos-arm64.tar.gz.sha256 holds',
+      );
+    });
+
     test('an archive GitHub gives no digest', () {
       return _refusesToPublish(
         _Finalize(

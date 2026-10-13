@@ -143,6 +143,24 @@ void main() {
     ).not((it) => it.contains('--clobber'));
   });
 
+  test('is not stopped by the releases of other tags', () async {
+    final attach = _Attach(directory);
+    final other = _Attach(
+      directory,
+      listed: [
+        releaseJson(tag: 'v1.0.0', draft: false, id: 5),
+        releaseJson(
+          tag: 'v1.2.0',
+          id: 6,
+          assets: [assetJson(_archiveName, 'ee')],
+        ),
+        releaseJson(assets: _draftAssets(attach._infoSha256)),
+      ],
+    );
+
+    await other.run();
+  });
+
   group('refuses, uploading nothing,', () {
     Future<void> refuses(
       String label,

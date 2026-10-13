@@ -148,6 +148,50 @@ void main() {
     });
   }
 
+  test('is not stopped by the releases of other tags', () async {
+    final other = {'id': 1, 'tag_name': 'v1.0.0', 'draft': false};
+
+    await _publish({
+      _listing: [
+        _releases([other]),
+        _releases([
+          other,
+          {'id': _draftId, 'tag_name': 'v1.1.0', 'draft': true},
+        ]),
+      ],
+      ..._pushed,
+      'release create': _result(0),
+      _byId: _published,
+    });
+  });
+
+  for (final (label, after) in [
+    ('none', <Map<String, Object?>>[]),
+    (
+      'two',
+      [
+        {'id': _draftId, 'tag_name': 'v1.1.0', 'draft': true},
+        {'id': 78, 'tag_name': 'v1.1.0', 'draft': true},
+      ],
+    ),
+  ]) {
+    test('refuses to read back when GitHub lists $label releases of the '
+        'tag it created', () async {
+      await check(
+        _publish({
+          _listing: [_noReleases, _releases(after)],
+          ..._pushed,
+          'release create': _result(0),
+          _byId: _published,
+        }),
+      ).throws<PublishException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .contains('GitHub lists ${after.length} releases'),
+      );
+    });
+  }
+
   test('lists every page of the releases, and finds the tag on a later '
       'one', () async {
     final calls = <List<String>>[];
