@@ -120,6 +120,28 @@ void main() {
     });
   }
 
+  test(
+    'off macOS, refuses --publish before it deletes anything',
+    () async {
+      final root = temporary.path;
+      _copyTools(root);
+      final kept = File(p.join(root, 'output', 'manifest.json'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('{}');
+
+      final result = await _build(root, ['--release=v1.1.0', '--publish']);
+
+      check(result.exitCode).equals(1);
+      check(result.stderr as String)
+        ..contains('--publish creates the draft from a build on macOS')
+        ..contains('--attach');
+      check(kept.existsSync()).isTrue();
+    },
+    skip: Platform.isMacOS
+        ? 'a build on macOS publishes; this refusal is of every other host'
+        : false,
+  );
+
   test('refuses source bundles that do not exist', () async {
     final root = temporary.path;
     _copyTools(root);
