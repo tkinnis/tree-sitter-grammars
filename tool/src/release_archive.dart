@@ -4,10 +4,12 @@
 /// On macOS and Linux `/usr/bin/tar` and `/usr/bin/gzip` pack it from
 /// files whose modes and times `chmod` and `touch` have set: bsdtar on
 /// macOS, with [tarArguments], and GNU tar on Linux, with
-/// [gnuTarArguments], which ask each for the same ustar stream. Windows has
-/// neither tool at a fixed path, nor modes to set, so there `tar.dart`
-/// writes the same headers from the same rules in Dart and `dart:io`'s
-/// zlib compresses them.
+/// [gnuTarArguments], which ask each for a ustar stream of the same
+/// layout, modes, owners and times. The two tools' bytes still differ (the
+/// device fields of a header, for one), so each platform's archive is the
+/// same bytes only from its own tar. Windows has neither tool at a fixed
+/// path, nor modes to set, so there `tar.dart` writes headers from the same
+/// rules in Dart and `dart:io`'s zlib compresses them.
 library;
 
 import 'dart:convert';
@@ -173,9 +175,10 @@ const tarArguments = [
 ];
 
 /// The GNU tar arguments that write the files read from standard input,
-/// each name as it is and none of a directory's contents, as the ustar
-/// stream [tarArguments] asks bsdtar for: owned by root:wheel, with no
-/// extended attributes, ACLs or SELinux contexts.
+/// each name as it is and none of a directory's contents, as a ustar
+/// stream of the layout, modes, owners and times [tarArguments] asks bsdtar
+/// for: owned by root:wheel, with no extended attributes, ACLs or SELinux
+/// contexts.
 const gnuTarArguments = [
   '--no-recursion',
   '--verbatim-files-from',

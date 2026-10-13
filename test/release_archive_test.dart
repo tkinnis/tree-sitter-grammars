@@ -149,6 +149,25 @@ void main() {
     }
   }, testOn: 'linux || windows');
 
+  test('GNU tar is asked, on any host, for the names it reads and none of '
+      'their contents, as ustar owned by root:wheel, with no extended '
+      'attributes, ACLs or SELinux contexts', () {
+    check(gnuTarArguments).deepEquals([
+      '--no-recursion',
+      '--verbatim-files-from',
+      '--no-xattrs',
+      '--no-acls',
+      '--no-selinux',
+      '--owner=root:0',
+      '--group=wheel:0',
+      '--format=ustar',
+      '-cf',
+      '-',
+      '-T',
+      '-',
+    ]);
+  });
+
   test('on Windows and Linux, packs root:wheel, the modes and the time, '
       'files only', () async {
     final archive = await pack('.tar.gz');
