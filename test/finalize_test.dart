@@ -748,6 +748,21 @@ void main() {
         );
       });
 
+      test('an asset changed state', () {
+        return changes(
+          (f) => release(
+            f,
+            edit: (assets) => [
+              for (final asset in assets)
+                asset['name'] == 'latex-0.tar.gz'
+                    ? assetJson('latex-0.tar.gz', 'b2', state: 'open')
+                    : asset,
+            ],
+          ),
+          'before publishing: latex-0.tar.gz is in the state open now',
+        );
+      });
+
       test('an asset got another digest', () {
         return changes(
           (f) => release(
