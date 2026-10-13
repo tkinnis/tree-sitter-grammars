@@ -2,11 +2,9 @@
 /// that already exists is never changed.
 library;
 
-import 'dart:convert';
 
 import 'package:path/path.dart' as p;
 
-import 'build_platform.dart';
 import 'github.dart';
 
 export 'github.dart' show PublishException, ProcessRunner, releaseRepository;
@@ -40,33 +38,22 @@ Future<void> publishRelease({
     when: when,
   );
 
-  final existing = await gh([
-    'release',
-    'view',
-    tag,
-    '--repo',
-    releaseRepository,
-    '--json',
-    'tagName',
-  ]);
-  if (existing.exitCode == 0) {
+  final existing = await releasesOfTag(gh, tag);
+  if (existing.isNotEmpty) {
     throw PublishException(
-      'release $tag exists on $releaseRepository; a release is published '
-      'once and never changed',
-    );
-  }
-  if (!'${existing.stderr}'.contains('release not found')) {
-    throw PublishException(
-      'gh release view $tag failed: ${'${existing.stderr}'.trim()}',
+      'release $tag exists on $releaseRepository'
+      '${existing.any((release) => release.draft) ? ' as a draft' : ''}; '
+      'a release is created once and never replaced',
     );
   }
   await requireTag('before publishing');
-  final created = await gh([
+  final creation = await gh([
     'release',
     'create',
     tag,
     '--repo',
     releaseRepository,
+    '--draft',
     '--verify-tag',
     '--title',
     tag,
@@ -74,27 +61,21 @@ Future<void> publishRelease({
     notesFile,
     ...assets.keys,
   ]);
-  if (created.exitCode != 0) {
+  if (creation.exitCode != 0) {
     throw PublishException(
-      'gh release create $tag failed: ${'${created.stderr}'.trim()}',
+      'gh release create $tag failed: ${errorText(creation)}',
     );
   }
   await requireTag('after publishing');
-  final listed = await gh([
-    'api',
-    'repos/$releaseRepository/releases/tags/$tag',
-    '--jq',
-    '[.assets[] | {name, digest}]',
-  ]);
-  if (listed.exitCode != 0) {
+  final created = await releasesOfTag(gh, tag);
+  if (created.length != 1) {
     throw PublishException(
-      'published $tag, but could not read its assets back: '
-      '${'${listed.stderr}'.trim()}',
+      'created $tag, but GitHub lists ${created.length} releases of it',
     );
   }
   final published = {
-    for (final asset in jsonDecode(outputText(listed.stdout)) as List)
-      (asset as Map<String, Object?>)['name']: asset['digest'],
+    for (final asset in (await readRelease(gh, created.single.id)).assets)
+      asset.name: asset.digest,
   };
   final problems = [
     for (final MapEntry(key: path, value: sha256) in assets.entries)
@@ -111,15 +92,18 @@ Future<void> publishRelease({
   if (problems.isNotEmpty) {
     throw PublishException(
       [
-        'published $tag, but its assets are not the packed files:',
+        'created the draft $tag, but its assets are not the packed files:',
         ...problems,
       ].join('\n  '),
     );
   }
 }
 
-/// The release notes: the runtime, every pinned grammar and the sha256 of
+/// The release notes of the macOS build: the runtime, every pinned grammar and the sha256 of
 /// each attached file, from `build_info.json` [info] and [archiveSha256].
+///
+/// Throws a [PublishException] when [info] records no platform, or one
+/// that is not the macOS build a release is created from.
 String releaseNotes(Map<String, Object?> info, String archiveSha256) {
   final treeSitter = info['treeSitter']! as Map<String, Object?>;
   final sources = info['sources']! as Map<String, Object?>;
@@ -135,15 +119,14 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
             '`${record['commit']}` | `${p.basename('${record['file']}')}` | '
             '`${record['sha256']}` |',
   ];
-  final platform =
-      BuildPlatform.parse(info['platform']) ?? BuildPlatform.macosArm64;
-  final runsOn = switch (platform.os) {
-    'windows' => 'Windows 10 and later on ${platform.arch}',
-    'linux' =>
-      'Linux on ${platform.arch} with glibc ${info['glibcRequirement']} and '
-          'later',
-    _ => 'macOS ${info['deploymentTarget']} and later on arm64',
-  };
+  final platform = requirePlatform(info['platform']);
+  if (!platform.isMacos) {
+    throw PublishException(
+      'a release is created from the macOS build; build_info.json records '
+      'the platform ${platform.id}',
+    );
+  }
+  final runsOn = 'macOS ${info['deploymentTarget']} and later on arm64';
   return 'tree-sitter ${treeSitter['tag']} (${treeSitter['commit']}), '
       '$runsOn.\n\n'
       '`${platform.releaseArchiveName}`: sha256 `$archiveSha256`.\n\n'

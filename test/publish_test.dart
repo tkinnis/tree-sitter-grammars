@@ -57,16 +57,34 @@ Future<void> _publish(
 
 final _published = _result(
   0,
-  stdout: _digests({
-    'grammars-macos-arm64.tar.gz': 'aa',
-    'tree-sitter-0000.tar.gz': 'bb',
+  stdout: jsonEncode({
+    'id': _draftId,
+    'assets': jsonDecode(
+      _digests({
+        'grammars-macos-arm64.tar.gz': 'aa',
+        'tree-sitter-0000.tar.gz': 'bb',
+      }),
+    ),
   }),
 );
+
+/// The listing of the repository's releases, one page, holding [releases].
+ProcessResult _releases(List<Map<String, Object?>> releases) =>
+    _result(0, stdout: jsonEncode([releases]));
+
+/// The listing after the draft [_draftId] of v1.1.0 exists.
+final _listed = _releases([
+  {'id': _draftId, 'tag_name': 'v1.1.0', 'draft': true},
+]);
+
+const _draftId = 77;
+const _listing = 'api repos/$releaseRepository/releases?per_page=100';
+const _byId = 'api repos/$releaseRepository/releases/$_draftId';
 
 ProcessResult _result(int exitCode, {String stdout = '', String stderr = ''}) =>
     ProcessResult(0, exitCode, stdout, stderr);
 
-final _notFound = _result(1, stderr: 'release not found\n');
+final _noReleases = _releases([]);
 
 String _digests(Map<String, String> digests) => jsonEncode([
   for (final MapEntry(:key, :value) in digests.entries)
@@ -74,26 +92,25 @@ String _digests(Map<String, String> digests) => jsonEncode([
 ]);
 
 void main() {
-  const releaseByTag = 'api repos/$releaseRepository/releases/tags/v1.1.0';
-
-  test('creates the release from the pushed tag with every asset', () async {
+  test('creates a draft from the pushed tag with every asset', () async {
     final calls = <List<String>>[];
 
     await _publish({
-      'release view': _notFound,
+      _listing: [_noReleases, _listed],
       ..._pushed,
       'release create': _result(0),
-      releaseByTag: _published,
+      _byId: _published,
     }, calls);
 
     check([for (final call in calls) call.take(2).join(' ')]).deepEquals([
-      'release view',
+      _listing,
       _ref,
       _tag,
       'release create',
       _ref,
       _tag,
-      releaseByTag,
+      _listing,
+      _byId,
     ]);
     check(calls[3]).deepEquals([
       'release',
@@ -101,6 +118,7 @@ void main() {
       'v1.1.0',
       '--repo',
       releaseRepository,
+      '--draft',
       '--verify-tag',
       '--title',
       'v1.1.0',
@@ -112,22 +130,51 @@ void main() {
     check(calls.expand((call) => call)).not((it) => it.contains('--clobber'));
   });
 
-  test('refuses a release that exists, creating nothing', () async {
+  for (final (label, draft) in [('published', false), ('draft', true)]) {
+    test('refuses a $label release of the tag, creating nothing', () async {
+      final calls = <List<String>>[];
+
+      await check(
+        _publish({
+          _listing: _releases([
+            {'id': 1, 'tag_name': 'v1.0.0', 'draft': false},
+            {'id': 2, 'tag_name': 'v1.1.0', 'draft': draft},
+          ]),
+        }, calls),
+      ).throws<PublishException>(
+        (it) => it.has((e) => e.message, 'message').contains('exists'),
+      );
+      check(calls).length.equals(1);
+    });
+  }
+
+  test('lists every page of the releases, and finds the tag on a later '
+      'one', () async {
     final calls = <List<String>>[];
 
     await check(
-      _publish({'release view': _result(0, stdout: '{}')}, calls),
+      _publish({
+        _listing: _result(
+          0,
+          stdout: jsonEncode([
+            [
+              {'id': 1, 'tag_name': 'v1.0.0', 'draft': false},
+            ],
+            [
+              {'id': 2, 'tag_name': 'v1.1.0', 'draft': true},
+            ],
+          ]),
+        ),
+      }, calls),
     ).throws<PublishException>(
       (it) => it.has((e) => e.message, 'message').contains('exists'),
     );
-    check(calls).length.equals(1);
+    check(calls.single).containsEqualInOrder(['--paginate', '--slurp']);
   });
 
-  test('stops when gh cannot tell whether the release exists', () async {
+  test('stops when gh cannot list the releases', () async {
     await check(
-      _publish({
-        'release view': _result(1, stderr: 'HTTP 401: Bad credentials'),
-      }),
+      _publish({_listing: _result(1, stderr: 'HTTP 401: Bad credentials')}),
     ).throws<PublishException>(
       (it) => it.has((e) => e.message, 'message').contains('401'),
     );
@@ -159,7 +206,7 @@ void main() {
       final calls = <List<String>>[];
 
       await check(
-        _publish({'release view': _notFound, ...answers}, calls),
+        _publish({_listing: _noReleases, ...answers}, calls),
       ).throws<PublishException>(
         (it) => it.has((e) => e.message, 'message')
           ..startsWith('before publishing')
@@ -174,14 +221,14 @@ void main() {
   test('fails when the tag moves while the release is created', () async {
     await check(
       _publish({
-        'release view': _notFound,
+        _listing: [_noReleases, _listed],
         ..._pushed,
         _tag: [
           _result(0, stdout: 'commit $_commit\n'),
           _result(0, stdout: 'commit $_other\n'),
         ],
         'release create': _result(0),
-        releaseByTag: _published,
+        _byId: _published,
       }),
     ).throws<PublishException>(
       (it) => it.has((e) => e.message, 'message')
@@ -193,14 +240,19 @@ void main() {
   test('refuses an upload GitHub reports with another digest', () async {
     await check(
       _publish({
-        'release view': _notFound,
+        _listing: [_noReleases, _listed],
         ..._pushed,
         'release create': _result(0),
-        releaseByTag: _result(
+        _byId: _result(
           0,
-          stdout: _digests({
-            'grammars-macos-arm64.tar.gz': 'aa',
-            'tree-sitter-0000.tar.gz': 'cc',
+          stdout: jsonEncode({
+            'id': _draftId,
+            'assets': jsonDecode(
+              _digests({
+                'grammars-macos-arm64.tar.gz': 'aa',
+                'tree-sitter-0000.tar.gz': 'cc',
+              }),
+            ),
           }),
         ),
       }),
@@ -213,6 +265,7 @@ void main() {
 
   test('the notes name the runtime, the archive and every bundle', () {
     final notes = releaseNotes({
+      'platform': 'macos-arm64',
       'deploymentTarget': '13.0',
       'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
       'sources': {
@@ -244,20 +297,26 @@ void main() {
       );
   });
 
-  test('the notes of a Linux archive name it and the glibc its libraries '
-      'need, not the one it was built on', () {
-    final notes = releaseNotes({
-      'platform': 'linux-arm64',
-      'glibcRequirement': '2.17',
-      'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
-      'toolchain': {'hostLibc': 'glibc 2.43'},
-      'sources': const <String, Object?>{},
-    }, 'aa');
-
-    check(notes)
-      ..contains('Linux on arm64 with glibc 2.17 and later')
-      ..not((it) => it.contains('2.43'))
-      ..contains('`grammars-linux-arm64.tar.gz`: sha256 `aa`')
-      ..not((it) => it.contains('macOS'));
-  });
+  for (final (label, platform) in [
+    ('records none', null),
+    ('is garbled', 'macos-arm6'),
+    ('is not a platform', 'linux-x64'),
+    ('is not a number', 7),
+    ('is a Linux build', 'linux-arm64'),
+    ('is a Windows build', 'windows-x64'),
+  ]) {
+    test('the notes refuse a build_info.json whose platform $label', () {
+      check(
+            () => releaseNotes({
+              'platform': ?platform,
+              'deploymentTarget': '13.0',
+              'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
+              'sources': const <String, Object?>{},
+            }, 'aa'),
+          )
+          .throws<PublishException>()
+          .has((e) => e.message, 'message')
+          .contains('platform');
+    });
+  }
 }

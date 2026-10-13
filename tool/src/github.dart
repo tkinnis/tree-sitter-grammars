@@ -5,6 +5,8 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'build_platform.dart';
+
 /// The GitHub repository releases are published to.
 const releaseRepository = 'tkinnis/tree-sitter-grammars';
 
@@ -112,3 +114,140 @@ Future<void> requirePushedTag(
     );
   }
 }
+
+/// One asset of a GitHub release.
+typedef ReleaseAsset = ({int id, String name, String? digest});
+
+/// A GitHub release as the REST API describes it.
+final class GitHubRelease {
+  const GitHubRelease({
+    required this.id,
+    required this.tagName,
+    required this.draft,
+    required this.immutable,
+    required this.target,
+    required this.body,
+    required this.assets,
+  });
+
+  /// Reads the release object [json] of the REST API.
+  factory GitHubRelease.fromJson(Map<String, Object?> json) => GitHubRelease(
+    id: switch (json['id']) {
+      final int id => id,
+      _ => throw const PublishException('GitHub answered a release with no id'),
+    },
+    tagName: '${json['tag_name']}',
+    draft: json['draft'] == true,
+    immutable: json['immutable'] == true,
+    target: '${json['target_commitish']}',
+    body: '${json['body'] ?? ''}',
+    assets: [
+      for (final asset in json['assets'] as List? ?? const [])
+        (
+          id: (asset as Map<String, Object?>)['id'] as int? ?? 0,
+          name: '${asset['name']}',
+          digest: asset['digest'] as String?,
+        ),
+    ],
+  );
+
+  final int id;
+  final String tagName;
+
+  /// Whether the release is a draft, not yet published.
+  final bool draft;
+
+  /// Whether GitHub reports the release as immutable: published, and never
+  /// to gain or change an asset.
+  final bool immutable;
+
+  /// The release's `target_commitish`: a branch name or a commit.
+  final String target;
+  final String body;
+  final List<ReleaseAsset> assets;
+
+  /// The asset named [name], or null when the release has none.
+  ReleaseAsset? asset(String name) =>
+      assets.where((asset) => asset.name == name).firstOrNull;
+}
+
+/// Decodes the JSON [result] of a `gh api` call, or throws a
+/// [PublishException] saying that [what] failed.
+Object? _decoded(ProcessResult result, String what) {
+  if (result.exitCode != 0) {
+    throw PublishException('$what failed: ${errorText(result)}');
+  }
+  try {
+    return jsonDecode(outputText(result.stdout));
+  } on FormatException catch (error) {
+    throw PublishException('$what answered something other than JSON: $error');
+  }
+}
+
+/// Every release of [releaseRepository], drafts included, whose tag is
+/// [tag].
+///
+/// The listing is paginated: `releases/tags/<tag>` finds no draft, so a
+/// draft is found only by reading every page. More than one release can
+/// carry a tag while one of them is a draft.
+Future<List<GitHubRelease>> releasesOfTag(GitHubCli gh, String tag) async {
+  final pages = _decoded(
+    await gh([
+      'api',
+      'repos/$releaseRepository/releases?per_page=100',
+      '--paginate',
+      '--slurp',
+    ]),
+    'listing the releases of $releaseRepository',
+  );
+  if (pages is! List) {
+    throw const PublishException('GitHub listed the releases as a non-list');
+  }
+  return [
+    for (final page in pages)
+      for (final release in page is List ? page : [page])
+        if (release is Map<String, Object?> && release['tag_name'] == tag)
+          GitHubRelease.fromJson(release),
+  ];
+}
+
+/// The release with [id], read afresh.
+Future<GitHubRelease> readRelease(GitHubCli gh, int id) async {
+  final release = _decoded(
+    await gh(['api', 'repos/$releaseRepository/releases/$id']),
+    'reading release $id',
+  );
+  if (release is! Map<String, Object?>) {
+    throw PublishException('GitHub answered release $id as a non-object');
+  }
+  return GitHubRelease.fromJson(release);
+}
+
+/// The bytes of the asset with [assetId] of [releaseRepository], which a
+/// draft's assets are read through, since `releases/tags/<tag>` finds no
+/// draft.
+Future<List<int>> downloadAsset(GitHubCli gh, int assetId) async {
+  final result = await gh([
+    'api',
+    'repos/$releaseRepository/releases/assets/$assetId',
+    '-H',
+    binaryAcceptHeader,
+  ]);
+  if (result.exitCode != 0) {
+    throw PublishException(
+      'downloading asset $assetId failed: ${errorText(result)}',
+    );
+  }
+  return outputBytes(result.stdout);
+}
+
+/// The platform [id] names.
+///
+/// Throws a [PublishException] when [id] is absent or names no platform a
+/// build targets, so a garbled `platform` is never read as any other.
+BuildPlatform requirePlatform(Object? id) =>
+    BuildPlatform.parse(id) ??
+    (throw PublishException(
+      'build_info.json records the platform $id; a platform is one of '
+      '${[for (final platform in BuildPlatform.values) platform.id].join(', ')}',
+    ));
