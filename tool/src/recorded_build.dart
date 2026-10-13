@@ -8,6 +8,8 @@
 /// refuses a record for the same reasons in the same words.
 library;
 
+import 'package:path/path.dart' as p;
+
 import 'build_platform.dart';
 
 /// Every way [info], a `build_info.json` read from [source], records
@@ -59,7 +61,8 @@ const linuxToolchainKeys = [
 
 /// Every field of [linuxToolchainKeys] that [info], a Linux build's
 /// `build_info.json` read from [source], does not record as a string that
-/// is not empty; empty when it records each.
+/// is not empty, or, for a field whose name ends in `Path`, as an
+/// absolute path on Linux; empty when it records each.
 List<String> linuxToolchainRecordProblems(
   Map<Object?, Object?> info, {
   String source = 'build_info.json',
@@ -69,6 +72,10 @@ List<String> linuxToolchainRecordProblems(
   return [
     for (final key in linuxToolchainKeys)
       if (toolchain[key] is! String || (toolchain[key] as String).isEmpty)
-        '$source records no toolchain.$key',
+        '$source records no toolchain.$key'
+      else if (key.endsWith('Path') &&
+          !p.posix.isAbsolute(toolchain[key] as String))
+        '$source records toolchain.$key ${toolchain[key]}, which is no '
+            'absolute path',
   ];
 }

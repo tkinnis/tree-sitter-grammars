@@ -764,6 +764,38 @@ void main() {
       ).deepEquals(['build_info.json records no toolchain']);
     });
 
+    test('a record holding a toolchain path of Linux that is not '
+        'absolute is refused', () {
+      check([
+        for (final key in linuxToolchainKeys)
+          if (key.endsWith('Path')) key,
+      ]).deepEquals([
+        'linkerPath',
+        'linkerResolvedPath',
+        'hostLibcPath',
+        'hostLibcDevPath',
+        'gccRuntimePath',
+      ]);
+      for (final key in linuxToolchainKeys.where((k) => k.endsWith('Path'))) {
+        for (final relative in [
+          'usr/bin/ld.bfd',
+          './crti.o',
+          r'C:\usr\lib\crti.o',
+        ]) {
+          final record = info();
+          (record['toolchain']! as Map<String, Object?>)[key] = relative;
+
+          check(
+            because: '$key $relative',
+            linuxToolchainRecordProblems(record, source: 'its build_info.json'),
+          ).deepEquals([
+            'its build_info.json records toolchain.$key $relative, which is '
+                'no absolute path',
+          ]);
+        }
+      }
+    });
+
     test('invocations built from the flags match what build_info records', () {
       check(
         buildFlagProblems(info(), _roundTrip(commands()), {'json'}),
