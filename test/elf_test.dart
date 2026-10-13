@@ -640,12 +640,17 @@ void main() {
     // builds natively is the glibc this process runs on too.
     final running = await Process.run('getconf', ['GNU_LIBC_VERSION']);
     check(compiler.hostLibc).equals((running.stdout as String).trim());
+    check(compiler.hostLibcDev).isNotNull().contains(' ');
+    check(compiler.hostLibcDevPath).isNotNull().endsWith('/crti.o');
+    check(compiler.gccRuntime).isNotNull().contains(' ');
+    check(compiler.gccRuntimePath).isNotNull().endsWith('/crtbeginS.o');
     check(
       File(compiler.linkerPath!).resolveSymbolicLinksSync(),
     ).equals(compiler.linkerResolvedPath!);
   });
 
-  test('a real link runs the linker the compiler records', () async {
+  test('a real link runs the linker the compiler records, and the '
+      'startup files whose packages it records', () async {
     // -v prints each command as clang runs it, the link last, its program
     // in double quotes and each argument bare unless it needs them, as
     // none of this link's do.
@@ -670,9 +675,19 @@ void main() {
     final line = '${result.stderr}'
         .split('\n')
         .lastWhere((line) => line.startsWith(' "'));
-    final [linker, ...] = line.trim().split(' ');
+    final [linker, ...arguments] = line.trim().split(' ');
 
     check(p.normalize(linker.replaceAll('"', ''))).equals(compiler.linkerPath!);
+    check([
+      for (final argument in arguments)
+        if (p.basename(argument) == 'crti.o')
+          File(argument).resolveSymbolicLinksSync(),
+    ]).deepEquals([compiler.hostLibcDevPath!]);
+    check([
+      for (final argument in arguments)
+        if (p.basename(argument) == 'crtbeginS.o')
+          File(argument).resolveSymbolicLinksSync(),
+    ]).deepEquals([compiler.gccRuntimePath!]);
   });
 
   test('a shared object linked as the build links grammars passes', () async {

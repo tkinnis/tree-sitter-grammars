@@ -504,6 +504,10 @@ void main() {
       linkerPackage: 'binutils-aarch64-linux-gnu 2.46-3ubuntu2',
       linkerPath: '/usr/bin/ld.bfd',
       linkerResolvedPath: '/usr/bin/aarch64-linux-gnu-ld.bfd',
+      hostLibcDev: 'libc6-dev 2.43-2ubuntu2.4',
+      hostLibcDevPath: '/usr/lib/aarch64-linux-gnu/crti.o',
+      gccRuntime: 'libgcc-15-dev 15.2.0-16ubuntu1',
+      gccRuntimePath: '/usr/lib/gcc/aarch64-linux-gnu/15/crtbeginS.o',
     );
     const toolchain = Toolchain(
       treeSitterTag: 'v0.27.0',
@@ -683,7 +687,15 @@ void main() {
         '2.43',
       );
       check(tools['hostLibcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
-      check(tools.keys.take(9)).deepEquals([
+      check(tools['hostLibcDev']).equals('libc6-dev 2.43-2ubuntu2.4');
+      check(
+        tools['hostLibcDevPath'],
+      ).equals('/usr/lib/aarch64-linux-gnu/crti.o');
+      check(tools['gccRuntime']).equals('libgcc-15-dev 15.2.0-16ubuntu1');
+      check(
+        tools['gccRuntimePath'],
+      ).equals('/usr/lib/gcc/aarch64-linux-gnu/15/crtbeginS.o');
+      check(tools.keys.take(13)).deepEquals([
         'clang',
         'clangPath',
         'linker',
@@ -693,6 +705,10 @@ void main() {
         'hostLibc',
         'hostLibcBanner',
         'hostLibcPath',
+        'hostLibcDev',
+        'hostLibcDevPath',
+        'gccRuntime',
+        'gccRuntimePath',
       ]);
       for (final key in ['sdk', 'sdkBuild', 'sdkPath', 'msvcTools']) {
         check(tools.containsKey(key)).isFalse();

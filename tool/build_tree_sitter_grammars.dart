@@ -325,7 +325,8 @@ Future<void> _build(String root, BuildOptions options) async {
   } else if (platform.isLinux) {
     print(
       '  ${compiler.linker}\n  ${compiler.linkerPath}\n'
-      '  ${compiler.hostLibc}\n  ${compiler.hostLibcPath}',
+      '  ${compiler.hostLibc}\n  ${compiler.hostLibcPath}\n'
+      '  ${compiler.hostLibcDev}\n  ${compiler.gccRuntime}',
     );
   } else {
     print('  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');

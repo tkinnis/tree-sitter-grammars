@@ -9,8 +9,10 @@
 /// Linux it is the first `clang` on `PATH`, targeting the platform's GNU
 /// triple and linking with GNU ld (`-fuse-ld=bfd`) against the system's C
 /// library; `build_info.json` records the linker's version and the
-/// package and revision that installed it, and the C library's release and
-/// banner, each with its path, as macOS records its SDK. On
+/// package and revision that installed it, the C library's release and
+/// banner, and the package and revision of the startup files every link
+/// takes from the C library's development files, each with its path, as
+/// macOS records its SDK. On
 /// Windows it is LLVM's clang driving `lld-link`, targeting
 /// `*-pc-windows-msvc` against the libraries of the Visual Studio and the
 /// Windows SDK it names explicitly, rather than MSVC's `cl.exe`: it takes
@@ -67,6 +69,10 @@ final class Compiler {
     this.linkerPackage,
     this.linkerPath,
     this.linkerResolvedPath,
+    this.hostLibcDev,
+    this.hostLibcDevPath,
+    this.gccRuntime,
+    this.gccRuntimePath,
   });
 
   /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
@@ -110,8 +116,10 @@ final class Compiler {
   /// [glibcBanner] reads it, which names the distribution's build of it
   /// with its revision, for example `GNU C Library (Ubuntu GLIBC
   /// 2.43-2ubuntu2.4) stable release version 2.43`; null on macOS and
-  /// Windows. The startup files and static parts of glibc every library
-  /// links come from that same build, which [hostLibc] alone does not name.
+  /// Windows. It names the build of the shared library alone: the startup
+  /// files every library links (`crti.o` and `crtn.o`) and the static part
+  /// of glibc the linker script `libc.so` names (`libc_nonshared.a`) come
+  /// from its development files, whose package [hostLibcDev] records.
   final String? hostLibcBanner;
 
   /// On Linux, the build host's `libc.so.6` clang links against, as
@@ -142,6 +150,32 @@ final class Compiler {
   /// [linkerPackage] by, since it knows each file by its own path; null on
   /// macOS and Windows.
   final String? linkerResolvedPath;
+
+  /// On Linux, the package that installed the C library's startup file
+  /// `crti.o` every link takes, with its version and the distribution's
+  /// revision, for example `libc6-dev 2.43-2ubuntu2.4`: the development
+  /// files of glibc, which hold the startup files and `libc_nonshared.a`
+  /// and may be of another build than the `libc.so.6` [hostLibcBanner]
+  /// names; null on macOS and Windows.
+  final String? hostLibcDev;
+
+  /// On Linux, the `crti.o` the link `clang -###` would run names, with
+  /// every symbolic link resolved, which the package database is asked for
+  /// [hostLibcDev] by; null on macOS and Windows.
+  final String? hostLibcDevPath;
+
+  /// On Linux, the package that installed GCC's startup file
+  /// `crtbeginS.o` every link takes, with its version and the
+  /// distribution's revision, for example `libgcc-15-dev 15.2.0-16ubuntu1`
+  /// (`gcc` on Fedora): it holds `crtendS.o` and `libgcc.a` beside it,
+  /// which every link takes too, and neither clang, binutils nor glibc
+  /// names its build; null on macOS and Windows.
+  final String? gccRuntime;
+
+  /// On Linux, the `crtbeginS.o` the link `clang -###` would run names,
+  /// with every symbolic link resolved, which the package database is
+  /// asked for [gccRuntime] by; null on macOS and Windows.
+  final String? gccRuntimePath;
 
   /// Resolves the compiler a build on [platform], by default the platform
   /// this process runs on, compiles with: on macOS through `xcrun`, which
@@ -291,14 +325,21 @@ typedef ToolRunner =
 ///   release [glibcRelease] reads from that same file and the whole
 ///   banner [glibcBanner] reads, which names the distribution's build, so
 ///   what is recorded is the library linked against, not whatever glibc
-///   this process runs on.
+///   this process runs on;
+/// - the package and revision of the C library's development files,
+///   which installed the `crti.o` that same link names, asked as for the
+///   linker;
+/// - the package and revision of GCC's runtime, which installed the
+///   `crtbeginS.o` that same link names, with `crtendS.o` and `libgcc.a`
+///   beside it, asked as for the linker.
 ///
 /// Throws a [CompilerException] when clang finds the C library by no
 /// absolute path, which it answers when it finds none, or that library
 /// names no glibc release; when `-###` names no one link of the probe, a
-/// linker that is no file or one whose normalised path names another
-/// file; when the linker is not GNU ld; or when no package database names
-/// the one package that installed it.
+/// linker that is no file, one whose normalised path names another file,
+/// or not one `crti.o` or `crtbeginS.o` that is a file; when the linker is
+/// not GNU ld; or when no package database names the one package that
+/// installed the linker, `crti.o` or `crtbeginS.o`.
 Future<Compiler> resolveLinuxCompiler(
   BuildPlatform platform, {
   required String clang,
@@ -352,6 +393,26 @@ Future<Compiler> resolveLinuxCompiler(
       'revision it links with',
     );
   }
+  final (:path, :package) = await _startupPackage(
+    link,
+    'crti.o',
+    clang: clang,
+    platform: platform,
+    run: run,
+    library: 'the C library',
+    install: 'the C library',
+    records: "the C library's startup files",
+  );
+  final gcc = await _startupPackage(
+    link,
+    'crtbeginS.o',
+    clang: clang,
+    platform: platform,
+    run: run,
+    library: 'GCC',
+    install: "GCC's runtime",
+    records: "GCC's startup files and libgcc",
+  );
   return Compiler(
     path: clang,
     version: (await run(clang, ['--version'])).split('\n').first.trim(),
@@ -363,6 +424,50 @@ Future<Compiler> resolveLinuxCompiler(
     linkerPackage: linkerPackage,
     linkerPath: linkerPath,
     linkerResolvedPath: linkerResolved,
+    hostLibcDev: package,
+    hostLibcDevPath: path,
+    gccRuntime: gcc.package,
+    gccRuntimePath: gcc.path,
+  );
+}
+
+/// The one file named [name] that [link], the command `clang -###` would
+/// run, takes, with every symbolic link resolved, and the package that
+/// installed it, as [_packageOf] names it.
+///
+/// Throws a [CompilerException] when [link] names no one such file by an
+/// absolute path, saying to install [install] for [platform], or when no
+/// package database names the one package that installed it, saying the
+/// build records the package of [records]; [library] is whose [name] the
+/// link names.
+Future<({String path, String package})> _startupPackage(
+  List<String> link,
+  String name, {
+  required String clang,
+  required BuildPlatform platform,
+  required ToolRunner run,
+  required String library,
+  required String install,
+  required String records,
+}) async {
+  final named = [
+    for (final argument in link.skip(1))
+      if (p.basename(argument) == name) _resolvedFile(argument),
+  ];
+  if (named case [final String path]) {
+    final package = await _packageOf(path, run);
+    if (package == null) {
+      throw CompilerException(
+        'no package database names the one package that installed $path; '
+        'a build on Linux records the package and revision of $records it '
+        'links',
+      );
+    }
+    return (path: path, package: package);
+  }
+  throw CompilerException(
+    'the link $clang would run names no one $name of $library by the path '
+    'of a file; install $install for ${platform.linuxTarget}',
   );
 }
 

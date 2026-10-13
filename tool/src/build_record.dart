@@ -85,6 +85,10 @@ Map<String, Object?> buildInfo({
         'hostLibc': compiler.hostLibc,
         'hostLibcBanner': compiler.hostLibcBanner,
         'hostLibcPath': compiler.hostLibcPath,
+        'hostLibcDev': compiler.hostLibcDev,
+        'hostLibcDevPath': compiler.hostLibcDevPath,
+        'gccRuntime': compiler.gccRuntime,
+        'gccRuntimePath': compiler.gccRuntimePath,
       },
       _ => {
         'sdk': compiler.sdkVersion,

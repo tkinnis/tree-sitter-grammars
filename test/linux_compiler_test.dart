@@ -15,6 +15,8 @@ const _ldVersion = 'GNU ld (GNU Binutils for Ubuntu) 2.46';
 const _dpkg = '/usr/bin/dpkg-query';
 const _rpm = '/usr/bin/rpm';
 const _ldPackage = 'binutils-aarch64-linux-gnu';
+const _devPackage = 'libc6-dev:arm64';
+const _gccPackage = 'libgcc-15-dev:arm64';
 
 /// The bytes of a `libc.so.6` whose banner names [release], among others.
 List<int> _libc(String release) => latin1.encode(
@@ -68,8 +70,10 @@ void main() {
     // symbolic link as /lib is to usr/lib, and where they are.
     late String startup;
     late String crti;
-    // The directory the link names GCC's startup files in.
+    // The directory the link names GCC's startup files in, and the one it
+    // starts each library with.
     late String gcc;
+    late String crtbegin;
     late List<List<String>> asked;
     late List<String> probes;
 
@@ -98,6 +102,7 @@ void main() {
         'aarch64-linux-gnu',
         '15',
       );
+      crtbegin = p.join(gcc, 'crtbeginS.o');
       for (final name in ['crtbeginS.o', 'crtendS.o', 'libgcc.a']) {
         File(p.join(gcc, name))
           ..parent.createSync(recursive: true)
@@ -147,7 +152,11 @@ void main() {
         (final tool, '--version') when tool == ld || tool == ldLink =>
           '$_ldVersion\nCopyright (C) 2026',
         (_dpkg, final path) when path == ld => '$_ldPackage: $ld',
+        (_dpkg, final path) when path == crti => '$_devPackage: $crti',
+        (_dpkg, final path) when path == crtbegin => '$_gccPackage: $crtbegin',
         (_dpkg, _ldPackage) => '$_ldPackage 2.46-3ubuntu2',
+        (_dpkg, _devPackage) => 'libc6-dev 2.43-2ubuntu2',
+        (_dpkg, _gccPackage) => 'libgcc-15-dev 15.2.0-16ubuntu1',
         _ => throw CompilerException('unexpected $executable $arguments'),
       };
     };
@@ -161,17 +170,24 @@ void main() {
       run: runner(answers, missing: missing),
     );
 
-    /// The answer of a `-###` link that runs [linker].
-    String Function(List<String>) linking(String linker) =>
+    /// The answer of a `-###` link that runs [linker], with the C
+    /// library's startup files in [startupDirectory] and GCC's in
+    /// [gccDirectory], by default where they are.
+    String Function(List<String>) linking(
+      String linker, {
+      String? startupDirectory,
+      String? gccDirectory,
+    }) =>
         (arguments) => _driverOutput(
           arguments,
           linker: linker,
-          startup: startup,
-          gcc: gcc,
+          startup: startupDirectory ?? startup,
+          gcc: gccDirectory ?? gcc,
         );
 
-    test('records clang, the GNU ld it links with and the C library it '
-        'links against, each with its path', () async {
+    test('records clang, the GNU ld it links with, the C library it '
+        'links against and the packages of its startup files and of '
+        'GCC\'s, each with its path', () async {
       final compiler = await resolve();
 
       check(compiler.path).equals(_clang);
@@ -187,6 +203,10 @@ void main() {
         '2.43',
       );
       check(compiler.hostLibcPath).equals(libc);
+      check(compiler.hostLibcDev).equals('libc6-dev 2.43-2ubuntu2');
+      check(compiler.hostLibcDevPath).equals(crti);
+      check(compiler.gccRuntime).equals('libgcc-15-dev 15.2.0-16ubuntu1');
+      check(compiler.gccRuntimePath).equals(crtbegin);
       check(compiler.sdkPath).isNull();
       final [object] = probes;
       final library = p.join(p.dirname(object), 'libprobe.so');
@@ -207,6 +227,10 @@ void main() {
         [ld, '--version'],
         [_dpkg, '-S', ld],
         [_dpkg, '-W', r'--showformat=${Package} ${Version}', _ldPackage],
+        [_dpkg, '-S', crti],
+        [_dpkg, '-W', r'--showformat=${Package} ${Version}', _devPackage],
+        [_dpkg, '-S', crtbegin],
+        [_dpkg, '-W', r'--showformat=${Package} ${Version}', _gccPackage],
         [_clang, '--version'],
       ]);
       // The probe's directory is gone once clang has answered.
@@ -229,7 +253,8 @@ void main() {
         'database for the file it names with symbolic links resolved, '
         'which dpkg knows', () async {
       // clang names GNU ld relative to its GCC installation, through a
-      // symbolic link; dpkg knows each file only by its own path.
+      // symbolic link, and the startup files through /lib, a link to
+      // usr/lib; dpkg knows each file only by its own path.
       final named = p.join(
         scratch.path,
         'gcc',
@@ -249,11 +274,12 @@ void main() {
       check(compiler.linkerPath).equals(ldLink);
       check(compiler.linkerResolvedPath).equals(ld);
       check(compiler.linkerPackage).equals('$_ldPackage 2.46-3ubuntu2');
+      check(compiler.hostLibcDevPath).equals(crti);
       check(asked).any((it) => it.deepEquals([ldLink, '--version']));
       check([
         for (final it in asked)
           if (it[0] == _dpkg && it[1] == '-S') it.last,
-      ]).deepEquals([ld]);
+      ]).deepEquals([ld, crti, crtbegin]);
     });
 
     test('refuses a linker path whose normalised form names another file '
@@ -309,9 +335,18 @@ void main() {
     });
 
     test('asks rpm for the linker\'s package where there is no dpkg', () async {
-      final compiler = await resolve({ld: 'binutils 2.46-1.fc44'}, {_dpkg});
+      final compiler = await resolve(
+        {
+          ld: 'binutils 2.46-1.fc44',
+          crti: 'glibc-devel 2.43-1.fc44',
+          crtbegin: 'gcc 15.2.1-1.fc44',
+        },
+        {_dpkg},
+      );
 
       check(compiler.linkerPackage).equals('binutils 2.46-1.fc44');
+      check(compiler.hostLibcDev).equals('glibc-devel 2.43-1.fc44');
+      check(compiler.gccRuntime).equals('gcc 15.2.1-1.fc44');
       check(asked).any(
         (it) =>
             it.deepEquals([_rpm, '-qf', '--queryformat', '%{NAME} %{EVR}', ld]),
@@ -342,6 +377,79 @@ void main() {
                 'no package database names the one package that installed '
                 '$ld; a build on Linux records the binutils package and '
                 'revision it links with',
+              ),
+        );
+      }
+    });
+
+    test('refuses startup files no package database names a package '
+        'of', () async {
+      await check(resolve({crti: ''})).throws<CompilerException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals(
+              'no package database names the one package that installed '
+              '$crti; a build on Linux records the package and revision of '
+              'the C library\'s startup files it links',
+            ),
+      );
+    });
+
+    test('refuses a link clang would run that names no startup file, one '
+        'that is not there, or two', () async {
+      final other = p.join(scratch.path, 'other', 'crti.o');
+      File(other)
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+      for (final answer in [
+        (List<String> arguments) =>
+            linking(ld)(arguments).replaceAll(RegExp(r'"[^"]*crti\.o" '), ''),
+        (List<String> arguments) =>
+            linking(ld)(arguments).replaceFirst('"-shared"', '"$other"'),
+        linking(ld, startupDirectory: p.join(scratch.path, 'nowhere')),
+        linking(ld, startupDirectory: 'lib'),
+      ]) {
+        await check(resolve({'-###': answer})).throws<CompilerException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .startsWith('the link $_clang would run names no one crti.o'),
+        );
+      }
+    });
+
+    test('refuses GCC\'s startup files no package database names a '
+        'package of', () async {
+      await check(resolve({crtbegin: ''})).throws<CompilerException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals(
+              'no package database names the one package that installed '
+              '$crtbegin; a build on Linux records the package and revision '
+              'of GCC\'s startup files and libgcc it links',
+            ),
+      );
+    });
+
+    test('refuses a link clang would run that names no crtbeginS.o of '
+        'GCC, one that is not there, or two', () async {
+      final other = p.join(scratch.path, 'other', 'crtbeginS.o');
+      File(other)
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+      for (final answer in [
+        (List<String> arguments) => linking(ld)(
+          arguments,
+        ).replaceAll(RegExp(r'"[^"]*crtbeginS\.o" '), ''),
+        (List<String> arguments) =>
+            linking(ld)(arguments).replaceFirst('"-shared"', '"$other"'),
+        linking(ld, gccDirectory: p.join(scratch.path, 'nowhere')),
+        linking(ld, gccDirectory: 'gcc'),
+      ]) {
+        await check(resolve({'-###': answer})).throws<CompilerException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .startsWith(
+                'the link $_clang would run names no one crtbeginS.o',
               ),
         );
       }
