@@ -2,7 +2,6 @@
 /// that already exists is never changed.
 library;
 
-
 import 'package:path/path.dart' as p;
 
 import 'github.dart';
