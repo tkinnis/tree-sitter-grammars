@@ -48,8 +48,9 @@
 /// the working tree still clean once every check has passed. `--dry-run`
 /// skips only the tag requirement and packs the same bytes into
 /// `output/grammars-<platform>.dry-run.tar.gz`, a name no release asset
-/// has. Packing also writes the archive's sha256 beside it and the release
-/// notes into `output/release-notes.md`. `--publish`, on macOS only, then
+/// has. Packing also writes the archive's sha256 beside it and, on macOS
+/// only, the release notes into `output/release-notes.md`; a Linux or
+/// Windows build packs and stops there. `--publish`, on macOS only, then
 /// creates the GitHub release of the pushed tag as a draft, with the
 /// archive, its sha256, `build_info.json` and every source and generated
 /// bundle attached; it refuses a release of that tag, draft or published,
@@ -522,9 +523,12 @@ Future<void> _build(String root, BuildOptions options) async {
       dryRun: dryRun,
     );
     print('  ${archive.path}\n  sha256 ${archive.sha256}');
-    final notes = p.join(output.path, 'release-notes.md');
-    File(notes).writeAsStringSync(releaseNotes(info, archive.sha256));
-    print('  $notes');
+    final notes = releaseNotesOf(platform, info, archive.sha256);
+    final notesFile = p.join(output.path, 'release-notes.md');
+    if (notes != null) {
+      File(notesFile).writeAsStringSync(notes);
+      print('  $notesFile');
+    }
     if (publish) {
       _step('Creating the draft $release on $releaseRepository');
       final assets = await _releaseAssets(output.path, archive, info);
@@ -533,7 +537,7 @@ Future<void> _build(String root, BuildOptions options) async {
         tagObject: await _tagObject(root, release),
         commit: commit,
         assets: assets,
-        notesFile: notes,
+        notesFile: notesFile,
       );
       print(
         '  created the draft with ${assets.length} assets; GitHub reports '

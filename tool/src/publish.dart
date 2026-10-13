@@ -4,6 +4,7 @@ library;
 
 import 'package:path/path.dart' as p;
 
+import 'build_platform.dart';
 import 'github.dart';
 
 export 'github.dart' show PublishException, ProcessRunner, releaseRepository;
@@ -140,3 +141,15 @@ String releaseNotes(Map<String, Object?> info, String archiveSha256) {
       '| --- | --- | --- | --- |\n'
       '${rows.join('\n')}\n';
 }
+
+/// The release notes [platform]'s release build writes, or null when it
+/// writes none.
+///
+/// Only the macOS build writes notes, since only its release is created
+/// from them (`--publish`); a Linux or Windows build packs its archive and
+/// stops, and its `build_info.json` is not one [releaseNotes] accepts.
+String? releaseNotesOf(
+  BuildPlatform platform,
+  Map<String, Object?> info,
+  String archiveSha256,
+) => platform.isMacos ? releaseNotes(info, archiveSha256) : null;

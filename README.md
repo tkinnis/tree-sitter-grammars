@@ -398,7 +398,7 @@ It writes `output/grammars-macos-arm64.tar.gz` and its sha256 in `output/grammar
 
 The archive's sha256 identifies a build of one commit: `build_info.json`, which the archive carries, names the commit, and every file carries its time. A dry run of the commit a tag will name packs the tag's bytes; a dry run of any other commit, even one that changes nothing else in the archive, packs another sha256. Compare a digest only with a build of the same commit.
 
-It also writes the release notes into `output/release-notes.md`: the runtime, the archive's sha256, every repository's pinned commit with its source bundle and that bundle's sha256, and each bundle of generated sources with its sha256.
+A macOS build also writes the release notes into `output/release-notes.md` (a Linux or Windows build packs its archive and stops there): the runtime, the archive's sha256, every repository's pinned commit with its source bundle and that bundle's sha256, and each bundle of generated sources with its sha256.
 
 3. Push the tag, then build again with `--publish`, which creates a draft:
 

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:test/test.dart';
 
+import '../tool/src/build_platform.dart';
 import '../tool/src/publish.dart';
 
 const _archive = '/out/grammars-macos-arm64.tar.gz';
@@ -365,4 +366,35 @@ void main() {
           .contains('platform');
     });
   }
+
+  group('the notes a release build writes', () {
+    Map<String, Object?> info(BuildPlatform platform) => {
+      'platform': platform.id,
+      if (platform.isMacos) 'deploymentTarget': '13.0',
+      if (platform.isLinux) 'glibcRequirement': '2.17',
+      'treeSitter': {'tag': 'v0.27.0', 'commit': 'c0ffee'},
+      'sources': const <String, Object?>{},
+    };
+
+    test('are written by a macOS build', () {
+      check(
+        releaseNotesOf(
+          BuildPlatform.macosArm64,
+          info(BuildPlatform.macosArm64),
+          'aa',
+        ),
+      ).isNotNull().contains('macOS 13.0 and later on arm64');
+    });
+
+    for (final platform in [
+      BuildPlatform.linuxArm64,
+      BuildPlatform.windowsArm64,
+      BuildPlatform.windowsX64,
+    ]) {
+      test('are not written by a ${platform.id} build, which packs and '
+          'stops', () {
+        check(releaseNotesOf(platform, info(platform), 'aa')).isNull();
+      });
+    }
+  });
 }

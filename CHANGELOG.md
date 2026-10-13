@@ -5,12 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
-
-### Changed
-
-- `.github/workflows/archives.yml` installs the Dart SDK from Google's archive at a version and sha256 pinned in the workflow's `env`, checking the digest with `sha256sum --check` before unzipping and asserting `dart --version`, and uses GitHub-owned actions only, the one kind the repository allows; `test/archives_workflow_test.dart` requires both
-
 ## [1.5.0] - 2026-10-13
 
 ### Added
@@ -32,6 +26,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `.github/workflows/archives.yml` installs the Dart SDK from Google's archive at a version and sha256 pinned in the workflow's `env`, checking the digest with `sha256sum --check` before unzipping and asserting `dart --version`, and uses GitHub-owned actions only, the one kind the repository allows; `test/archives_workflow_test.dart` requires both
+- A `--release` build on Linux or Windows packs its archive and stops there; only the macOS build writes `release-notes.md`, the notes `--publish` creates the draft with
 - `--publish` creates a draft release (`gh release create --draft --verify-tag --target <the built commit>`) in place of a published one, refuses when any release of the tag, draft or published, exists in the paginated listing of the repository's releases, and reads the assets back by release id; a published release is immutable and never gains an asset, so the release is published by `--finalize`
 - The release notes of `--publish` are written for the macOS build alone, and a `build_info.json` that records no platform, or one that is not a platform the build targets, is refused
 - `build_info.json` of a Windows build records its platform, LLVM's clang, the MSVC tools and the Windows SDK in place of the deployment target, Xcode's clang and the macOS SDK; a macOS build records what it did
