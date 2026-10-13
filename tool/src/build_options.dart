@@ -31,6 +31,7 @@ typedef BuildOptions = ({
   String? sources,
   String? attachBuilt,
   List<BuildPlatform>? require,
+  List<BuildPlatform>? allowMissing,
 });
 
 /// Reads [args], or returns null when they are not a command the build
@@ -41,12 +42,15 @@ typedef BuildOptions = ({
 /// `--attach` needs `--release` and `--sources`; `--attach-built` needs
 /// `--release` and excludes `--sources`; `--finalize` needs `--release` and
 /// `--require`, a comma-separated list of distinct platform ids, and
-/// excludes `--sources`; `--require` is for `--finalize` alone.
+/// excludes `--sources`; `--require` and `--allow-missing` are for
+/// `--finalize` alone, and together they name every platform the
+/// repository builds, each once.
 BuildOptions? parseBuildArguments(List<String> args) {
   String? release;
   String? sources;
   String? attachBuilt;
   String? requireList;
+  String? allowMissingList;
   var dryRun = false;
   var publish = false;
   var attach = false;
@@ -60,6 +64,8 @@ BuildOptions? parseBuildArguments(List<String> args) {
       attachBuilt = arg.substring('--attach-built='.length);
     } else if (arg.startsWith('--require=') && requireList == null) {
       requireList = arg.substring('--require='.length);
+    } else if (arg.startsWith('--allow-missing=') && allowMissingList == null) {
+      allowMissingList = arg.substring('--allow-missing='.length);
     } else if (arg == '--dry-run' && !dryRun) {
       dryRun = true;
     } else if (arg == '--publish' && !publish) {
@@ -78,12 +84,23 @@ BuildOptions? parseBuildArguments(List<String> args) {
   final flags = modes.where((flag) => flag).length;
   if (flags > 0 && release == null) return null;
   if (flags > 1) return null;
-  if (requireList != null && !finalize) return null;
+  if ((requireList != null || allowMissingList != null) && !finalize) {
+    return null;
+  }
   if (attach && sources == null) return null;
   if (finalize) {
     if (sources != null) return null;
     final platforms = _platforms(requireList);
     if (platforms == null) return null;
+    final allowMissing = allowMissingList == null
+        ? <BuildPlatform>[]
+        : _platforms(allowMissingList);
+    if (allowMissing == null) return null;
+    final named = [...platforms, ...allowMissing];
+    if (named.toSet().length != named.length ||
+        named.length != BuildPlatform.values.length) {
+      return null;
+    }
     return (
       mode: BuildMode.finalize,
       release: release,
@@ -92,6 +109,7 @@ BuildOptions? parseBuildArguments(List<String> args) {
       sources: null,
       attachBuilt: null,
       require: platforms,
+      allowMissing: allowMissing,
     );
   }
   if (attachBuilt != null && sources != null) return null;
@@ -107,6 +125,7 @@ BuildOptions? parseBuildArguments(List<String> args) {
     sources: sources,
     attachBuilt: attachBuilt,
     require: null,
+    allowMissing: null,
   );
 }
 

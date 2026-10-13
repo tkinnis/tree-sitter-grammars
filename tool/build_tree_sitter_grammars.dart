@@ -12,7 +12,7 @@
 /// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
 ///     --attach-built=<output dir>
 /// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
-///     --finalize --require=<platform>,<platform>...
+///     --finalize --require=<platform>,... [--allow-missing=<platform>,...]
 /// ```
 ///
 /// Every build starts from empty `build/` and `output/` directories. The
@@ -62,8 +62,10 @@
 /// attaches the archive and its sha256; `--attach-built` attaches an
 /// `output/` built earlier, compiling nothing. `--finalize`, on macOS, checks
 /// that the draft holds the archive and sha256 of every `--require`d
-/// platform and nothing else, with the digests recorded for them, publishes
-/// it, and prints the sha256 of each archive as the `sha256` map of finch's
+/// platform (`--require` and `--allow-missing` name every platform the
+/// repository builds between them) and nothing else, with the digests
+/// recorded for them, that each archive records this release and commit,
+/// and that immutable releases are enabled, publishes it, and prints the sha256 of each archive as the `sha256` map of finch's
 /// `hook/grammars_config.json`. Each step resolves the tag on GitHub before
 /// it changes anything and again after, and reads the release back.
 ///
@@ -108,7 +110,8 @@ const _usage =
     '  [--sources=<dir>] [--release=vX.Y.Z [--dry-run | --publish]]\n'
     '  --release=vX.Y.Z --sources=<dir> --attach\n'
     '  --release=vX.Y.Z --attach-built=<output dir>\n'
-    '  --release=vX.Y.Z --finalize --require=<platform>,<platform>...';
+    '  --release=vX.Y.Z --finalize --require=<platform>,...\n'
+    '      [--allow-missing=<platform>,...]';
 
 /// Thrown to stop the build with a message.
 final class BuildException implements Exception {
@@ -141,10 +144,18 @@ Future<void> main(List<String> args) async {
 }
 
 Future<void> _build(String root, BuildOptions options) async {
-  final (:mode, :release, :dryRun, :publish, :sources, :attachBuilt, :require) =
-      options;
+  final (
+    :mode,
+    :release,
+    :dryRun,
+    :publish,
+    :sources,
+    :attachBuilt,
+    :require,
+    :allowMissing,
+  ) = options;
   if (mode == BuildMode.finalize) {
-    return _finalize(root, release!, require!);
+    return _finalize(root, release!, require!, allowMissing!);
   }
   final BuildPlatform platform;
   try {
@@ -565,6 +576,7 @@ Future<void> _finalize(
   String root,
   String release,
   List<BuildPlatform> platforms,
+  List<BuildPlatform> absent,
 ) async {
   final commit = await _releaseCommit(root, release, dryRun: false);
   _step('Publishing the draft $release of $releaseRepository');
@@ -573,6 +585,7 @@ Future<void> _finalize(
     tagObject: await _tagObject(root, release),
     commit: commit,
     platforms: platforms,
+    absent: absent,
   );
   print(
     '\n✓ Published $release; GitHub reports it immutable.\n'

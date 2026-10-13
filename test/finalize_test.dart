@@ -24,42 +24,63 @@ const _platforms = [
 class _Finalize {
   _Finalize({
     this.required = _platforms,
+    this.absent = const [BuildPlatform.windowsArm64],
     this.edit,
     this.sidecars = const {},
     this.downloads = const {},
     this.listed,
     this.extra = const {},
-    String? linuxGlibc = '2.17',
-  }) : linuxArchive = _archive(linuxGlibc);
+    this.linuxGlibc = '2.17',
+    this.embedded = const {},
+    this.draftInfo,
+    this.reread,
+    this.readBack,
+  }) {
+    for (final platform in _platforms) {
+      archives[platform] = gzipCompress(
+        ustar([
+          (
+            path: 'grammars/build_info.json',
+            bytes: utf8.encode(
+              jsonEncode(
+                embedded[platform] ??
+                    buildInfoJson(
+                      platform: platform.id,
+                      glibc: platform.isLinux ? linuxGlibc : null,
+                    ),
+              ),
+            ),
+            mode: 420,
+            epoch: 0,
+          ),
+        ]),
+      );
+    }
+  }
 
   final List<BuildPlatform> required;
+  final List<BuildPlatform> absent;
   final _Assets Function(_Assets)? edit;
   final Map<String, String> sidecars;
   final Map<String, List<int>> downloads;
   final List<Map<String, Object?>>? listed;
   final Map<String, Object> extra;
-  final List<int> linuxArchive;
+  final String? linuxGlibc;
+  final Map<BuildPlatform, Map<String, Object?>> embedded;
+  final Map<String, Object?>? draftInfo;
+
+  /// The release as read just before it is published, when not the draft.
+  final ProcessResult? reread;
+
+  /// The release as read back after it is published, when not the one
+  /// published.
+  final ProcessResult Function(_Finalize)? readBack;
+  final archives = <BuildPlatform, List<int>>{};
   final calls = <List<String>>[];
 
-  static List<int> _archive(String? glibc) => gzipCompress(
-    ustar([
-      (
-        path: 'grammars/build_info.json',
-        bytes: utf8.encode(
-          jsonEncode(buildInfoJson(platform: 'linux-arm64', glibc: glibc)),
-        ),
-        mode: 420,
-        epoch: 0,
-      ),
-    ]),
-  );
+  String get infoText => jsonEncode(draftInfo ?? buildInfoJson());
 
-  String get infoText => jsonEncode(buildInfoJson());
-
-  String shaOf(BuildPlatform platform) => switch (platform) {
-    BuildPlatform.linuxArm64 => dartSha256(linuxArchive),
-    _ => dartSha256(utf8.encode(platform.id)),
-  };
+  String shaOf(BuildPlatform platform) => dartSha256(archives[platform]!);
 
   String sidecarOf(BuildPlatform platform) =>
       sidecars[platform.releaseArchiveName] ??
@@ -87,18 +108,22 @@ class _Finalize {
       0,
       stdout: infoText,
     ),
-    for (final platform in _platforms)
+    for (final platform in _platforms) ...{
       fixtureAsset(fixtureAssetId('${platform.releaseArchiveName}.sha256')):
           ghResult(0, stdout: sidecarOf(platform)),
-    fixtureAsset(fixtureAssetId('grammars-linux-arm64.tar.gz')): ghResult(
-      0,
-      stdout: linuxArchive,
-    ),
+      fixtureAsset(fixtureAssetId(platform.releaseArchiveName)): ghResult(
+        0,
+        stdout: archives[platform]!,
+      ),
+    },
     for (final MapEntry(:key, :value) in downloads.entries)
       fixtureAsset(fixtureAssetId(key)): ghResult(0, stdout: value),
   };
 
-  ProcessResult get _published => ghResult(
+  ProcessResult get _draft =>
+      ghResult(0, stdout: jsonEncode(releaseJson(assets: assets)));
+
+  ProcessResult get published => ghResult(
     0,
     stdout: jsonEncode(
       releaseJson(draft: false, immutable: true, assets: assets),
@@ -110,12 +135,14 @@ class _Finalize {
     tagObject: fixtureTagObject,
     commit: fixtureCommit,
     platforms: required,
+    absent: absent,
     run: fakeGh({
       ...fixturePushed,
+      fixtureImmutable: ghResult(0, stdout: '{"enabled": true}'),
       fixtureListing: listing(listed ?? [releaseJson(assets: assets)]),
       ..._downloads,
       fixturePatch: ghResult(0, stdout: '{}'),
-      fixtureById: _published,
+      fixtureById: [reread ?? _draft, readBack?.call(this) ?? published],
       ...extra,
     }, calls),
   );
@@ -189,21 +216,34 @@ void main() {
           ..contains(
             '| windows-x64 | `${finalize.shaOf(BuildPlatform.windowsX64)}` '
             '| |',
-          );
+          )
+          ..contains('| windows-arm64 | not in this release | |');
       },
     );
 
-    test('checking the tag before and after', () async {
+    test('checking immutable releases first, then the tag and the draft '
+        'again just before and the tag again just after', () async {
       final finalize = _Finalize();
 
       await finalize.run();
 
-      final steps = finalize.calls.map((call) => call.take(2).join(' '));
-      check(steps.first).equals(fixtureRef);
-      final patch = steps.toList().indexWhere((s) => s == fixtureById);
-      check(
-        steps.skip(patch).take(3),
-      ).deepEquals([fixtureById, fixtureRef, fixtureTag]);
+      final steps = finalize.calls
+          .map(
+            (call) =>
+                call.contains('PATCH') ? fixturePatch : call.take(2).join(' '),
+          )
+          .toList();
+      check(steps.first).equals(fixtureImmutable);
+      final patch = steps.indexOf(fixturePatch);
+      check(steps.skip(patch - 3).take(7)).deepEquals([
+        fixtureRef,
+        fixtureTag,
+        fixtureById,
+        fixturePatch,
+        fixtureRef,
+        fixtureTag,
+        fixtureById,
+      ]);
     });
   });
 
@@ -212,6 +252,49 @@ void main() {
       return _refusesToPublish(
         _Finalize(required: const []),
         'checking the platforms: --require names no platform',
+      );
+    });
+
+    test('a platform the repository builds that is neither required nor '
+        'allowed missing', () {
+      return _refusesToPublish(
+        _Finalize(absent: const []),
+        'checking the platforms: windows-arm64 is neither required nor '
+        'allowed missing',
+      );
+    });
+
+    test('a platform both required and allowed missing', () {
+      return _refusesToPublish(
+        _Finalize(
+          absent: const [BuildPlatform.windowsArm64, BuildPlatform.linuxArm64],
+        ),
+        'checking the platforms: linux-arm64 is both required and allowed '
+        'missing',
+      );
+    });
+
+    test('immutable releases that are not enabled', () {
+      return _refusesToPublish(
+        _Finalize(
+          extra: {fixtureImmutable: ghResult(0, stdout: '{"enabled": false}')},
+        ),
+        'checking immutable releases: they are not enabled on '
+        '$releaseRepository',
+      );
+    });
+
+    test('immutable releases GitHub will not answer for', () {
+      return _refusesToPublish(
+        _Finalize(extra: {fixtureImmutable: ghResult(1, stderr: 'HTTP 404')}),
+        'checking immutable releases: HTTP 404',
+      );
+    });
+
+    test('immutable releases answered without enabled', () {
+      return _refusesToPublish(
+        _Finalize(extra: {fixtureImmutable: ghResult(0, stdout: '{}')}),
+        'checking immutable releases: they are not enabled',
       );
     });
 
@@ -309,6 +392,7 @@ void main() {
       return _refusesToPublish(
         _Finalize(
           required: const [BuildPlatform.macosArm64, BuildPlatform.linuxArm64],
+          absent: const [BuildPlatform.windowsArm64, BuildPlatform.windowsX64],
         ),
         'checking the assets: grammars-windows-x64.tar.gz is not an asset',
       );
@@ -394,7 +478,7 @@ void main() {
             'grammars-linux-arm64.tar.gz': [1, 2, 3],
           },
         ),
-        'reading the notes: grammars-linux-arm64.tar.gz as downloaded has '
+        'checking the archives: grammars-linux-arm64.tar.gz as downloaded has '
         'sha256',
       );
     });
@@ -402,16 +486,313 @@ void main() {
     test('a Linux archive that records no glibc', () {
       return _refusesToPublish(
         _Finalize(linuxGlibc: null),
-        'reading the notes: grammars-linux-arm64.tar.gz records no '
+        'checking the archives: grammars-linux-arm64.tar.gz records no '
         'glibcRequirement',
       );
     });
+
+    for (final platform in _platforms) {
+      test('${platform.id} archive that is not the bytes GitHub has the '
+          'digest of', () {
+        return _refusesToPublish(
+          _Finalize(
+            downloads: {
+              platform.releaseArchiveName: [1, 2, 3],
+            },
+          ),
+          'checking the archives: ${platform.releaseArchiveName} as '
+          'downloaded has sha256',
+        );
+      });
+
+      test('${platform.id} archive that records another release', () {
+        return _refusesToPublish(
+          _Finalize(
+            embedded: {
+              platform: buildInfoJson(
+                platform: platform.id,
+                release: 'v1.0.0',
+                glibc: platform.isLinux ? '2.17' : null,
+              ),
+            },
+          ),
+          'checking the archives: ${platform.releaseArchiveName}: its '
+          'build_info.json records the release v1.0.0, not v1.1.0',
+        );
+      });
+
+      test('${platform.id} archive that records another commit', () {
+        return _refusesToPublish(
+          _Finalize(
+            embedded: {
+              platform: buildInfoJson(
+                platform: platform.id,
+                commit: fixtureOtherCommit,
+                glibc: platform.isLinux ? '2.17' : null,
+              ),
+            },
+          ),
+          'checking the archives: ${platform.releaseArchiveName}: its '
+          'build_info.json records the commit $fixtureOtherCommit',
+        );
+      });
+
+      test('${platform.id} archive that records another platform', () {
+        return _refusesToPublish(
+          _Finalize(
+            embedded: {platform: buildInfoJson(platform: 'windows-arm64')},
+          ),
+          'checking the archives: ${platform.releaseArchiveName}: its '
+          'build_info.json records the platform windows-arm64, not '
+          '${platform.id}',
+        );
+      });
+
+      test('${platform.id} archive built from other bundles', () {
+        return _refusesToPublish(
+          _Finalize(
+            embedded: {
+              platform: buildInfoJson(
+                platform: platform.id,
+                glibc: platform.isLinux ? '2.17' : null,
+                sources: {'tree-sitter': 'ff', 'latex': 'b2'},
+              ),
+            },
+          ),
+          'checking the sources: tree-sitter',
+        );
+      });
+    }
+
+    test('a draft build_info.json of another release', () {
+      return _refusesToPublish(
+        _Finalize(draftInfo: buildInfoJson(release: 'v1.0.0')),
+        "checking the draft: the draft's build_info.json records the release "
+        'v1.0.0, not v1.1.0',
+      );
+    });
+
+    test('a draft build_info.json of another commit', () {
+      return _refusesToPublish(
+        _Finalize(draftInfo: buildInfoJson(commit: fixtureOtherCommit)),
+        'checking the draft: ',
+      );
+    });
+
+    test('a draft build_info.json that records no sources', () {
+      return _refusesToPublish(
+        _Finalize(draftInfo: buildInfoJson(sources: const {})),
+        'checking the draft: build_info.json records no sources',
+      );
+    });
+
+    test('a draft build_info.json that records no generated sources', () {
+      return _refusesToPublish(
+        _Finalize(draftInfo: buildInfoJson(generated: const {})),
+        'checking the draft: build_info.json records no generated',
+      );
+    });
+
+    for (final key in ['sources', 'generated']) {
+      for (final (label, record) in [
+        ('no file', {'sha256': 'bb'}),
+        ('no sha256', {'file': 'sources/x.tar.gz'}),
+        ('a non-string file', {'file': 3, 'sha256': 'bb'}),
+        ('a record that is not an object', 'x'),
+      ]) {
+        test('a draft build_info.json whose $key has $label', () {
+          final info = buildInfoJson();
+          info[key] = {
+            ...(info[key]! as Map<String, Object?>),
+            'broken': record,
+          };
+          return _refusesToPublish(
+            _Finalize(draftInfo: info),
+            'checking the draft: build_info.json records a malformed bundle '
+            '$key.broken',
+          );
+        });
+      }
+    }
+
+    test('a draft build_info.json that records a bundle twice', () {
+      final info = buildInfoJson();
+      info['sources'] = {
+        ...(info['sources']! as Map<String, Object?>),
+        'dup': {'file': 'sources/tree-sitter-0.tar.gz', 'sha256': 'bb'},
+      };
+      return _refusesToPublish(
+        _Finalize(draftInfo: info),
+        'checking the draft: build_info.json records tree-sitter-0.tar.gz '
+        'twice',
+      );
+    });
+
+    for (final (label, sidecar) in [
+      (
+        'no trailing newline',
+        (String sha) => '$sha  grammars-macos-arm64.tar.gz',
+      ),
+      (
+        'two trailing newlines',
+        (String sha) => '$sha  grammars-macos-arm64.tar.gz\n\n',
+      ),
+      (
+        'uppercase hex',
+        (String sha) => '${sha.toUpperCase()}  grammars-macos-arm64.tar.gz\n',
+      ),
+      ('one space', (String sha) => '$sha grammars-macos-arm64.tar.gz\n'),
+    ]) {
+      test('a .sha256 with $label', () {
+        final sha = _Finalize().shaOf(BuildPlatform.macosArm64);
+        return _refusesToPublish(
+          _Finalize(sidecars: {'grammars-macos-arm64.tar.gz': sidecar(sha)}),
+          'checking the digests: grammars-macos-arm64.tar.gz.sha256 holds',
+        );
+      });
+    }
+
+    test('an asset GitHub has not finished', () {
+      return _refusesToPublish(
+        _Finalize(
+          edit: (assets) => [
+            for (final asset in assets)
+              asset['name'] == 'latex-0.tar.gz'
+                  ? assetJson('latex-0.tar.gz', 'b2', state: 'open')
+                  : asset,
+          ],
+        ),
+        'checking the assets: latex-0.tar.gz is in the state open',
+      );
+    });
+
+    test('an asset in no state', () {
+      return _refusesToPublish(
+        _Finalize(
+          edit: (assets) => [
+            for (final asset in assets)
+              asset['name'] == 'latex-0.tar.gz'
+                  ? assetJson('latex-0.tar.gz', 'b2', state: null)
+                  : asset,
+          ],
+        ),
+        'checking the assets: latex-0.tar.gz is in the state null',
+      );
+    });
+
+    group('that changed between the checks and the publication:', () {
+      test('a tag moved', () {
+        return _refusesToPublish(
+          _Finalize(
+            extra: {
+              fixtureTag: [
+                ghResult(0, stdout: 'commit $fixtureCommit\n'),
+                ghResult(0, stdout: 'commit $fixtureOtherCommit\n'),
+              ],
+            },
+          ),
+          'before publishing, v1.1.0 on GitHub names commit',
+        );
+      });
+
+      Future<void> changes(
+        ProcessResult Function(_Finalize) change,
+        String message,
+      ) {
+        final base = _Finalize();
+        return _refusesToPublish(_Finalize(reread: change(base)), message);
+      }
+
+      ProcessResult release(
+        _Finalize f, {
+        bool draft = true,
+        String target = fixtureCommit,
+        _Assets Function(_Assets)? edit,
+      }) => ghResult(
+        0,
+        stdout: jsonEncode(
+          releaseJson(
+            draft: draft,
+            target: target,
+            assets: edit?.call(f.assets) ?? f.assets,
+          ),
+        ),
+      );
+
+      test('the release stopped being a draft', () {
+        return changes(
+          (f) => release(f, draft: false),
+          'before publishing: v1.1.0 is no longer a draft',
+        );
+      });
+
+      test('the target moved', () {
+        return changes(
+          (f) => release(f, target: fixtureOtherCommit),
+          'before publishing: v1.1.0 targets $fixtureOtherCommit now',
+        );
+      });
+
+      test('an asset was replaced by one of the same name and digest', () {
+        return changes(
+          (f) => release(
+            f,
+            edit: (assets) => [
+              for (final asset in assets)
+                asset['name'] == 'latex-0.tar.gz'
+                    ? {...asset, 'id': 99999}
+                    : asset,
+            ],
+          ),
+          'before publishing: latex-0.tar.gz is a different asset now',
+        );
+      });
+
+      test('an asset got another digest', () {
+        return changes(
+          (f) => release(
+            f,
+            edit: (assets) =>
+                _withDigest(assets, 'latex-0.tar.gz', 'sha256:other'),
+          ),
+          'before publishing: latex-0.tar.gz was sha256:b2, GitHub reports '
+          'sha256:other',
+        );
+      });
+
+      test('an asset came', () {
+        return changes(
+          (f) =>
+              release(f, edit: (assets) => [...assets, assetJson('x', 'ab')]),
+          'before publishing: x is an asset nobody checked',
+        );
+      });
+
+      test('an asset went', () {
+        return changes(
+          (f) => release(
+            f,
+            edit: (assets) => _without(assets, 'grammars-macos-arm64.tar.gz'),
+          ),
+          'before publishing: grammars-macos-arm64.tar.gz is gone',
+        );
+      });
+
+      test('the release could not be read', () {
+        return _refusesToPublish(
+          _Finalize(reread: ghResult(1, stderr: 'HTTP 502')),
+          'reading release',
+        );
+      });
+    });
   });
 
-  test('fails when the publication fails', () {
+  test('fails when the publication fails, saying the release may be '
+      'published', () {
     return _refuses(
       _Finalize(extra: {fixturePatch: ghResult(1, stderr: 'HTTP 422')}),
-      'publishing: gh api PATCH v1.1.0 failed: HTTP 422',
+      'publishing: gh api PATCH v1.1.0 failed: HTTP 422; read the release '
+      'before trying again',
     );
   });
 
@@ -421,11 +802,12 @@ void main() {
         extra: {
           fixtureTag: [
             ghResult(0, stdout: 'commit $fixtureCommit\n'),
+            ghResult(0, stdout: 'commit $fixtureCommit\n'),
             ghResult(0, stdout: 'commit $fixtureOtherCommit\n'),
           ],
         },
       ),
-      'after finalizing, v1.1.0 on GitHub names commit',
+      'the tag v1.1.0 is burned',
     );
   });
 
@@ -434,10 +816,15 @@ void main() {
       ProcessResult Function(_Finalize) readBack,
       String message,
     ) {
-      final finalize = _Finalize();
-      return _refuses(
-        _Finalize(extra: {fixtureById: readBack(finalize)}),
-        message,
+      return check(
+        _Finalize(readBack: readBack).run(),
+      ).throws<PublishException>(
+        (it) => it.has((e) => e.message, 'message')
+          ..contains(message)
+          ..contains('v1.1.0 is published and immutable')
+          ..contains('the tag v1.1.0 is burned')
+          ..contains('do not pin these digests')
+          ..contains('release the next version'),
       );
     }
 

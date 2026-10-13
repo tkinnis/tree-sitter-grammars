@@ -45,7 +45,7 @@ void main() {
     final options = parseBuildArguments([
       '--release=v1.1.0',
       '--finalize',
-      '--require=macos-arm64,linux-arm64,windows-x64',
+      '--require=macos-arm64,linux-arm64,windows-arm64,windows-x64',
     ]);
 
     check(options).isNotNull()
@@ -53,11 +53,76 @@ void main() {
       ..has((o) => o.require, 'require').isNotNull().deepEquals([
         BuildPlatform.macosArm64,
         BuildPlatform.linuxArm64,
+        BuildPlatform.windowsArm64,
+        BuildPlatform.windowsX64,
+      ])
+      ..has((o) => o.allowMissing, 'allowMissing').isNotNull().isEmpty();
+  });
+
+  test('--allow-missing names the platforms a release has no archive for', () {
+    final options = parseBuildArguments([
+      '--release=v1.5.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64',
+      '--allow-missing=windows-arm64,windows-x64',
+    ]);
+
+    check(options).isNotNull()
+      ..has((o) => o.require, 'require').isNotNull().deepEquals([
+        BuildPlatform.macosArm64,
+        BuildPlatform.linuxArm64,
+      ])
+      ..has((o) => o.allowMissing, 'allowMissing').isNotNull().deepEquals([
+        BuildPlatform.windowsArm64,
         BuildPlatform.windowsX64,
       ]);
   });
 
   for (final arguments in [
+    ['--release=v1.1.0', '--finalize', '--require=macos-arm64,linux-arm64'],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64,windows-arm64',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64',
+      '--allow-missing=windows-arm64',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64,windows-arm64',
+      '--allow-missing=windows-arm64,windows-x64',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64',
+      '--allow-missing=',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64',
+      '--allow-missing=windows-x64,windows-x6',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64',
+      '--allow-missing=windows-arm64,windows-arm64,windows-x64',
+    ],
+    ['--release=v1.1.0', '--allow-missing=windows-x64'],
+    [
+      '--release=v1.1.0',
+      '--finalize',
+      '--require=macos-arm64,linux-arm64,windows-arm64,windows-x64',
+      '--allow-missing=windows-x64',
+      '--allow-missing=windows-x64',
+    ],
     ['--release=v1.1.0', '--sources=a', '--attach', '--publish'],
     ['--release=v1.1.0', '--sources=a', '--attach', '--dry-run'],
     ['--release=v1.1.0', '--attach'],

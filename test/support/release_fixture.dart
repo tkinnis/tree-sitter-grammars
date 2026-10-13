@@ -21,6 +21,10 @@ const fixtureById = 'api repos/$releaseRepository/releases/$fixtureReleaseId';
 String fixtureAsset(int id) =>
     'api repos/$releaseRepository/releases/assets/$id';
 
+/// The key under which the fake answers whether the repository's releases
+/// are immutable.
+const fixtureImmutable = 'api repos/$releaseRepository/immutable-releases';
+
 /// The key under which the fake answers the request that publishes the
 /// fixture release.
 const fixturePatch =

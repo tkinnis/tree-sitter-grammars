@@ -320,25 +320,33 @@ Future<Map<String, Object?>> _embeddedInfo(
   String commit,
   BuildPlatform platform,
 ) async {
-  final bytes = await tarGzFile(archive, 'build_info.json');
-  if (bytes == null) {
-    throw PublishException(
-      'checking the archive: ${p.basename(archive)} holds no build_info.json',
-    );
-  }
-  final info = parseBuildInfo(bytes, "the archive's build_info.json");
+  final info = await archiveBuildInfo(archive);
   try {
     requireBuildRecord(
       info,
       release: tag,
       commit: commit,
       platform: platform,
-      source: "its build_info.json",
+      source: 'its build_info.json',
     );
   } on PublishException catch (error) {
     throw PublishException('checking the archive: $error');
   }
   return info;
+}
+
+/// The `build_info.json` inside the archive at [archive].
+///
+/// Throws a [PublishException] when the archive holds none, or one that is
+/// not a JSON object.
+Future<Map<String, Object?>> archiveBuildInfo(String archive) async {
+  final bytes = await tarGzFile(archive, 'build_info.json');
+  if (bytes == null) {
+    throw PublishException(
+      'checking the archive: ${p.basename(archive)} holds no build_info.json',
+    );
+  }
+  return parseBuildInfo(bytes, "the archive's build_info.json");
 }
 
 /// Every way [after] differs from [before] plus [uploaded], the sha256 of
