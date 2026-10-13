@@ -119,6 +119,12 @@ void main() {
     [
       '--release=v1.1.0',
       '--finalize',
+      '--require=macos-arm64,linux-arm64,windows-arm64',
+      '--allow-missing=windows-arm64',
+    ],
+    [
+      '--release=v1.1.0',
+      '--finalize',
       '--require=macos-arm64,linux-arm64,windows-arm64,windows-x64',
       '--allow-missing=windows-x64',
       '--allow-missing=windows-x64',

@@ -190,6 +190,48 @@ void main() {
   });
 
   group('is idempotent', () {
+    test('when an asset is complete only once GitHub says so', () async {
+      final holder = _Attach(directory);
+      final starting = [
+        assetJson(_archiveName, holder.sha256, state: 'starter'),
+        assetJson('$_archiveName.sha256', holder.sidecarSha256),
+      ];
+      final attach = _Attach(
+        directory,
+        alreadyHeld: (a, s) => starting,
+        extra: {
+          fixtureById: [
+            holder.releaseWith([
+              ..._draftAssets(holder._infoSha256),
+              ...starting,
+            ]),
+            holder.releaseWith([
+              ..._draftAssets(holder._infoSha256),
+              ...holder.ownAssets,
+            ]),
+          ],
+        },
+      );
+
+      await attach.run();
+
+      check(attach.steps).not((it) => it.contains('release upload'));
+    });
+
+    test('but not when an asset with the right digest never completes', () {
+      final holder = _Attach(directory);
+      return _refuses(
+        _Attach(
+          directory,
+          alreadyHeld: (a, s) => [
+            assetJson(_archiveName, a, state: 'starter'),
+            assetJson('$_archiveName.sha256', s),
+          ],
+        ),
+        'remove it with gh release delete-asset v1.1.0 $_archiveName',
+      );
+    });
+
     test('when both assets are already attached with the local digests, '
         'uploading nothing', () async {
       final attach = _Attach(
@@ -682,6 +724,17 @@ void main() {
             if (asset['name'] != _macosAssets[1]) asset,
         ],
         'reading back: ${_macosAssets[1]} is gone',
+      );
+    });
+
+    test('an asset that existed before, replaced by another of the same '
+        'name and digest', () {
+      return failsWith(
+        (assets) => [
+          for (final asset in assets)
+            asset['name'] == _macosAssets[0] ? {...asset, 'id': 98765} : asset,
+        ],
+        'reading back: ${_macosAssets[0]} was sha256:dd',
       );
     });
 
