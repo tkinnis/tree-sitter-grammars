@@ -265,26 +265,35 @@ Future<void> _readBack(
   Map<String, String> uploaded,
 ) async {
   final after = await readRelease(gh, draft.id);
-  final problems = <String?>[
+  final problems = assetProblems(draft.assets, after, uploaded: uploaded);
+  if (problems.isNotEmpty) throw PublishException(problems.join('\n'));
+}
+
+/// Every way [after] differs from [before] plus [uploaded], the sha256 of
+/// each asset added by name: an asset that changed, went or came, or an
+/// uploaded one whose digest GitHub reports as another.
+List<String> assetProblems(
+  List<ReleaseAsset> before,
+  GitHubRelease after, {
+  Map<String, String> uploaded = const {},
+}) {
+  ReleaseAsset? earlier(String name) =>
+      before.where((asset) => asset.name == name).firstOrNull;
+  return <String?>[
     for (final MapEntry(key: name, value: sha256) in uploaded.entries)
       if (after.asset(name)?.digest != 'sha256:$sha256')
-        '$name: GitHub reports ${after.asset(name)?.digest}, the local file '
-            'is sha256:$sha256',
-    for (final before in draft.assets)
-      switch (after.asset(before.name)) {
-        null => '${before.name} is gone',
-        final now when now.digest != before.digest =>
-          '${before.name} was ${before.digest}, GitHub reports ${now.digest}',
+        'reading back: $name: GitHub reports ${after.asset(name)?.digest}, '
+            'the local file is sha256:$sha256',
+    for (final asset in before)
+      switch (after.asset(asset.name)) {
+        null => 'reading back: ${asset.name} is gone',
+        final now when now.digest != asset.digest =>
+          'reading back: ${asset.name} was ${asset.digest}, GitHub reports '
+              '${now.digest}',
         _ => null,
       },
     for (final asset in after.assets)
-      if (draft.asset(asset.name) == null && !uploaded.containsKey(asset.name))
-        '${asset.name} is an asset nobody uploaded',
-  ];
-  final found = problems.nonNulls;
-  if (found.isNotEmpty) {
-    throw PublishException(
-      [for (final problem in found) 'reading back: $problem'].join('\n'),
-    );
-  }
+      if (earlier(asset.name) == null && !uploaded.containsKey(asset.name))
+        'reading back: ${asset.name} is an asset nobody uploaded',
+  ].nonNulls.toList();
 }
