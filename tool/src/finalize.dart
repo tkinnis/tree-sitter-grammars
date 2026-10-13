@@ -80,7 +80,8 @@ Future<Map<String, String>> finalizeRelease({
     commit,
   );
   await requireTag('before publishing');
-  _requireUnchanged(draft, await readRelease(gh, draft.id), tag);
+  final current = await readRelease(gh, draft.id);
+  _requireUnchanged(draft, current, tag);
   final patch = await gh([
     'api',
     'repos/$releaseRepository/releases/${draft.id}',
@@ -89,13 +90,14 @@ Future<Map<String, String>> finalizeRelease({
     '-F',
     'draft=false',
     '-f',
-    'body=${draft.body}\n\n'
+    'body=${current.body}\n\n'
         '${_archiveTable(platforms, absent, archives, glibc)}',
   ]);
   if (patch.exitCode != 0) {
     throw PublishException(
-      'publishing: gh api PATCH $tag failed: ${errorText(patch)}; read the '
-      'release before trying again, since the request may have been applied',
+      'publishing: gh api PATCH $tag failed: ${errorText(patch)}; if the '
+      'request was applied the tag $tag is burned: do not pin these digests, '
+      'and check gh release view $tag',
     );
   }
   try {
@@ -379,6 +381,8 @@ Future<Map<BuildPlatform, String>> _requireArchives(
 void _requireUnchanged(GitHubRelease checked, GitHubRelease now, String tag) {
   final problems = [
     if (!now.draft) 'before publishing: $tag is no longer a draft',
+    if (now.body != checked.body)
+      'before publishing: the notes of $tag were edited',
     if (now.target != checked.target)
       'before publishing: $tag targets ${now.target} now, not '
           '${checked.target}',

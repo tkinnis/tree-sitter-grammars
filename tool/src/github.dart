@@ -139,26 +139,53 @@ final class GitHubRelease {
   });
 
   /// Reads the release object [json] of the REST API.
-  factory GitHubRelease.fromJson(Map<String, Object?> json) => GitHubRelease(
-    id: switch (json['id']) {
+  ///
+  /// Throws a [PublishException] when the object has not the shape the API
+  /// documents: an integer id, and assets that are objects with an integer
+  /// id and a name.
+  factory GitHubRelease.fromJson(Map<String, Object?> json) {
+    final id = switch (json['id']) {
       final int id => id,
       _ => throw const PublishException('GitHub answered a release with no id'),
-    },
-    tagName: '${json['tag_name']}',
-    draft: json['draft'] == true,
-    immutable: json['immutable'] == true,
-    target: '${json['target_commitish']}',
-    body: '${json['body'] ?? ''}',
-    assets: [
-      for (final asset in json['assets'] as List? ?? const [])
-        (
-          id: (asset as Map<String, Object?>)['id'] as int? ?? 0,
-          name: '${asset['name']}',
-          digest: asset['digest'] as String?,
-          state: asset['state'] as String?,
-        ),
-    ],
-  );
+    };
+    final assets = json['assets'] ?? const <Object?>[];
+    if (assets is! List) {
+      throw PublishException(
+        'GitHub answered the assets of release $id as a '
+        'non-list',
+      );
+    }
+    return GitHubRelease(
+      id: id,
+      tagName: '${json['tag_name']}',
+      draft: json['draft'] == true,
+      immutable: json['immutable'] == true,
+      target: '${json['target_commitish']}',
+      body: '${json['body'] ?? ''}',
+      assets: [
+        for (final asset in assets)
+          switch (asset) {
+            {'id': final int assetId, 'name': final String name} => (
+              id: assetId,
+              name: name,
+              digest: switch (asset['digest']) {
+                null => null,
+                final String digest => digest,
+                _ => throw PublishException(
+                  'GitHub answered an asset of release $id with a digest '
+                  'that is not text',
+                ),
+              },
+              state: asset['state'] is String ? asset['state'] as String : null,
+            ),
+            _ => throw PublishException(
+              'GitHub answered an asset of release $id that has no integer '
+              'id and name',
+            ),
+          },
+      ],
+    );
+  }
 
   final int id;
   final String tagName;

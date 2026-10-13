@@ -53,6 +53,23 @@ List<String> workflowProblems(String source) {
         problems.add('job $name checks out with persisted credentials');
       }
       final run = step['run'];
+      if (run is String && run.contains('git ')) {
+        if (run.contains('http.extraheader')) {
+          if (RegExp(r'-c\s+\S*http\.extraheader').hasMatch(run)) {
+            problems.add('job $name passes http.extraheader in argv');
+          }
+          if (!run.contains('::add-mask::')) {
+            problems.add('job $name does not mask the derived header');
+          }
+          if (!run.contains('GIT_CONFIG_COUNT')) {
+            problems.add('job $name does not pass the header through env');
+          }
+        }
+        if (run.contains('cat-file') &&
+            !run.contains(r'rev-parse "refs/tags/$TAG^{commit}"')) {
+          problems.add('job $name does not assert HEAD is the tag commit');
+        }
+      }
       if (run is String && run.contains(r'${{')) {
         problems.add('job $name interpolates an expression into a run');
       }
@@ -148,6 +165,26 @@ void main() {
       RegExp(r'          - linux-arm64\n'),
       '          - linux-arm64\n          - windows-x64\n',
       'platform is not the choice',
+    ),
+    (
+      'a header passed in argv',
+      RegExp(r'git fetch'),
+      'git -c http.extraheader=x fetch',
+      'passes http.extraheader in argv',
+    ),
+    (
+      'an unmasked header',
+      RegExp(r'echo "::add-mask::\$value"\n'),
+      '',
+      'does not mask the derived header',
+    ),
+    (
+      'a missing HEAD assertion',
+      RegExp(
+        r'          test "\$\(git rev-parse "refs/tags/\$TAG\^\{commit\}"\)".*\n.*\n',
+      ),
+      '',
+      'does not assert HEAD',
     ),
     (
       'a concurrency group without the tag',

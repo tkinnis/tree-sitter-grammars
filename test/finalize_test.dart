@@ -748,6 +748,21 @@ void main() {
         );
       });
 
+      test('the notes were edited', () {
+        final base = _Finalize();
+        return _refusesToPublish(
+          _Finalize(
+            reread: ghResult(
+              0,
+              stdout: jsonEncode(
+                releaseJson(body: 'edited', assets: base.assets),
+              ),
+            ),
+          ),
+          'before publishing: the notes of v1.1.0 were edited',
+        );
+      });
+
       test('an asset changed state', () {
         return changes(
           (f) => release(
@@ -806,8 +821,9 @@ void main() {
       'published', () {
     return _refuses(
       _Finalize(extra: {fixturePatch: ghResult(1, stderr: 'HTTP 422')}),
-      'publishing: gh api PATCH v1.1.0 failed: HTTP 422; read the release '
-      'before trying again',
+      'publishing: gh api PATCH v1.1.0 failed: HTTP 422; if the request was '
+      'applied the tag v1.1.0 is burned: do not pin these digests, and check '
+      'gh release view v1.1.0',
     );
   });
 
@@ -858,6 +874,23 @@ void main() {
         ),
       ),
     );
+
+    test('a payload of the wrong shape, saying the tag is burned', () {
+      return failsWith(
+        (f) => ghResult(
+          0,
+          stdout: jsonEncode({
+            'id': fixtureReleaseId,
+            'draft': false,
+            'immutable': true,
+            'assets': [
+              {'id': 'seven', 'name': 'x'},
+            ],
+          }),
+        ),
+        'GitHub answered an asset of release',
+      );
+    });
 
     test('a release not reported immutable', () {
       return failsWith(
