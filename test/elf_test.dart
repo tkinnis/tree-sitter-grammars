@@ -1,6 +1,3 @@
-@TestOn('linux')
-library;
-
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -31,26 +28,151 @@ final _hasClang = (Platform.environment['PATH'] ?? '')
     .split(':')
     .any((directory) => File(p.join(directory, 'clang')).existsSync());
 
-/// A crafted shared object for arm64 holding only a string table and a
-/// version-needed section that lists, by file, the versions [needs]
-/// names, laid out as a linker lays them out.
-Uint8List _craftedElf(Map<String, List<String>> needs) {
-  final strings = BytesBuilder()..addByte(0);
-  int string(String text) {
-    final at = strings.length;
-    strings
+/// One section of a crafted image: its `sh_type`, its contents, the
+/// section its `sh_link` names and its `sh_entsize`. A section of
+/// [_noBits] holds no bytes of the file; [size] gives its `sh_size`.
+final class _Section {
+  const _Section(
+    this.type, {
+    this.bytes = const [],
+    this.link = 0,
+    this.entrySize = 0,
+    this.size,
+  });
+
+  final int type;
+  final List<int> bytes;
+  final int link;
+  final int entrySize;
+  final int? size;
+}
+
+const _stringTable = 3; // SHT_STRTAB
+const _dynamic = 6; // SHT_DYNAMIC
+const _noBits = 8; // SHT_NOBITS
+const _dynamicSymbols = 11; // SHT_DYNSYM
+const _versionsNeeded = 0x6ffffffe; // SHT_GNU_verneed
+
+/// The strings of a crafted string table, the empty string first.
+final class _Strings {
+  final _bytes = BytesBuilder()..addByte(0);
+
+  /// Adds [text] and returns its offset in the table.
+  int add(String text) {
+    final at = _bytes.length;
+    _bytes
       ..add(text.codeUnits)
       ..addByte(0);
     return at;
   }
 
+  _Section get section => _Section(_stringTable, bytes: _bytes.toBytes());
+}
+
+/// A crafted 64-bit little-endian shared object for arm64 holding
+/// [sections] after the null section 0, each at an 8-byte boundary, as a
+/// linker lays them out, and its section headers last.
+Uint8List _image(List<_Section> sections) {
+  int aligned(int offset) => (offset + 7) & ~7;
+  final offsets = <int>[];
+  var at = 64;
+  for (final section in sections) {
+    offsets.add(at);
+    if (section.type != _noBits) at = aligned(at + section.bytes.length);
+  }
+  final sectionsAt = at;
+  final count = sections.length + 1;
+  final bytes = Uint8List(sectionsAt + count * 64)
+    ..setAll(0, [0x7f, 0x45, 0x4c, 0x46, 2, 1, 1]);
+  final data = ByteData.sublistView(bytes)
+    ..setUint16(16, elfSharedObject, Endian.little)
+    ..setUint16(18, 183 /* EM_AARCH64 */, Endian.little)
+    ..setUint64(0x28, sectionsAt, Endian.little)
+    ..setUint16(0x34, 64, Endian.little)
+    ..setUint16(0x3a, 64, Endian.little)
+    ..setUint16(0x3c, count, Endian.little);
+  for (final (index, section) in sections.indexed) {
+    if (section.type != _noBits) bytes.setAll(offsets[index], section.bytes);
+    final header = sectionsAt + 64 * (index + 1);
+    data
+      ..setUint32(header + 4, section.type, Endian.little)
+      ..setUint64(header + 24, offsets[index], Endian.little)
+      ..setUint64(
+        header + 32,
+        section.size ?? section.bytes.length,
+        Endian.little,
+      )
+      ..setUint32(header + 40, section.link, Endian.little)
+      ..setUint64(header + 56, section.entrySize, Endian.little);
+  }
+  return bytes;
+}
+
+/// The offset of the section header of section [index] in [image].
+int _sectionHeader(Uint8List image, int index) =>
+    ByteData.sublistView(image).getUint64(0x28, Endian.little).toInt() +
+    64 * index;
+
+/// [image] with the 64-bit field at [offset] set to [value], which may be
+/// any 64-bit pattern, those Dart reads back as negative among them.
+Uint8List _with(Uint8List image, int offset, int value) {
+  final copy = Uint8List.fromList(image);
+  ByteData.sublistView(copy).setUint64(offset, value, Endian.little);
+  return copy;
+}
+
+/// The `Elf64_Dyn` entries of [entries], `(d_tag, d_val)`, and `DT_NULL`.
+_Section _dynamicSection(List<(int, int)> entries, {int link = 1}) {
+  final data = ByteData(16 * (entries.length + 1));
+  for (final (index, (tag, value)) in entries.indexed) {
+    data
+      ..setUint64(16 * index, tag, Endian.little)
+      ..setUint64(16 * index + 8, value, Endian.little);
+  }
+  return _Section(
+    _dynamic,
+    bytes: data.buffer.asUint8List(),
+    link: link,
+    entrySize: 16,
+  );
+}
+
+/// One `Elf64_Sym`: the offset of its name, its binding (`STB_*`), its
+/// visibility (`STV_*`) and the section that defines it, 0 for none.
+typedef _Symbol = ({int name, int binding, int visibility, int section});
+
+/// The `.dynsym` of [symbols] after the null symbol, its names in section
+/// [link].
+_Section _symbolSection(List<_Symbol> symbols, {int link = 1}) {
+  final data = ByteData(24 * (symbols.length + 1));
+  for (final (index, symbol) in symbols.indexed) {
+    final at = 24 * (index + 1);
+    data
+      ..setUint32(at, symbol.name, Endian.little)
+      ..setUint8(at + 4, symbol.binding << 4 | 2 /* STT_FUNC */)
+      ..setUint8(at + 5, symbol.visibility)
+      ..setUint16(at + 6, symbol.section, Endian.little);
+  }
+  return _Section(
+    _dynamicSymbols,
+    bytes: data.buffer.asUint8List(),
+    link: link,
+    entrySize: 24,
+  );
+}
+
+/// A crafted shared object for arm64 holding only a string table and a
+/// version-needed section that lists, by file, the versions [needs]
+/// names, laid out as a linker lays them out.
+Uint8List _craftedElf(Map<String, List<String>> needs) {
+  final strings = _Strings();
   final need = BytesBuilder();
   final files = needs.entries.toList();
   for (final (index, MapEntry(key: file, value: versions)) in files.indexed) {
     final entry = ByteData(16 + 16 * versions.length)
       ..setUint16(0, 1, Endian.little) // vn_version
       ..setUint16(2, versions.length, Endian.little) // vn_cnt
-      ..setUint32(4, string(file), Endian.little) // vn_file
+      ..setUint32(4, strings.add(file), Endian.little) // vn_file
       ..setUint32(8, 16, Endian.little) // vn_aux
       ..setUint32(
         12,
@@ -61,7 +183,7 @@ Uint8List _craftedElf(Map<String, List<String>> needs) {
       final aux = 16 + 16 * at;
       entry
         ..setUint16(aux + 6, at + 2, Endian.little) // vna_other
-        ..setUint32(aux + 8, string(version), Endian.little) // vna_name
+        ..setUint32(aux + 8, strings.add(version), Endian.little) // vna_name
         ..setUint32(
           aux + 12,
           at == versions.length - 1 ? 0 : 16,
@@ -70,33 +192,50 @@ Uint8List _craftedElf(Map<String, List<String>> needs) {
     }
     need.add(entry.buffer.asUint8List());
   }
-  int aligned(int offset) => (offset + 7) & ~7;
-  final stringsAt = 64;
-  final needAt = aligned(stringsAt + strings.length);
-  final sectionsAt = aligned(needAt + need.length);
-  final bytes = Uint8List(sectionsAt + 3 * 64)
-    ..setAll(0, [0x7f, 0x45, 0x4c, 0x46, 2, 1, 1])
-    ..setAll(stringsAt, strings.toBytes())
-    ..setAll(needAt, need.toBytes());
-  final data = ByteData.sublistView(bytes)
-    ..setUint16(16, elfSharedObject, Endian.little)
-    ..setUint16(18, 183 /* EM_AARCH64 */, Endian.little)
-    ..setUint64(0x28, sectionsAt, Endian.little)
-    ..setUint16(0x34, 64, Endian.little)
-    ..setUint16(0x3a, 64, Endian.little)
-    ..setUint16(0x3c, 3, Endian.little);
-  void section(int index, int type, int offset, int size, int link) {
-    final header = sectionsAt + 64 * index;
-    data
-      ..setUint32(header + 4, type, Endian.little)
-      ..setUint64(header + 24, offset, Endian.little)
-      ..setUint64(header + 32, size, Endian.little)
-      ..setUint32(header + 40, link, Endian.little);
-  }
+  return _image([
+    strings.section,
+    _Section(_versionsNeeded, bytes: need.toBytes(), link: 1),
+  ]);
+}
 
-  section(1, 3 /* SHT_STRTAB */, stringsAt, strings.length, 0);
-  section(2, 0x6ffffffe /* SHT_GNU_verneed */, needAt, need.length, 1);
-  return bytes;
+/// A crafted `libx.so` whose dynamic section names its soname and
+/// `libc.so.6`, then [dynamic], and whose `.dynsym` holds `tree_sitter_x`,
+/// bound global, defined in section 1; [after] follow its four sections.
+Uint8List _library({
+  List<(int, int)> dynamic = const [],
+  List<_Section> after = const [],
+}) {
+  final strings = _Strings();
+  final soname = strings.add('libx.so');
+  final libc = strings.add('libc.so.6');
+  final symbol = strings.add('tree_sitter_x');
+  return _image([
+    strings.section,
+    _dynamicSection([
+      (14 /* DT_SONAME */, soname),
+      (1 /* DT_NEEDED */, libc),
+      ...dynamic,
+    ]),
+    _symbolSection([(name: symbol, binding: 1, visibility: 0, section: 1)]),
+    ...after,
+  ]);
+}
+
+/// [elfProblems] of [image], written to a file of its own, against the
+/// expectation [_library] meets.
+List<String> _problemsOf(Uint8List image) {
+  final scratch = Directory.systemTemp.createTempSync('elf_test');
+  addTearDown(() => scratch.deleteSync(recursive: true));
+  final path = p.join(scratch.path, 'libx.so');
+  File(path).writeAsBytesSync(image);
+  return elfProblems(
+    ElfExpectation(
+      path: path,
+      soname: 'libx.so',
+      exportedSymbols: const ['tree_sitter_x'],
+    ),
+    BuildPlatform.linuxArm64,
+  ).map((problem) => problem.replaceFirst(path, 'libx.so')).toList();
 }
 
 void main() {
@@ -237,9 +376,187 @@ void main() {
     });
   });
 
-  if (!_hasClang) {
+  group('a crafted image', () {
+    test('as a linker lays it out is read and passes', () {
+      final image = readElf(_library());
+
+      check(image.soname).equals('libx.so');
+      check(image.needed).deepEquals(['libc.so.6']);
+      check(image.exports).deepEquals(['tree_sitter_x']);
+      check(image.textRelocations).isFalse();
+      check(_problemsOf(_library())).isEmpty();
+    });
+
+    test('cut short anywhere is refused as malformed, not read past its '
+        'end', () {
+      final whole = _library();
+      for (final length in [
+        0,
+        10,
+        63,
+        64,
+        100,
+        whole.length - 64,
+        whole.length - 1,
+      ]) {
+        final cut = Uint8List.sublistView(whole, 0, length);
+
+        check(because: 'cut to $length bytes', () => readElf(cut))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals(
+              length < 64
+                  ? 'not an ELF image: no ELF header'
+                  : 'malformed ELF image: section headers past the end of '
+                        'the file',
+            );
+        check(
+          because: 'cut to $length bytes',
+          _problemsOf(cut),
+        ).length.equals(1);
+      }
+    });
+
+    test('a huge offset, size or string index is refused as malformed, '
+        'not a crash', () {
+      final whole = _library();
+      final dynamicHeader = _sectionHeader(whole, 2);
+      final dynamicAt = ByteData.sublistView(
+        whole,
+      ).getUint64(dynamicHeader + 24, Endian.little).toInt();
+      for (final (what, image, problem) in [
+        // 0xfff...f0 reads in Dart as -16.
+        (
+          'a section offset past 2^63',
+          _with(whole, dynamicHeader + 24, -16),
+          'section 2 past the end',
+        ),
+        (
+          'a section size past 2^63',
+          _with(whole, dynamicHeader + 32, -16),
+          'section 2 past the end',
+        ),
+        (
+          'an offset and size whose sum passes 2^63',
+          _with(
+            _with(whole, dynamicHeader + 24, 1 << 62),
+            dynamicHeader + 32,
+            1 << 62,
+          ),
+          'section 2 past the end',
+        ),
+        (
+          'a section table past 2^63',
+          _with(whole, 0x28, -64),
+          'section headers past the end of the file',
+        ),
+        (
+          'a soname past 2^63 in its table',
+          _with(whole, dynamicAt + 8, -16),
+          'string -16 outside its table',
+        ),
+      ]) {
+        check(because: what, () => readElf(image))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals('malformed ELF image: $problem');
+        check(because: what, _problemsOf(image)).length.equals(1);
+      }
+    });
+
+    test('a section that holds no bytes of the file, as .bss, may reach '
+        'past its end', () {
+      final image = _library(after: [const _Section(_noBits, size: 1 << 20)]);
+
+      check(readElf(image).exports).deepEquals(['tree_sitter_x']);
+      check(_problemsOf(image)).isEmpty();
+    });
+
+    test('a section linking to a section that does not exist is refused', () {
+      final whole = _library();
+      for (final index in [2, 3]) {
+        final image = Uint8List.fromList(whole);
+        ByteData.sublistView(
+          image,
+        ).setUint32(_sectionHeader(image, index) + 40, 9, Endian.little);
+
+        check(() => readElf(image))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals('malformed ELF image: section $index links section 9 of 4');
+        check(_problemsOf(image)).length.equals(1);
+      }
+    });
+
+    test('a string table that holds no bytes of the file is refused', () {
+      final strings = _Strings();
+      final soname = strings.add('libx.so');
+      final image = _image([
+        const _Section(_noBits, size: 64),
+        _dynamicSection([(14 /* DT_SONAME */, soname)]),
+      ]);
+
+      check(() => readElf(image))
+          .throws<FormatException>()
+          .has((e) => e.message, 'message')
+          .equals('malformed ELF image: section 1 is no string table');
+    });
+
+    test('has text relocations when its dynamic section holds DT_TEXTREL or '
+        'DF_TEXTREL in DT_FLAGS', () {
+      bool textRelocations(List<(int, int)> dynamic) =>
+          readElf(_library(dynamic: dynamic)).textRelocations;
+
+      check(textRelocations(const [])).isFalse();
+      check(textRelocations(const [(22 /* DT_TEXTREL */, 0)])).isTrue();
+      check(textRelocations(const [(30 /* DT_FLAGS */, 0x4)])).isTrue();
+      check(
+        textRelocations(const [(30 /* DT_FLAGS */, 0x8 /* BIND_NOW */)]),
+      ).isFalse();
+      check(
+        _problemsOf(_library(dynamic: const [(30 /* DT_FLAGS */, 0x4)])),
+      ).deepEquals(['libx.so: has text relocations']);
+    });
+
+    test('exports what is defined, bound global or weak, and of default or '
+        'protected visibility', () {
+      final strings = _Strings();
+      _Symbol symbol(
+        String name, {
+        int binding = 1 /* GLOBAL */,
+        int visibility = 0 /* DEFAULT */,
+        int section = 1,
+      }) => (
+        name: strings.add(name),
+        binding: binding,
+        visibility: visibility,
+        section: section,
+      );
+      final symbols = [
+        symbol('global'),
+        symbol('weak', binding: 2 /* WEAK */),
+        symbol('protected', visibility: 3 /* PROTECTED */),
+        symbol('weak_protected', binding: 2, visibility: 3),
+        symbol('local', binding: 0 /* LOCAL */),
+        symbol('hidden', visibility: 2 /* HIDDEN */),
+        symbol('internal', visibility: 1 /* INTERNAL */),
+        symbol('undefined', section: 0 /* SHN_UNDEF */),
+        symbol('unique', binding: 10 /* GNU_UNIQUE */),
+      ];
+
+      check(
+        readElf(_image([strings.section, _symbolSection(symbols)])).exports,
+      ).deepEquals(['global', 'weak', 'protected', 'weak_protected']);
+    });
+  });
+
+  if (!Platform.isLinux || !_hasClang) {
     test('links shared objects with the build\'s flags', () {
-      markTestSkipped('no clang on PATH, which a build on Linux needs');
+      markTestSkipped(
+        Platform.isLinux
+            ? 'no clang on PATH, which a build on Linux needs'
+            : 'a shared object for Linux is linked only on Linux',
+      );
     });
     return;
   }
@@ -309,11 +626,20 @@ void main() {
     return copy;
   }
 
-  test('the compiler records the C library it links against', () {
+  test('the compiler records the linker and the C library it links '
+      'against', () async {
     check(compiler.hostLibc).isNotNull().startsWith('glibc ');
     check(compiler.hostLibcPath).isNotNull().endsWith('libc.so.6');
     check(p.isAbsolute(compiler.hostLibcPath!)).isTrue();
+    check(compiler.linker).isNotNull().startsWith('GNU ld ');
+    check(compiler.linkerPackage).isNotNull().contains(' ');
+    check(p.isAbsolute(compiler.linkerPath!)).isTrue();
+    check(compiler.hostLibcBanner).isNotNull().startsWith('GNU C Library (');
     check(compiler.sdkPath).isNull();
+    // Read from the libc.so.6 clang links against, which on a host that
+    // builds natively is the glibc this process runs on too.
+    final running = await Process.run('getconf', ['GNU_LIBC_VERSION']);
+    check(compiler.hostLibc).equals((running.stdout as String).trim());
   });
 
   test('a shared object linked as the build links grammars passes', () async {

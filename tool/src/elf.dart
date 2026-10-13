@@ -111,8 +111,23 @@ List<String> elfProblems(ElfExpectation expectation, BuildPlatform platform) {
 /// example `{'libc.so.6': ['GLIBC_2.17']}`: those the loader requires that
 /// file to define before it loads the image.
 ///
-/// Throws a [FormatException] for anything that is not such an image.
+/// Throws a [FormatException] for anything that is not such an image: a
+/// file cut short, an offset, size or string index outside the file or
+/// its table (an unsigned field Dart reads as negative among them), or a
+/// section linking to a section the image does not hold. A section that
+/// holds no bytes of the file (`SHT_NOBITS`, as `.bss`) may reach past its
+/// end.
 ElfImage readElf(Uint8List bytes) {
+  try {
+    return _readElf(bytes);
+  } on RangeError catch (error) {
+    // Every read is bounded first; one that is not is a malformed image,
+    // never a crash of the build that checks it.
+    throw FormatException('malformed ELF image: ${error.message}');
+  }
+}
+
+ElfImage _readElf(Uint8List bytes) {
   if (bytes.length < 64 ||
       bytes[0] != 0x7f ||
       bytes[1] != 0x45 ||
@@ -131,6 +146,12 @@ ElfImage readElf(Uint8List bytes) {
     if (!holds) throw FormatException('malformed ELF image: $what');
   }
 
+  // Whether [length] bytes from [offset] lie within the file. A 64-bit
+  // field past 2^63 reads as negative, and a sum of two fields can pass
+  // 2^63, so each is compared on its own.
+  bool within(int offset, int length) =>
+      offset >= 0 && length >= 0 && length <= bytes.length - offset;
+
   final type = u16(16);
   final machine = u16(18);
   final sectionTable = u64(0x28);
@@ -138,28 +159,42 @@ ElfImage readElf(Uint8List bytes) {
   final sectionCount = u16(0x3c);
   require(sectionSize == 64, 'section headers of $sectionSize bytes');
   require(
-    sectionTable + sectionCount * sectionSize <= bytes.length,
+    within(sectionTable, sectionCount * sectionSize),
     'section headers past the end of the file',
   );
+  const noBits = 8; // SHT_NOBITS
+  const stringTable = 3; // SHT_STRTAB
   ({int type, int offset, int size, int link, int entrySize}) section(
     int index,
   ) {
     final header = sectionTable + index * sectionSize;
+    final type = u32(header + 4);
     final offset = u64(header + 24);
     final size = u64(header + 32);
-    require(offset + size <= bytes.length, 'section $index past the end');
+    final link = u32(header + 40);
+    // A section of SHT_NOBITS, as .bss, takes no bytes of the file, so
+    // its size may reach past the file's end.
+    require(
+      type == noBits ? size >= 0 : within(offset, size),
+      'section $index past the end',
+    );
+    require(
+      link < sectionCount,
+      'section $index links section $link of $sectionCount',
+    );
     return (
-      type: u32(header + 4),
+      type: type,
       offset: offset,
       size: size,
-      link: u32(header + 40),
+      link: link,
       entrySize: u64(header + 56),
     );
   }
 
   String string(int table, int at) {
     final strings = section(table);
-    require(at < strings.size, 'string $at outside its table');
+    require(strings.type == stringTable, 'section $table is no string table');
+    require(at >= 0 && at < strings.size, 'string $at outside its table');
     final start = strings.offset + at;
     var end = start;
     while (end < strings.offset + strings.size && bytes[end] != 0) {
