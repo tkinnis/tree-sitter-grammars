@@ -293,6 +293,19 @@ Future<Uint8List?> tarGzFile(String archive, String path) async {
   return null;
 }
 
+/// Whether a build on [operatingSystem], by default the one this process
+/// runs on, as `Platform.operatingSystem` spells it, computes sha256
+/// digests in Dart rather than with `/usr/bin/shasum`: everywhere but
+/// macOS, which always has shasum. Windows has none at a fixed path, and a
+/// minimal Linux image none at all, since it comes with Perl.
+bool sha256InDart([String? operatingSystem]) =>
+    (operatingSystem ?? Platform.operatingSystem) != 'macos';
+
+/// The `shasum` a build on macOS runs to compute a sha256 digest. Tests
+/// name a file that does not exist, to show that a build elsewhere never
+/// runs it.
+String shasumExecutable = '/usr/bin/shasum';
+
 /// The sha256 of the file at [path], in lowercase hex, computed in Dart,
 /// where a build on macOS runs `/usr/bin/shasum`.
 Future<String> dartFileSha256(String path) async =>

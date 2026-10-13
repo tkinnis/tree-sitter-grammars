@@ -7,9 +7,49 @@ import 'package:test/test.dart';
 import '../tool/src/files_digest.dart';
 import '../tool/src/source_bundles.dart';
 import '../tool/src/tar.dart';
+import '../tool/src/tree_sitter_cli.dart';
 import 'support/git_fixture.dart';
 
 void main() {
+  test('only macOS computes digests with shasum: Windows has none, nor '
+      'has a minimal Linux image, where it comes with Perl', () {
+    check(sha256InDart('macos')).isFalse();
+    check(sha256InDart('linux')).isTrue();
+    check(sha256InDart('windows')).isTrue();
+    check(sha256InDart()).equals(!Platform.isMacOS);
+  });
+
+  group('with no shasum to run', () {
+    late Directory scratch;
+    late String file;
+    final content = bytes('digest me\n');
+    final contentSha256 = dartSha256(content);
+
+    setUp(() {
+      scratch = Directory.systemTemp.createTempSync('no_shasum_test');
+      file = p.join(scratch.path, 'file');
+      File(file).writeAsBytesSync(content);
+      shasumExecutable = p.join(scratch.path, 'no-such-shasum');
+    });
+
+    tearDown(() {
+      shasumExecutable = '/usr/bin/shasum';
+      scratch.deleteSync(recursive: true);
+    });
+
+    test('a build off macOS computes every digest in Dart', () async {
+      check(await fileSha256(file)).equals(contentSha256);
+      check(await sha256Of(file)).equals(contentSha256);
+      check(await filesDigest(const [])).equals(dartSha256(const <int>[]));
+    }, testOn: '!mac-os');
+
+    test('a build on macOS runs the shasum it names', () async {
+      await check(fileSha256(file)).throws<ProcessException>();
+      await check(sha256Of(file)).throws<ProcessException>();
+      await check(filesDigest(const [])).throws<ProcessException>();
+    }, testOn: 'mac-os');
+  });
+
   late Directory temporary;
   late FixtureRepository upstream;
   late String commit;

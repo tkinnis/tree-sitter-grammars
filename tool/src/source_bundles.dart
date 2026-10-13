@@ -307,11 +307,11 @@ Future<String?> bundleCommit(String bundle) async {
   return await git.exitCode == 0 ? (await commit).trim() : null;
 }
 
-/// The sha256 of the file at [path]: `/usr/bin/shasum`'s on macOS, and on
-/// Windows, which has no such tool of fixed path, [dartFileSha256]'s.
+/// The sha256 of the file at [path]: `/usr/bin/shasum`'s on macOS, and
+/// elsewhere, as [sha256InDart] decides, [dartFileSha256]'s.
 Future<String> fileSha256(String path) async {
-  if (Platform.isWindows) return dartFileSha256(path);
-  final result = await Process.run('/usr/bin/shasum', ['-a', '256', path]);
+  if (sha256InDart()) return dartFileSha256(path);
+  final result = await Process.run(shasumExecutable, ['-a', '256', path]);
   if (result.exitCode != 0) {
     throw SourceBundleException('shasum $path failed: ${result.stderr}');
   }

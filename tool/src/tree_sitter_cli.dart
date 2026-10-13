@@ -21,11 +21,11 @@ final class CliException implements Exception {
   String toString() => message;
 }
 
-/// The sha256 of [path], as `shasum -a 256` computes it; on Windows, which
-/// has no `shasum`, as [dartFileSha256] does.
+/// The sha256 of [path], as `/usr/bin/shasum -a 256` computes it on macOS,
+/// and elsewhere, as [sha256InDart] decides, as [dartFileSha256] does.
 Future<String> sha256Of(String path) async {
-  if (Platform.isWindows) return dartFileSha256(path);
-  final result = await Process.run('shasum', ['-a', '256', path]);
+  if (sha256InDart()) return dartFileSha256(path);
+  final result = await Process.run(shasumExecutable, ['-a', '256', path]);
   if (result.exitCode != 0) {
     throw CliException('shasum $path failed: ${result.stderr}');
   }

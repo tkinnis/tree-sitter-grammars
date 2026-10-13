@@ -44,8 +44,8 @@ Future<String> filesDigest(List<TreeFile> files) async {
       ..add(utf8.encode('${file.mode} ${file.blob}\t${file.path}'))
       ..addByte(0);
   }
-  if (Platform.isWindows) return dartSha256(listing.takeBytes());
-  final shasum = await Process.start('/usr/bin/shasum', ['-a', '256']);
+  if (sha256InDart()) return dartSha256(listing.takeBytes());
+  final shasum = await Process.start(shasumExecutable, ['-a', '256']);
   shasum.stdin.add(listing.takeBytes());
   await shasum.stdin.close();
   final output = shasum.stdout.transform(utf8.decoder).join();
