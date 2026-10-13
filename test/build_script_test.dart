@@ -56,6 +56,11 @@ void main() {
     ['--release=v1.1.0', '--dry-run', '--publish'],
     ['--release=v1.1.0', '--publish', '--publish'],
     ['--sources='],
+    ['--release=v1.1.0', '--attach'],
+    ['--release=v1.1.0', '--sources=a', '--attach', '--publish'],
+    ['--release=v1.1.0', '--sources=a', '--attach', '--dry-run'],
+    ['--release=v1.1.0', '--finalize'],
+    ['--release=v1.1.0', '--finalize', '--require=macos-arm6'],
   ]) {
     test('refuses ${arguments.join(' ')}', () async {
       _copyTools(temporary.path);
@@ -66,6 +71,18 @@ void main() {
       check(result.stderr as String).contains('usage:');
     });
   }
+
+  test('refuses --attach on macOS, whose build creates the draft', () async {
+    _copyTools(temporary.path);
+
+    final result = await _build(temporary.path, [
+      '--release=v1.1.0',
+      '--attach-built=${temporary.path}',
+    ]);
+
+    check(result.exitCode).equals(1);
+    check(result.stderr as String).contains('with --publish');
+  }, skip: Platform.isMacOS ? false : 'the macOS build creates the draft');
 
   test('refuses source bundles inside output/, which it deletes', () async {
     final root = temporary.path;

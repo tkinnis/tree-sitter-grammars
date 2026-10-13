@@ -7,6 +7,12 @@
 /// dart run tool/build_tree_sitter_grammars.dart [--sources=<dir>]
 /// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
 ///     [--dry-run | --publish]
+/// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
+///     --sources=<dir> --attach
+/// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
+///     --attach-built=<output dir>
+/// dart run tool/build_tree_sitter_grammars.dart --release=vX.Y.Z
+///     --finalize --require=<platform>,<platform>...
 /// ```
 ///
 /// Every build starts from empty `build/` and `output/` directories. The
@@ -43,11 +49,23 @@
 /// `output/grammars-<platform>.dry-run.tar.gz`, a name no release asset
 /// has. Packing also writes the archive's sha256 beside it and the release
 /// notes into `output/release-notes.md`. `--publish`, on macOS only, then
-/// creates the GitHub release of the pushed tag with the archive, its
-/// sha256, `build_info.json` and every source and generated bundle
-/// attached; it refuses a release that exists, so an asset is never
-/// replaced, and a tag on GitHub that is not the local tag naming the
-/// built commit.
+/// creates the GitHub release of the pushed tag as a draft, with the
+/// archive, its sha256, `build_info.json` and every source and generated
+/// bundle attached; it refuses a release of that tag, draft or published,
+/// that exists, so an asset is never replaced, and a tag on GitHub that is
+/// not the local tag naming the built commit.
+///
+/// GitHub's immutable releases never gain an asset once published, so the
+/// other platforms attach to the draft. `--attach`, on Linux and Windows,
+/// builds from the draft's downloaded assets in `--sources` (whose
+/// `build_info.json` must name the release and the built commit) and
+/// attaches the archive and its sha256; `--attach-built` attaches an
+/// `output/` built earlier, compiling nothing. `--finalize`, on macOS, checks
+/// that the draft holds the archive and sha256 of every `--require`d
+/// platform and nothing else, with the digests recorded for them, publishes
+/// it, and prints the sha256 of each archive as the `sha256` map of finch's
+/// `hook/grammars_config.json`. Each step resolves the tag on GitHub before
+/// it changes anything and again after, and reads the release back.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
 /// every check passes, so a failed build leaves no `output/`. Any failure
@@ -59,10 +77,13 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'src/attach.dart';
+import 'src/build_options.dart';
 import 'src/build_platform.dart';
 import 'src/build_record.dart';
 import 'src/compiler.dart';
 import 'src/elf.dart';
+import 'src/finalize.dart';
 import 'src/generated_sources.dart';
 import 'src/git.dart';
 import 'src/grammar_pins.dart';
@@ -83,42 +104,11 @@ import 'src/toolchain.dart';
 import 'src/tree_sitter_cli.dart';
 
 const _usage =
-    'usage: dart run tool/build_tree_sitter_grammars.dart '
-    '[--sources=<dir>] [--release=vX.Y.Z [--dry-run | --publish]]';
-
-/// What the command line asks the build to do.
-typedef _Options = ({
-  String? release,
-  bool dryRun,
-  bool publish,
-  String? sources,
-});
-
-/// Reads [args], or returns null when they are not a command the build
-/// takes.
-_Options? _parseArguments(List<String> args) {
-  String? release;
-  String? sources;
-  var dryRun = false;
-  var publish = false;
-  for (final arg in args) {
-    if (arg.startsWith('--release=') && release == null) {
-      release = arg.substring('--release='.length);
-    } else if (arg.startsWith('--sources=') && sources == null) {
-      sources = arg.substring('--sources='.length);
-    } else if (arg == '--dry-run' && !dryRun) {
-      dryRun = true;
-    } else if (arg == '--publish' && !publish) {
-      publish = true;
-    } else {
-      return null;
-    }
-  }
-  if ((dryRun || publish) && release == null) return null;
-  if (dryRun && publish) return null;
-  if (sources != null && sources.isEmpty) return null;
-  return (release: release, dryRun: dryRun, publish: publish, sources: sources);
-}
+    'usage: dart run tool/build_tree_sitter_grammars.dart\n'
+    '  [--sources=<dir>] [--release=vX.Y.Z [--dry-run | --publish]]\n'
+    '  --release=vX.Y.Z --sources=<dir> --attach\n'
+    '  --release=vX.Y.Z --attach-built=<output dir>\n'
+    '  --release=vX.Y.Z --finalize --require=<platform>,<platform>...';
 
 /// Thrown to stop the build with a message.
 final class BuildException implements Exception {
@@ -131,7 +121,7 @@ final class BuildException implements Exception {
 }
 
 Future<void> main(List<String> args) async {
-  final options = _parseArguments(args);
+  final options = parseBuildArguments(args);
   if (options == null) {
     stderr.writeln(_usage);
     exit(64);
@@ -150,26 +140,37 @@ Future<void> main(List<String> args) async {
   }
 }
 
-Future<void> _build(String root, _Options options) async {
-  final (:release, :dryRun, :publish, :sources) = options;
+Future<void> _build(String root, BuildOptions options) async {
+  final (:mode, :release, :dryRun, :publish, :sources, :attachBuilt, :require) =
+      options;
+  if (mode == BuildMode.finalize) {
+    return _finalize(root, release!, require!);
+  }
   final BuildPlatform platform;
   try {
     platform = BuildPlatform.host;
   } on BuildPlatformException catch (error) {
     throw BuildException('$error');
   }
-  if (publish && !platform.isMacos) {
-    // A release is created once, with the macOS archive and the source
-    // bundles it was built from; publishing creates it, so a second
-    // platform's archive cannot be published the same way. It is built
-    // from the release's downloaded bundles instead, so the bundle sha256s
-    // its build_info.json records are those of assets the release has.
+  if (platform.isMacos
+      ? mode == BuildMode.attach || mode == BuildMode.attachBuilt
+      : publish) {
+    // The release is a draft that macOS creates with the source bundles it
+    // was built from; the other platforms add their archives to it, built
+    // from those bundles so the bundle sha256s their build_info.json
+    // records are those of assets the draft has.
     throw BuildException(
-      '--publish creates the release from a build on macOS; a build on '
-      '${platform.osName} packs its archive with --release=<tag> '
-      "--sources=<the release's downloaded assets>, and is attached with "
-      'gh release upload',
+      platform.isMacos
+          ? '--attach adds a Linux or Windows archive to the draft; the '
+                'macOS build creates it with --publish'
+          : '--publish creates the draft from a build on macOS; a build on '
+                '${platform.osName} is attached to it with '
+                "--release=<tag> --sources=<the draft's downloaded assets> "
+                '--attach',
     );
+  }
+  if (mode == BuildMode.attachBuilt) {
+    return _attachBuilt(root, release!, platform, attachBuilt!);
   }
   final bundles = sources == null ? null : _sourcesDirectory(root, sources);
   // output/ holds only a build that passed every check: it is removed
@@ -180,6 +181,11 @@ Future<void> _build(String root, _Options options) async {
   final commit = release == null
       ? null
       : await _releaseCommit(root, release, dryRun: dryRun);
+  if (mode == BuildMode.attach && commit != null && bundles != null) {
+    // Before anything compiles: bundles of another release or commit never
+    // reach an archive that is attached to this one.
+    requireSourcesRecord(bundles, release!, commit);
+  }
   // A release reads this repository's own files from its commit, extracted
   // into build/repository; any other build reads the working tree.
   final inputs = commit == null ? root : await _extractRepository(root, commit);
@@ -493,26 +499,93 @@ Future<void> _build(String root, _Options options) async {
     File(notes).writeAsStringSync(releaseNotes(info, archive.sha256));
     print('  $notes');
     if (publish) {
-      _step('Publishing $release to $releaseRepository');
+      _step('Creating the draft $release on $releaseRepository');
       final assets = await _releaseAssets(output.path, archive, info);
       await publishRelease(
         tag: release,
-        tagObject: (await runGit(root, [
-          'rev-parse',
-          '--verify',
-          'refs/tags/$release',
-        ])).trim(),
+        tagObject: await _tagObject(root, release),
         commit: commit,
         assets: assets,
         notesFile: notes,
       );
       print(
-        '  published ${assets.length} assets; GitHub reports the digest '
-        'of each as the local sha256',
+        '  created the draft with ${assets.length} assets; GitHub reports '
+        'the digest of each as the local sha256',
       );
+    }
+    if (mode == BuildMode.attach) {
+      await _attach(root, release, commit, platform, output.path);
     }
   }
 }
+
+/// Attaches the archive and `.sha256` [outputDirectory] holds to the draft
+/// of [release], whose tag is checked on GitHub against the local one.
+Future<void> _attach(
+  String root,
+  String release,
+  String commit,
+  BuildPlatform platform,
+  String outputDirectory,
+) async {
+  _step('Attaching ${platform.releaseArchiveName} to the draft $release');
+  await attachArchive(
+    tag: release,
+    tagObject: await _tagObject(root, release),
+    commit: commit,
+    platform: platform,
+    outputDirectory: outputDirectory,
+  );
+  print(
+    '  attached the archive and its .sha256; GitHub reports the digest of '
+    'each as the local sha256',
+  );
+}
+
+/// Attaches the archive built earlier into [builtDirectory] to the draft of
+/// [release], compiling nothing.
+Future<void> _attachBuilt(
+  String root,
+  String release,
+  BuildPlatform platform,
+  String builtDirectory,
+) async {
+  final commit = await _releaseCommit(root, release, dryRun: false);
+  final directory = Directory(builtDirectory);
+  if (!directory.existsSync()) {
+    throw BuildException('--attach-built=$builtDirectory is not a directory');
+  }
+  await _attach(root, release, commit, platform, directory.absolute.path);
+}
+
+/// Publishes the draft of [release] once the archives of [platforms] are
+/// attached, and prints the sha256 map finch's `hook/grammars_config.json`
+/// takes.
+Future<void> _finalize(
+  String root,
+  String release,
+  List<BuildPlatform> platforms,
+) async {
+  final commit = await _releaseCommit(root, release, dryRun: false);
+  _step('Publishing the draft $release of $releaseRepository');
+  final digests = await finalizeRelease(
+    tag: release,
+    tagObject: await _tagObject(root, release),
+    commit: commit,
+    platforms: platforms,
+  );
+  print(
+    '\n✓ Published $release; GitHub reports it immutable.\n'
+    "\nfinch's hook/grammars_config.json `sha256` map:\n"
+    '${const JsonEncoder.withIndent('  ').convert(digests)}',
+  );
+}
+
+/// The object of the annotated tag [release] in the repository at [root].
+Future<String> _tagObject(String root, String release) async => (await runGit(
+  root,
+  ['rev-parse', '--verify', 'refs/tags/$release'],
+)).trim();
 
 /// [sources], the directory `--sources` names, as the file system spells
 /// it, with every symbolic link resolved.
