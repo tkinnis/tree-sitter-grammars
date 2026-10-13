@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- `.github/workflows/archives.yml` installs the Dart SDK from Google's archive at a version and sha256 pinned in the workflow's `env`, checking the digest with `sha256sum --check` before unzipping and asserting `dart --version`, and uses GitHub-owned actions only, the one kind the repository allows; `test/archives_workflow_test.dart` requires both
+
 ## [1.5.0] - 2026-10-13
 
 ### Added

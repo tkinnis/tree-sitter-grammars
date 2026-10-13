@@ -6,6 +6,14 @@ import 'package:yaml/yaml.dart';
 
 final _pinned = RegExp(r'^[\w.-]+/[\w./-]+@[0-9a-f]{40}$');
 
+/// The owners of the actions the repository's settings allow: it permits
+/// GitHub-owned actions only (`allowed_actions: selected`,
+/// `github_owned_allowed: true`, `verified_allowed: false`, no patterns), so
+/// an action of any other owner fails the run at startup.
+const _allowedOwners = {'actions', 'github'};
+
+final _hex64 = RegExp(r'^[0-9a-f]{64}$');
+
 /// Every way the workflow in [source] departs from what a workflow that
 /// attaches to a release may be.
 List<String> workflowProblems(String source) {
@@ -47,6 +55,12 @@ List<String> workflowProblems(String source) {
       if (uses is String && !_pinned.hasMatch(uses)) {
         problems.add('job $name uses $uses, not pinned by a commit SHA');
       }
+      if (uses is String && !_allowedOwners.contains(uses.split('/').first)) {
+        problems.add(
+          'job $name uses $uses, whose owner the repository does '
+          'not allow',
+        );
+      }
       if (uses is String &&
           uses.startsWith('actions/checkout@') &&
           (step['with'] as YamlMap?)?['persist-credentials'] != false) {
@@ -73,6 +87,43 @@ List<String> workflowProblems(String source) {
       if (run is String && run.contains(r'${{')) {
         problems.add('job $name interpolates an expression into a run');
       }
+    }
+  }
+
+  final env = workflow['env'] as YamlMap;
+  if (!_hex64.hasMatch('${env['DART_SDK_SHA256']}') ||
+      !RegExp(r'^\d+\.\d+\.\d+$').hasMatch('${env['DART_SDK_VERSION']}')) {
+    problems.add(
+      'the Dart SDK version or sha256 is not pinned at workflow '
+      'level',
+    );
+  }
+  for (final name in ['build', 'attach']) {
+    final runs = [
+      for (final step in (jobs[name] as YamlMap)['steps'] as YamlList)
+        '${(step as YamlMap)['run']}',
+    ];
+    final install = runs.where((run) => run.contains('dartsdk-linux-arm64'));
+    if (install.length != 1) {
+      problems.add('job $name does not install the Dart SDK once');
+      continue;
+    }
+    final run = install.single;
+    final check = run.indexOf('sha256sum --check');
+    final unzip = run.indexOf('unzip');
+    if (check < 0 || unzip < 0 || check > unzip) {
+      problems.add('job $name unzips the Dart SDK before checking its digest');
+    }
+    if (!run.contains(r'$DART_SDK_SHA256') || !run.contains(r'$RUNNER_TEMP')) {
+      problems.add('job $name does not use the pinned digest in RUNNER_TEMP');
+    }
+    if (!run.contains(r'GITHUB_PATH') ||
+        !run.contains(r'dart --version') ||
+        !run.contains(r'$DART_SDK_VERSION')) {
+      problems.add(
+        'job $name does not add the SDK to the path and assert '
+        'its version',
+      );
     }
   }
 
@@ -108,6 +159,30 @@ void main() {
       RegExp(r'actions/attest@[0-9a-f]{40}'),
       'actions/attest@v4',
       'actions/attest@v4, not pinned',
+    ),
+    (
+      'an action of an owner the repository does not allow',
+      RegExp(r'actions/attest@'),
+      'dart-lang/setup-dart@',
+      'whose owner the repository does not allow',
+    ),
+    (
+      'a Dart SDK unzipped before its digest is checked',
+      RegExp(r'sha256sum --check'),
+      'true',
+      'unzips the Dart SDK before checking its digest',
+    ),
+    (
+      'a Dart SDK version that is not asserted',
+      RegExp(r'dart --version'),
+      'dart --help',
+      'does not add the SDK to the path and assert its version',
+    ),
+    (
+      'an unpinned Dart SDK digest',
+      RegExp(r'DART_SDK_SHA256: [0-9a-f]{64}'),
+      'DART_SDK_SHA256: latest',
+      'not pinned at workflow level',
     ),
     (
       'a short SHA',

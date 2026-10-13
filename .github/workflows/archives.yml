@@ -35,6 +35,8 @@ env:
   PLATFORM: ${{ inputs.platform }}
   # The glibc of ubuntu-24.04: the archive needs no later one.
   GLIBC_BUILD_HOST: glibc 2.39
+  DART_SDK_VERSION: 3.13.5
+  DART_SDK_SHA256: 19a731647c3ed55058ee46dde00330150e6a8729bb6121b4a31e86084c8a3e6d
 
 jobs:
   build:
@@ -83,10 +85,20 @@ jobs:
           test "$(getconf GNU_LIBC_VERSION)" = "$GLIBC_BUILD_HOST" \
             || { echo "expected $GLIBC_BUILD_HOST" >&2; exit 1; }
 
-      # dart-lang/setup-dart v1.8.1
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d
-        with:
-          sdk: "3.11"
+      # The repository allows GitHub-owned actions only, so the Dart SDK is
+      # downloaded from Google's archive and checked against its pinned
+      # digest before it is unpacked.
+      - name: Install the pinned Dart SDK
+        run: |
+          url="https://storage.googleapis.com/dart-archive/channels/stable/release/$DART_SDK_VERSION/sdk/dartsdk-linux-arm64-release.zip"
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/dartsdk.zip" "$url"
+          echo "$DART_SDK_SHA256  $RUNNER_TEMP/dartsdk.zip" | sha256sum --check -
+          unzip -q "$RUNNER_TEMP/dartsdk.zip" -d "$RUNNER_TEMP/dart-sdk"
+          echo "$RUNNER_TEMP/dart-sdk/dart-sdk/bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/dart-sdk/dart-sdk/bin:$PATH"
+          dart --version 2>&1 \
+            | grep -Fq "Dart SDK version: $DART_SDK_VERSION " \
+            || { echo "expected Dart $DART_SDK_VERSION" >&2; exit 1; }
 
       - run: dart pub get
 
@@ -171,10 +183,20 @@ jobs:
           test "$(git rev-parse "refs/tags/$TAG^{commit}")" = "$(git rev-parse HEAD)" \
             || { echo "HEAD is not $TAG" >&2; exit 1; }
 
-      # dart-lang/setup-dart v1.8.1
-      - uses: dart-lang/setup-dart@6afc89df92d6eb3834022f73cd65adc8cdfcb92d
-        with:
-          sdk: "3.11"
+      # The repository allows GitHub-owned actions only, so the Dart SDK is
+      # downloaded from Google's archive and checked against its pinned
+      # digest before it is unpacked.
+      - name: Install the pinned Dart SDK
+        run: |
+          url="https://storage.googleapis.com/dart-archive/channels/stable/release/$DART_SDK_VERSION/sdk/dartsdk-linux-arm64-release.zip"
+          curl --fail --silent --show-error --location --output "$RUNNER_TEMP/dartsdk.zip" "$url"
+          echo "$DART_SDK_SHA256  $RUNNER_TEMP/dartsdk.zip" | sha256sum --check -
+          unzip -q "$RUNNER_TEMP/dartsdk.zip" -d "$RUNNER_TEMP/dart-sdk"
+          echo "$RUNNER_TEMP/dart-sdk/dart-sdk/bin" >> "$GITHUB_PATH"
+          export PATH="$RUNNER_TEMP/dart-sdk/dart-sdk/bin:$PATH"
+          dart --version 2>&1 \
+            | grep -Fq "Dart SDK version: $DART_SDK_VERSION " \
+            || { echo "expected Dart $DART_SDK_VERSION" >&2; exit 1; }
 
       - run: dart pub get
 
