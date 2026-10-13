@@ -280,13 +280,32 @@ bool _leavesItsDirectory(String segment) =>
 /// The bytes of the file at [path] relative to the top-level directory
 /// of the gzip-compressed tar [archive], or null when it holds no such
 /// file.
-Future<Uint8List?> tarGzFile(String archive, String path) async {
+///
+/// A source bundle is a tree `git archive` writes under one top-level
+/// directory; a release archive has none (see [tarGzRootFile]).
+Future<Uint8List?> tarGzFile(String archive, String path) => _tarGzMember(
+  archive,
+  (member) => member.path.split('/').skip(1).join('/') == path,
+);
+
+/// The bytes of the file at [path] in the gzip-compressed tar [archive],
+/// named as the archive names it, or null when it holds no such file.
+///
+/// A release archive holds its files at the root, `build_info.json` and
+/// `dylibs/<language>/...` with no top-level directory, so no path segment
+/// is skipped.
+Future<Uint8List?> tarGzRootFile(String archive, String path) =>
+    _tarGzMember(archive, (member) => member.path == path);
+
+Future<Uint8List?> _tarGzMember(
+  String archive,
+  bool Function(TarMember member) matches,
+) async {
   final members = readTar(
     Uint8List.fromList(gzip.decode(await File(archive).readAsBytes())),
   );
   for (final member in members) {
-    final segments = member.path.split('/').skip(1).join('/');
-    if (member.type == TarMemberType.file && segments == path) {
+    if (member.type == TarMemberType.file && matches(member)) {
       return member.bytes;
     }
   }

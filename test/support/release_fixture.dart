@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 
+import '../../tool/src/build_platform.dart';
 import '../../tool/src/github.dart';
 import '../../tool/src/tar.dart';
 
@@ -177,16 +178,7 @@ String writeArchive(
   String Function(String sha256, String name)? sidecar,
 }) {
   final name = 'grammars-$platform.tar.gz';
-  final bytes = gzipCompress(
-    ustar([
-      (
-        path: 'grammars/build_info.json',
-        bytes: utf8.encode(jsonEncode(info)),
-        mode: 420,
-        epoch: 0,
-      ),
-    ]),
-  );
+  final bytes = releaseArchiveBytes(BuildPlatform.parse(platform)!, info);
   final path = p.join(directory, name);
   File(path).writeAsBytesSync(bytes);
   final sha256 = dartSha256(bytes);
@@ -195,3 +187,35 @@ String writeArchive(
   ).writeAsStringSync(sidecar?.call(sha256, name) ?? '$sha256  $name\n');
   return sha256;
 }
+
+/// The files a release archive of [platform] holds in the tiny fixture,
+/// relative to its root, in the order the real packer writes them: sorted
+/// by code unit, at the root, with no top-level directory.
+List<String> fixtureArchiveFiles(BuildPlatform platform) => [
+  'THIRD_PARTY_NOTICES.md',
+  'build_info.json',
+  'dylibs/ada/${platform.libraryFileName('ada')}',
+  platform.runtimeFileName,
+  'manifest.json',
+  'queries/ada/highlights.scm',
+]..sort();
+
+/// A release archive of [platform] laid out as `packArchive` writes one:
+/// a ustar stream of files only, at the root, owned by root:wheel, with
+/// [info] as its `build_info.json`.
+List<int> releaseArchiveBytes(
+  BuildPlatform platform,
+  Map<String, Object?> info,
+) => gzipCompress(
+  ustar([
+    for (final file in fixtureArchiveFiles(platform))
+      (
+        path: file,
+        bytes: file == 'build_info.json'
+            ? utf8.encode(jsonEncode(info))
+            : utf8.encode('$file\n'),
+        mode: BuildPlatform.isAnyLibrary(file) ? 0x1ed : 0x1a4,
+        epoch: 0,
+      ),
+  ]),
+);

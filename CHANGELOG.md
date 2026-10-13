@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `--attach` and `--finalize` read a release archive's `build_info.json` at the archive's root, where `grammars-<platform>.tar.gz` holds it with no top-level directory; their tests build archives with that layout, and `test/support/release-archive-linux-arm64.tar.gz`, written by the real packer, holds a regression case
 - `.github/workflows/archives.yml` installs the Dart SDK from Google's archive at a version and sha256 pinned in the workflow's `env`, checking the digest with `sha256sum --check` before unzipping and asserting `dart --version`, and uses GitHub-owned actions only, the one kind the repository allows; `test/archives_workflow_test.dart` requires both
 - A `--release` build on Linux or Windows packs its archive and stops there; only the macOS build writes `release-notes.md`, the notes `--publish` creates the draft with
 - `--publish` creates a draft release (`gh release create --draft --verify-tag --target <the built commit>`) in place of a published one, refuses when any release of the tag, draft or published, exists in the paginated listing of the repository's releases, and reads the assets back by release id; a published release is immutable and never gains an asset, so the release is published by `--finalize`

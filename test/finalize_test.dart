@@ -37,23 +37,13 @@ class _Finalize {
     this.readBack,
   }) {
     for (final platform in _platforms) {
-      archives[platform] = gzipCompress(
-        ustar([
-          (
-            path: 'grammars/build_info.json',
-            bytes: utf8.encode(
-              jsonEncode(
-                embedded[platform] ??
-                    buildInfoJson(
-                      platform: platform.id,
-                      glibc: platform.isLinux ? linuxGlibc : null,
-                    ),
-              ),
+      archives[platform] = releaseArchiveBytes(
+        platform,
+        embedded[platform] ??
+            buildInfoJson(
+              platform: platform.id,
+              glibc: platform.isLinux ? linuxGlibc : null,
             ),
-            mode: 420,
-            epoch: 0,
-          ),
-        ]),
       );
     }
   }
