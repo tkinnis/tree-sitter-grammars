@@ -7,6 +7,7 @@ import 'package:test/test.dart';
 
 import '../tool/src/files_digest.dart';
 import '../tool/src/grammar_sources.dart';
+import '../tool/src/recorded_build.dart';
 import '../tool/src/source_bundles.dart';
 import '../tool/src/toolchain.dart';
 import 'support/git_fixture.dart';
@@ -204,40 +205,44 @@ void main() {
 
     test('of the release and commit a build reads is its own', () {
       check(
-        recordedReleaseProblems(info(), release: 'v1.1.0', commit: _commit),
+        buildRecordProblems(
+          info(),
+          release: 'v1.1.0',
+          commit: _commit,
+          source: 'build_info.json',
+        ),
       ).isEmpty();
     });
 
     test('of another release or commit is refused', () {
       check(
-        recordedReleaseProblems(
+        buildRecordProblems(
           info(release: 'v1.0.0'),
           release: 'v1.1.0',
           commit: _commit,
+          source: 'build_info.json',
         ),
-      ).deepEquals([
-        'build_info.json records the release v1.0.0; this build is of '
-            'v1.1.0',
-      ]);
+      ).deepEquals(['build_info.json records the release v1.0.0, not v1.1.0']);
       check(
-        recordedReleaseProblems(
+        buildRecordProblems(
           info(commit: '1' * 40),
           release: 'v1.1.0',
           commit: _commit,
+          source: 'build_info.json',
         ),
       ).deepEquals([
-        'build_info.json records the commit ${'1' * 40}; this build is of '
-            '$_commit',
+        'build_info.json records the commit ${'1' * 40}, not $_commit',
       ]);
       check(
-        recordedReleaseProblems(
+        buildRecordProblems(
           {'sources': const <String, Object?>{}},
           release: 'v1.1.0',
           commit: _commit,
+          source: 'build_info.json',
         ),
       ).deepEquals([
-        'build_info.json records the release null; this build is of v1.1.0',
-        'build_info.json records the commit null; this build is of $_commit',
+        'build_info.json records the release null, not v1.1.0',
+        'build_info.json records the commit null, not $_commit',
       ]);
     });
 
@@ -245,21 +250,22 @@ void main() {
       // Every published build_info.json records its tag, so a build
       // without --release checks the commit alone.
       check(
-        recordedReleaseProblems(
+        buildRecordProblems(
           info(release: 'v1.1.0'),
           release: null,
           commit: _commit,
+          source: 'build_info.json',
         ),
       ).isEmpty();
       check(
-        recordedReleaseProblems(
+        buildRecordProblems(
           info(release: 'v1.1.0', commit: '1' * 40),
           release: null,
           commit: _commit,
+          source: 'build_info.json',
         ),
       ).deepEquals([
-        'build_info.json records the commit ${'1' * 40}; this build is of '
-            '$_commit',
+        'build_info.json records the commit ${'1' * 40}, not $_commit',
       ]);
     });
 
@@ -315,7 +321,9 @@ void main() {
         ),
       ).throws<GrammarSourceException>(
         (it) => it.has((e) => e.message, 'message')
-          ..contains('build_info.json records the release v1.0.0')
+          ..contains(
+            '\n  build_info.json records the release v1.0.0, not v1.1.0\n',
+          )
           ..contains('download the assets of v1.1.0'),
       );
       check(Directory(path('out')).existsSync()).isFalse();

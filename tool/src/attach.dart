@@ -13,13 +13,14 @@ import 'package:path/path.dart' as p;
 
 import 'build_platform.dart';
 import 'github.dart';
+import 'recorded_build.dart';
 import 'tar.dart';
 
 /// Requires the `build_info.json` [info], read from [source], to record
 /// the build of [release] at [commit]; when [platform] is given, for it.
 ///
-/// A release's commit is `repository.commit`, the commit the build ran at.
-/// Throws a [PublishException] naming the first field that differs.
+/// Throws a [PublishException] naming every problem
+/// [buildRecordProblems] finds.
 void requireBuildRecord(
   Map<String, Object?> info, {
   required String release,
@@ -27,19 +28,13 @@ void requireBuildRecord(
   required String source,
   BuildPlatform? platform,
 }) {
-  String record(Object? value) => '$value';
-  final repository = info['repository'];
-  final recordedCommit = repository is Map ? repository['commit'] : null;
-  final problems = [
-    if (info['release'] != release)
-      '$source records the release ${record(info['release'])}, '
-          'not $release',
-    if (recordedCommit != commit)
-      '$source records the commit ${record(recordedCommit)}, not $commit',
-    if (platform != null && info['platform'] != platform.id)
-      '$source records the platform ${record(info['platform'])}, '
-          'not ${platform.id}',
-  ];
+  final problems = buildRecordProblems(
+    info,
+    source: source,
+    release: release,
+    commit: commit,
+    platform: platform,
+  );
   if (problems.isNotEmpty) throw PublishException(problems.join('; '));
 }
 
