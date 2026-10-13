@@ -100,8 +100,9 @@ Future<void> publishRelease({
   }
 }
 
-/// The release notes of the macOS build: the runtime, every pinned grammar and the sha256 of
-/// each attached file, from `build_info.json` [info] and [archiveSha256].
+/// The release notes of the macOS build: the runtime, every pinned grammar
+/// and the sha256 of each attached file, from `build_info.json` [info] and
+/// [archiveSha256].
 ///
 /// Throws a [PublishException] when [info] records no platform, or one
 /// that is not the macOS build a release is created from.

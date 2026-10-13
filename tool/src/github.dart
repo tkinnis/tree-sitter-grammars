@@ -258,5 +258,5 @@ BuildPlatform requirePlatform(Object? id) =>
     BuildPlatform.parse(id) ??
     (throw PublishException(
       'build_info.json records the platform $id; a platform is one of '
-      '${[for (final platform in BuildPlatform.values) platform.id].join(', ')}',
+      '${BuildPlatform.values.map((platform) => platform.id).join(', ')}',
     ));

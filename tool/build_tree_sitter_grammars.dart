@@ -65,7 +65,8 @@
 /// platform (`--require` and `--allow-missing` name every platform the
 /// repository builds between them) and nothing else, with the digests
 /// recorded for them, that each archive records this release and commit,
-/// and that immutable releases are enabled, publishes it, and prints the sha256 of each archive as the `sha256` map of finch's
+/// and that immutable releases are enabled, publishes it, and prints the
+/// sha256 of each archive as the `sha256` map of finch's
 /// `hook/grammars_config.json`. Each step resolves the tag on GitHub before
 /// it changes anything and again after, and reads the release back.
 ///

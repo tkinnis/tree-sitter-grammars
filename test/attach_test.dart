@@ -423,6 +423,22 @@ void main() {
       );
     });
 
+    test('a tag answer that is not "<type> <sha>"', () {
+      return refuses(
+        'odd',
+        (d) => _Attach(d, extra: {fixtureRef: ghResult(0, stdout: 'tag\n')}),
+        'before attaching, GitHub answered "tag" for v1.1.0',
+      );
+    });
+
+    test('a tag answer that is empty', () {
+      return refuses(
+        'empty',
+        (d) => _Attach(d, extra: {fixtureRef: ghResult(0)}),
+        'before attaching, GitHub answered "" for v1.1.0',
+      );
+    });
+
     test('a draft that does not exist', () {
       return refuses(
         'missing',
