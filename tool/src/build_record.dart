@@ -81,6 +81,7 @@ Map<String, Object?> buildInfo({
         'linker': compiler.linker,
         'linkerPackage': compiler.linkerPackage,
         'linkerPath': compiler.linkerPath,
+        'linkerResolvedPath': compiler.linkerResolvedPath,
         'hostLibc': compiler.hostLibc,
         'hostLibcBanner': compiler.hostLibcBanner,
         'hostLibcPath': compiler.hostLibcPath,

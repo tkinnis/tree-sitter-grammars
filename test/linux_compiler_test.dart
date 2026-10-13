@@ -10,7 +10,6 @@ import '../tool/src/compiler.dart';
 
 const _platform = BuildPlatform.linuxArm64;
 const _clang = '/opt/llvm/bin/clang';
-const _ld = '/usr/bin/aarch64-linux-gnu-ld.bfd';
 const _clangVersion = 'clang version 21.1.8';
 const _ldVersion = 'GNU ld (GNU Binutils for Ubuntu) 2.46';
 const _dpkg = '/usr/bin/dpkg-query';
@@ -23,57 +22,153 @@ List<int> _libc(String release) => latin1.encode(
   'stable release version $release.\nCopyright (C) 2026\x00more\x00',
 );
 
+/// What `clang -###` writes to its standard error for a link whose
+/// arguments end with `<object> -o <output>`: its version lines, then the
+/// one command it would run, every argument quoted as clang quotes it,
+/// with [linker] first, [startup] for the C library's startup files and
+/// [gcc] for GCC's.
+String _driverOutput(
+  List<String> arguments, {
+  required String linker,
+  required String startup,
+  required String gcc,
+}) {
+  String quoted(String argument) =>
+      '"${argument.replaceAllMapped(RegExp(r'["\\$]'), (m) => '\\${m[0]}')}"';
+  final object = arguments[arguments.length - 3];
+  final output = arguments.last;
+  return [
+    'Ubuntu clang version 21.1.8 (6ubuntu1)',
+    'Target: aarch64-unknown-linux-gnu',
+    'Thread model: posix',
+    'InstalledDir: /usr/lib/llvm-21/bin',
+    ' ${[linker, '-EL', '-shared', '-o', output, p.join(startup, 'crti.o'), p.join(gcc, 'crtbeginS.o'), '-L$gcc', '-z', 'defs', '-soname', 'libprobe.so', object, '-lgcc', '-lc', '-lgcc', p.join(gcc, 'crtendS.o'), p.join(startup, 'crtn.o')].map(quoted).join(' ')}',
+  ].join('\n');
+}
+
 void main() {
   late Directory scratch;
 
-  setUp(() => scratch = Directory.systemTemp.createTempSync('linux_compiler'));
+  setUp(
+    () => scratch = Directory(
+      Directory.systemTemp
+          .createTempSync('linux_compiler')
+          .resolveSymbolicLinksSync(),
+    ),
+  );
   tearDown(() => scratch.deleteSync(recursive: true));
 
   group('resolveLinuxCompiler, on any host,', () {
     late String libc;
+    // GNU ld as the -### link names it, and its file.
+    late String ld;
+    // A symbolic link to [ld], as /usr/bin/ld.bfd is on Ubuntu.
+    late String ldLink;
+    // The directory the link names the startup files in, through a
+    // symbolic link as /lib is to usr/lib, and where they are.
+    late String startup;
+    late String crti;
+    // The directory the link names GCC's startup files in.
+    late String gcc;
     late List<List<String>> asked;
+    late List<String> probes;
 
     setUp(() {
       libc = p.join(scratch.path, 'lib', 'aarch64-linux-gnu', 'libc.so.6');
       File(libc)
         ..parent.createSync(recursive: true)
         ..writeAsBytesSync(_libc('2.43'));
+      ld = p.join(scratch.path, 'bin', 'aarch64-linux-gnu-ld.bfd');
+      File(ld)
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+      ldLink = p.join(scratch.path, 'bin', 'ld.bfd');
+      Link(ldLink).createSync('aarch64-linux-gnu-ld.bfd');
+      crti = p.join(scratch.path, 'usr', 'lib', 'aarch64-linux-gnu', 'crti.o');
+      File(crti)
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+      Link(p.join(scratch.path, 'lib64')).createSync('usr/lib');
+      startup = p.join(scratch.path, 'lib64', 'aarch64-linux-gnu');
+      gcc = p.join(
+        scratch.path,
+        'usr',
+        'lib',
+        'gcc',
+        'aarch64-linux-gnu',
+        '15',
+      );
+      for (final name in ['crtbeginS.o', 'crtendS.o', 'libgcc.a']) {
+        File(p.join(gcc, name))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('');
+      }
       asked = [];
+      probes = [];
     });
 
     /// A [ToolRunner] answering as clang, GNU ld and dpkg answer on Ubuntu,
     /// with [answers] in place of any of their answers, keyed by the
-    /// argument asked last, and failing as a tool that is not there for
-    /// each of [missing].
+    /// argument asked last, or `-###` for the link clang would run, and
+    /// failing as a tool that is not there for each of [missing]. An
+    /// answer is a string, or a function of the arguments.
     ToolRunner runner(
-      Map<String, String> answers, {
+      Map<String, Object> answers, {
       Set<String> missing = const {},
-    }) => (executable, arguments) async {
+    }) => (executable, arguments, {standardError = false}) async {
       asked.add([executable, ...arguments]);
       if (missing.contains(executable)) {
         throw CompilerException('$executable: not found');
       }
-      final key = arguments.last;
-      if (answers[key] case final answer?) return answer;
+      final key = arguments.first == '-###' ? '-###' : arguments.last;
+      if (key == '-###') {
+        check(standardError).isTrue();
+        final object = arguments[arguments.length - 3];
+        check(File(object).existsSync()).isTrue();
+        probes.add(object);
+      } else {
+        check(standardError).isFalse();
+      }
+      switch (answers[key]) {
+        case final String answer:
+          return answer;
+        case final String Function(List<String>) answer:
+          return answer(arguments);
+      }
       return switch ((executable, key)) {
         (_clang, '-print-file-name=libc.so.6') => libc,
-        (_clang, '-print-prog-name=ld.bfd') => _ld,
+        (_clang, '-###') => _driverOutput(
+          arguments,
+          linker: ld,
+          startup: startup,
+          gcc: gcc,
+        ),
         (_clang, '--version') => '$_clangVersion\nTarget: aarch64',
-        (_ld, '--version') => '$_ldVersion\nCopyright (C) 2026',
-        (_dpkg, _ld) => '$_ldPackage: $_ld',
+        (final tool, '--version') when tool == ld || tool == ldLink =>
+          '$_ldVersion\nCopyright (C) 2026',
+        (_dpkg, final path) when path == ld => '$_ldPackage: $ld',
         (_dpkg, _ldPackage) => '$_ldPackage 2.46-3ubuntu2',
         _ => throw CompilerException('unexpected $executable $arguments'),
       };
     };
 
     Future<Compiler> resolve([
-      Map<String, String> answers = const {},
+      Map<String, Object> answers = const {},
       Set<String> missing = const {_rpm},
     ]) => resolveLinuxCompiler(
       _platform,
       clang: _clang,
       run: runner(answers, missing: missing),
     );
+
+    /// The answer of a `-###` link that runs [linker].
+    String Function(List<String>) linking(String linker) =>
+        (arguments) => _driverOutput(
+          arguments,
+          linker: linker,
+          startup: startup,
+          gcc: gcc,
+        );
 
     test('records clang, the GNU ld it links with and the C library it '
         'links against, each with its path', () async {
@@ -84,7 +179,8 @@ void main() {
       check(compiler.platform).equals(_platform);
       check(compiler.linker).equals(_ldVersion);
       check(compiler.linkerPackage).equals('$_ldPackage 2.46-3ubuntu2');
-      check(compiler.linkerPath).equals(_ld);
+      check(compiler.linkerPath).equals(ld);
+      check(compiler.linkerResolvedPath).equals(ld);
       check(compiler.hostLibc).equals('glibc 2.43');
       check(compiler.hostLibcBanner).equals(
         'GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2) stable release version '
@@ -92,14 +188,101 @@ void main() {
       );
       check(compiler.hostLibcPath).equals(libc);
       check(compiler.sdkPath).isNull();
+      final [object] = probes;
+      final library = p.join(p.dirname(object), 'libprobe.so');
       check(asked).deepEquals([
         [_clang, '--target=aarch64-linux-gnu', '-print-file-name=libc.so.6'],
-        [_clang, '--target=aarch64-linux-gnu', '-print-prog-name=ld.bfd'],
-        [_ld, '--version'],
-        [_dpkg, '-S', _ld],
+        [
+          _clang,
+          '-###',
+          '-shared',
+          '--target=aarch64-linux-gnu',
+          '-fuse-ld=bfd',
+          '-Wl,-z,defs',
+          '-Wl,-soname,libprobe.so',
+          object,
+          '-o',
+          library,
+        ],
+        [ld, '--version'],
+        [_dpkg, '-S', ld],
         [_dpkg, '-W', r'--showformat=${Package} ${Version}', _ldPackage],
         [_clang, '--version'],
       ]);
+      // The probe's directory is gone once clang has answered.
+      check(Directory(p.dirname(object)).existsSync()).isFalse();
+    });
+
+    test('takes the linker from the link clang would run, not from '
+        '-print-prog-name, which may search another way', () async {
+      final compiler = await resolve({
+        '-print-prog-name=ld.bfd': '/usr/bin/ld.bfd',
+      });
+
+      check(compiler.linkerPath).equals(ld);
+      check(
+        asked.where((it) => it.last.startsWith('-print-prog-name')),
+      ).isEmpty();
+    });
+
+    test('records the linker by its normalised path, and asks the package '
+        'database for the file it names with symbolic links resolved, '
+        'which dpkg knows', () async {
+      // clang names GNU ld relative to its GCC installation, through a
+      // symbolic link; dpkg knows each file only by its own path.
+      final named = p.join(
+        scratch.path,
+        'gcc',
+        'aarch64-linux-gnu',
+        '15',
+        '..',
+        '..',
+        '..',
+        'bin',
+        'ld.bfd',
+      );
+      Directory(
+        p.join(scratch.path, 'gcc', 'aarch64-linux-gnu', '15'),
+      ).createSync(recursive: true);
+      final compiler = await resolve({'-###': linking(named)});
+
+      check(compiler.linkerPath).equals(ldLink);
+      check(compiler.linkerResolvedPath).equals(ld);
+      check(compiler.linkerPackage).equals('$_ldPackage 2.46-3ubuntu2');
+      check(asked).any((it) => it.deepEquals([ldLink, '--version']));
+      check([
+        for (final it in asked)
+          if (it[0] == _dpkg && it[1] == '-S') it.last,
+      ]).deepEquals([ld]);
+    });
+
+    test('refuses a linker path whose normalised form names another file '
+        'than clang would run', () async {
+      // Through a symbolic link, `..` leaves the directory the link
+      // names, not the one it sits in.
+      final elsewhere = p.join(scratch.path, 'elsewhere', 'bin');
+      File(p.join(elsewhere, 'ld.bfd'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+      Directory(p.join(scratch.path, 'tools')).createSync();
+      Link(
+        p.join(scratch.path, 'tools', 'gcc'),
+      ).createSync(p.join(scratch.path, 'elsewhere', 'lib'));
+      Directory(p.join(scratch.path, 'elsewhere', 'lib')).createSync();
+      final named = p.join(scratch.path, 'tools', 'gcc', '..', 'bin', 'ld.bfd');
+      File(p.join(scratch.path, 'tools', 'bin', 'ld.bfd'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync('');
+
+      await check(resolve({'-###': linking(named)})).throws<CompilerException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals(
+              '$_clang would link with $named, another file than its '
+              'normalised path ${p.join(scratch.path, 'tools', 'bin', 'ld.bfd')} '
+              'names',
+            ),
+      );
     });
 
     test('records the package and revision that installed the linker, '
@@ -107,10 +290,10 @@ void main() {
       // Diversions are named too, and an architecture-qualified package
       // is asked for as dpkg names it.
       final compiler = await resolve({
-        _ld:
-            'diversion by other from: $_ld\n'
-            'diversion by other to: $_ld.real\n'
-            'binutils:arm64: $_ld',
+        ld:
+            'diversion by other from: $ld\n'
+            'diversion by other to: $ld.real\n'
+            'binutils:arm64: $ld',
         'binutils:arm64': 'binutils 2.46-3ubuntu1',
       });
 
@@ -126,32 +309,27 @@ void main() {
     });
 
     test('asks rpm for the linker\'s package where there is no dpkg', () async {
-      final compiler = await resolve({_ld: 'binutils 2.46-1.fc44'}, {_dpkg});
+      final compiler = await resolve({ld: 'binutils 2.46-1.fc44'}, {_dpkg});
 
       check(compiler.linkerPackage).equals('binutils 2.46-1.fc44');
       check(asked).any(
-        (it) => it.deepEquals([
-          _rpm,
-          '-qf',
-          '--queryformat',
-          '%{NAME} %{EVR}',
-          _ld,
-        ]),
+        (it) =>
+            it.deepEquals([_rpm, '-qf', '--queryformat', '%{NAME} %{EVR}', ld]),
       );
     });
 
     test('refuses a linker no package database names a package of', () async {
       for (final (answers, missing) in [
-        (const <String, String>{}, {_dpkg, _rpm}),
+        (const <String, Object>{}, {_dpkg, _rpm}),
         // dpkg would answer for the two packages as for one.
         (
           {
-            _ld: 'binutils, binutils-x: $_ld',
+            ld: 'binutils, binutils-x: $ld',
             'binutils, binutils-x': 'binutils 2.46-3ubuntu2',
           },
           {_rpm},
         ),
-        ({_ld: 'diversion by other from: $_ld'}, {_rpm}),
+        ({ld: 'diversion by other from: $ld'}, {_rpm}),
         ({_ldPackage: ''}, {_rpm}),
       ]) {
         await check(
@@ -162,7 +340,7 @@ void main() {
               .has((e) => e.message, 'message')
               .equals(
                 'no package database names the one package that installed '
-                '$_ld; a build on Linux records the binutils package and '
+                '$ld; a build on Linux records the binutils package and '
                 'revision it links with',
               ),
         );
@@ -232,21 +410,48 @@ void main() {
       }
     });
 
-    test(
-      'refuses the bare name clang answers when it finds no ld.bfd',
-      () async {
+    test('refuses a link clang would run by the bare name of a linker, or '
+        'by one that is not there', () async {
+      // pubspec.yaml names a file relative to the working directory the
+      // tests run in, which a relative answer must not be read against.
+      for (final linker in [
+        'ld.bfd',
+        'pubspec.yaml',
+        p.join(scratch.path, 'bin', 'ld'),
+        p.join(scratch.path, 'bin'),
+      ]) {
         await check(
-          resolve({'-print-prog-name=ld.bfd': 'ld.bfd'}),
+          because: linker,
+          resolve({'-###': linking(linker)}),
         ).throws<CompilerException>(
           (it) => it
               .has((e) => e.message, 'message')
               .equals(
-                '$_clang finds no ld.bfd for aarch64-linux-gnu; install GNU '
-                'binutils for that target',
+                '$_clang would link with $linker, which is no file; install '
+                'GNU binutils for aarch64-linux-gnu',
               ),
         );
-      },
-    );
+      }
+    });
+
+    test('refuses an answer to -### that runs no link, or more than '
+        'one', () async {
+      for (final answer in [
+        'clang version 21.1.8\nTarget: aarch64-unknown-linux-gnu',
+        (List<String> arguments) =>
+            '${linking(ld)(arguments)}\n "$ld" "-o" "x"',
+        // A link of other objects than the probe's.
+        (List<String> arguments) => linking(ld)(
+          arguments,
+        ).replaceAll(arguments[arguments.length - 3], 'other.o'),
+      ]) {
+        await check(resolve({'-###': answer})).throws<CompilerException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .startsWith('$_clang -### names no one link of '),
+        );
+      }
+    });
 
     test('refuses a linker that is not GNU ld', () async {
       await check(
@@ -254,8 +459,35 @@ void main() {
       ).throws<CompilerException>(
         (it) => it
             .has((e) => e.message, 'message')
-            .startsWith('$_ld --version reports LLD 21.1.8'),
+            .startsWith('$ld --version reports LLD 21.1.8'),
       );
+    });
+  });
+
+  group('driverCommands', () {
+    test('reads each command clang -### would run, unquoted', () {
+      check(
+        driverCommands(
+          'clang version 18.1.8\n'
+          'InstalledDir: /usr/lib/llvm-18/bin\n'
+          ' "/usr/bin/aarch64-linux-gnu-ld.bfd" "-z" "relro" '
+          r'"a \"quoted\" \\ \$name" "o.so"'
+          '\n'
+          ' "/usr/bin/true" ""',
+        ),
+      ).deepEquals([
+        [
+          '/usr/bin/aarch64-linux-gnu-ld.bfd',
+          '-z',
+          'relro',
+          r'a "quoted" \ $name',
+          'o.so',
+        ],
+        ['/usr/bin/true', ''],
+      ]);
+      check(
+        driverCommands('clang version 18.1.8\nThread model: posix'),
+      ).isEmpty();
     });
   });
 

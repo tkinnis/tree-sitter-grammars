@@ -66,6 +66,7 @@ final class Compiler {
     this.linker,
     this.linkerPackage,
     this.linkerPath,
+    this.linkerResolvedPath,
   });
 
   /// Absolute path of the clang binary, as `xcrun --find clang` reports it,
@@ -130,9 +131,17 @@ final class Compiler {
   /// out; null on macOS and Windows.
   final String? linkerPackage;
 
-  /// On Linux, the GNU ld every link runs, as
-  /// `clang -print-prog-name=ld.bfd` finds it for the platform's target.
+  /// On Linux, the GNU ld every link runs, as the link `clang -###` would
+  /// run for the platform's target names it, normalised; null on macOS
+  /// and Windows.
   final String? linkerPath;
+
+  /// On Linux, the file [linkerPath] names with every symbolic link
+  /// resolved, for example `/usr/bin/aarch64-linux-gnu-ld.bfd` for
+  /// `/usr/bin/ld.bfd`: the path the package database is asked for
+  /// [linkerPackage] by, since it knows each file by its own path; null on
+  /// macOS and Windows.
+  final String? linkerResolvedPath;
 
   /// Resolves the compiler a build on [platform], by default the platform
   /// this process runs on, compiles with: on macOS through `xcrun`, which
@@ -184,7 +193,7 @@ final class Compiler {
     return resolveLinuxCompiler(
       platform,
       clang: onPath('clang', platform),
-      run: (executable, arguments) async {
+      run: (executable, arguments, {standardError = false}) async {
         final ProcessResult result;
         try {
           result = await Process.run(
@@ -202,7 +211,8 @@ final class Compiler {
             '$executable ${arguments.join(' ')} failed: ${result.stderr}',
           );
         }
-        return (result.stdout as String).trim();
+        return ((standardError ? result.stderr : result.stdout) as String)
+            .trim();
       },
     );
   }
@@ -245,10 +255,15 @@ final class Compiler {
 }
 
 /// Runs [executable] with [arguments] in the environment a compiler
-/// invocation sees and returns its standard output, trimmed; throws a
+/// invocation sees and returns its standard output, or with
+/// [standardError] its standard error, trimmed; throws a
 /// [CompilerException] when it fails.
 typedef ToolRunner =
-    Future<String> Function(String executable, List<String> arguments);
+    Future<String> Function(
+      String executable,
+      List<String> arguments, {
+      bool standardError,
+    });
 
 /// The [Compiler] of a build on the Linux [platform] that compiles with
 /// the clang at [clang], asking it through [run] what it links with.
@@ -259,23 +274,31 @@ typedef ToolRunner =
 /// user's, so [run] runs it in that environment, as every compiler
 /// invocation is, and its answers are what `build_info.json` records:
 ///
-/// - the linker, GNU ld, which every link selects with `-fuse-ld=bfd` and
-///   clang finds as `ld.bfd` for [platform]'s target, with the first line
-///   of its `--version`, since two linkers write the same objects to
-///   different bytes;
+/// - the linker, GNU ld, as the one command `clang -###` would run for a
+///   link of an empty object with the flags every grammar's link passes
+///   ([linuxGrammarLinkFlags]) names it, which is the program clang
+///   searches for as `-fuse-ld=bfd` selects it, the target's
+///   `<triple>-ld.bfd` before `ld.bfd`; its path normalised, which must
+///   name the file clang would run, with the first line of its
+///   `--version`, since two linkers write the same objects to different
+///   bytes;
 /// - the package that installed that linker, with its version and the
 ///   distribution's revision, which `--version` leaves out, as dpkg or,
-///   where there is none, rpm names it;
+///   where there is none, rpm names it, asked by the file the path names
+///   with every symbolic link resolved, which is the path a package
+///   database knows it by;
 /// - the C library, the `libc.so.6` clang finds for that target, with the
 ///   release [glibcRelease] reads from that same file and the whole
 ///   banner [glibcBanner] reads, which names the distribution's build, so
 ///   what is recorded is the library linked against, not whatever glibc
 ///   this process runs on.
 ///
-/// Throws a [CompilerException] when clang finds either by no absolute
-/// path, which it answers when it finds none, when the C library names no
-/// glibc release, when the linker is not GNU ld, or when no package
-/// database names the one package that installed it.
+/// Throws a [CompilerException] when clang finds the C library by no
+/// absolute path, which it answers when it finds none, or that library
+/// names no glibc release; when `-###` names no one link of the probe, a
+/// linker that is no file or one whose normalised path names another
+/// file; when the linker is not GNU ld; or when no package database names
+/// the one package that installed it.
 Future<Compiler> resolveLinuxCompiler(
   BuildPlatform platform, {
   required String clang,
@@ -298,11 +321,20 @@ Future<Compiler> resolveLinuxCompiler(
       'glibc',
     );
   }
-  final linkerPath = await run(clang, [target, '-print-prog-name=ld.bfd']);
-  if (!p.isAbsolute(linkerPath)) {
+  final link = await _probeLink(platform, clang, run);
+  final named = link.first;
+  final linkerResolved = _resolvedFile(named);
+  if (linkerResolved == null) {
     throw CompilerException(
-      '$clang finds no ld.bfd for ${platform.linuxTarget}; install GNU '
-      'binutils for that target',
+      '$clang would link with $named, which is no file; install GNU '
+      'binutils for ${platform.linuxTarget}',
+    );
+  }
+  final linkerPath = p.normalize(named);
+  if (_resolvedFile(linkerPath) != linkerResolved) {
+    throw CompilerException(
+      '$clang would link with $named, another file than its normalised '
+      'path $linkerPath names',
     );
   }
   final linker = (await run(linkerPath, ['--version'])).split('\n').first;
@@ -312,11 +344,11 @@ Future<Compiler> resolveLinuxCompiler(
       'GNU ld',
     );
   }
-  final linkerPackage = await _packageOf(linkerPath, run);
+  final linkerPackage = await _packageOf(linkerResolved, run);
   if (linkerPackage == null) {
     throw CompilerException(
       'no package database names the one package that installed '
-      '$linkerPath; a build on Linux records the binutils package and '
+      '$linkerResolved; a build on Linux records the binutils package and '
       'revision it links with',
     );
   }
@@ -329,9 +361,78 @@ Future<Compiler> resolveLinuxCompiler(
     hostLibcPath: p.normalize(libcPath),
     linker: linker.trim(),
     linkerPackage: linkerPackage,
-    linkerPath: p.normalize(linkerPath),
+    linkerPath: linkerPath,
+    linkerResolvedPath: linkerResolved,
   );
 }
+
+/// The command `clang -###` would run for a link of an empty object into a
+/// shared object with the flags every grammar's link on [platform] passes,
+/// the linker first.
+///
+/// The object is written to a directory of its own, removed afterwards,
+/// since clang refuses an input that is not there.
+Future<List<String>> _probeLink(
+  BuildPlatform platform,
+  String clang,
+  ToolRunner run,
+) async {
+  final probe = Directory.systemTemp.createTempSync('linker_probe');
+  try {
+    final object = p.join(probe.path, 'probe.o');
+    File(object).writeAsBytesSync(const []);
+    final library = p.join(probe.path, 'libprobe.so');
+    final output = await run(clang, [
+      '-###',
+      ...linuxGrammarLinkFlags(platform),
+      ...libraryNameFlags('libprobe.so', platform),
+      object,
+      '-o',
+      library,
+    ], standardError: true);
+    final links = [
+      for (final command in driverCommands(output))
+        if (command.contains(object) && command.contains(library)) command,
+    ];
+    if (links case [final link] when driverCommands(output).length == 1) {
+      return link;
+    }
+    throw CompilerException(
+      '$clang -### names no one link of $object, but:\n$output',
+    );
+  } finally {
+    probe.deleteSync(recursive: true);
+  }
+}
+
+/// The absolute path [path] names with every symbolic link resolved, or
+/// null when it is relative or names no file.
+String? _resolvedFile(String path) {
+  if (!p.isAbsolute(path)) return null;
+  try {
+    final resolved = File(path).resolveSymbolicLinksSync();
+    return File(resolved).statSync().type == FileSystemEntityType.file
+        ? resolved
+        : null;
+  } on FileSystemException {
+    return null;
+  }
+}
+
+/// Each command [output], what `clang -###` writes to its standard error,
+/// says clang would run, its program first.
+///
+/// clang writes each on a line of its own, every argument in double
+/// quotes with `"`, `\` and `$` escaped by a backslash, after lines of
+/// its version and configuration, which are none.
+List<List<String>> driverCommands(String output) => [
+  for (final line in output.split('\n'))
+    if (line.trimLeft().startsWith('"'))
+      [
+        for (final match in RegExp(r'"((?:[^"\\]|\\.)*)"').allMatches(line))
+          match[1]!.replaceAllMapped(RegExp(r'\\(.)'), (m) => m[1]!),
+      ],
+];
 
 /// The package that installed [path] and its full version, its name and
 /// version apart by a space, as dpkg names it or, where dpkg cannot be
@@ -735,7 +836,7 @@ final class BuildFlags {
     final platform = compiler.platform;
     final target = ['--target=${platform.linuxTarget}'];
     const prefixMap = '-ffile-prefix-map=$workingDirectoryPlaceholder=.';
-    const link = ['-fuse-ld=bfd', '-Wl,-z,defs'];
+    const link = _linuxLinkFlags;
     return BuildFlags._(
       runtime: [
         '-O3',
@@ -755,7 +856,7 @@ final class BuildFlags {
         ...libraryNameFlags(platform.runtimeFileName, platform),
       ],
       grammarCompile: ['-c', '-O3', '-std=c11', '-fPIC', ...target, prefixMap],
-      grammarLink: ['-shared', ...target, ...link],
+      grammarLink: linuxGrammarLinkFlags(platform),
     );
   }
 
@@ -776,6 +877,19 @@ final class BuildFlags {
   /// output.
   final List<String> grammarLink;
 }
+
+/// The flags every link on Linux passes to select GNU ld and refuse an
+/// undefined symbol.
+const _linuxLinkFlags = ['-fuse-ld=bfd', '-Wl,-z,defs'];
+
+/// The flags each grammar's link on the Linux [platform] passes before
+/// its [grammarLinkFlags], which [resolveLinuxCompiler] asks clang about
+/// the linker with.
+List<String> linuxGrammarLinkFlags(BuildPlatform platform) => [
+  '-shared',
+  '--target=${platform.linuxTarget}',
+  ..._linuxLinkFlags,
+];
 
 /// The flags one grammar source's compile passes after
 /// [BuildFlags.grammarCompile]: the directory its headers come from.

@@ -640,6 +640,39 @@ void main() {
     // builds natively is the glibc this process runs on too.
     final running = await Process.run('getconf', ['GNU_LIBC_VERSION']);
     check(compiler.hostLibc).equals((running.stdout as String).trim());
+    check(
+      File(compiler.linkerPath!).resolveSymbolicLinksSync(),
+    ).equals(compiler.linkerResolvedPath!);
+  });
+
+  test('a real link runs the linker the compiler records', () async {
+    // -v prints each command as clang runs it, the link last, its program
+    // in double quotes and each argument bare unless it needs them, as
+    // none of this link's do.
+    final source = p.join(scratch, 'tiny.c');
+    File(source).writeAsStringSync('int tiny(void) { return 42; }\n');
+    final result = await Process.run(
+      compiler.path,
+      [
+        '-v',
+        '-O3',
+        '-fPIC',
+        ...flags.grammarLink,
+        ...grammarLinkFlags('tiny', platform: platform),
+        source,
+        '-o',
+        p.join(scratch, 'libtiny.so'),
+      ],
+      environment: compilerEnvironment(Platform.environment),
+      includeParentEnvironment: false,
+    );
+    check(because: '${result.stderr}', result.exitCode).equals(0);
+    final line = '${result.stderr}'
+        .split('\n')
+        .lastWhere((line) => line.startsWith(' "'));
+    final [linker, ...] = line.trim().split(' ');
+
+    check(p.normalize(linker.replaceAll('"', ''))).equals(compiler.linkerPath!);
   });
 
   test('a shared object linked as the build links grammars passes', () async {

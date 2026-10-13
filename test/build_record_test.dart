@@ -502,7 +502,8 @@ void main() {
       hostLibcPath: '/lib/aarch64-linux-gnu/libc.so.6',
       linker: 'GNU ld (GNU Binutils for Ubuntu) 2.46',
       linkerPackage: 'binutils-aarch64-linux-gnu 2.46-3ubuntu2',
-      linkerPath: '/usr/bin/aarch64-linux-gnu-ld.bfd',
+      linkerPath: '/usr/bin/ld.bfd',
+      linkerResolvedPath: '/usr/bin/aarch64-linux-gnu-ld.bfd',
     );
     const toolchain = Toolchain(
       treeSitterTag: 'v0.27.0',
@@ -672,19 +673,23 @@ void main() {
       check(
         tools['linkerPackage'],
       ).equals('binutils-aarch64-linux-gnu 2.46-3ubuntu2');
-      check(tools['linkerPath']).equals('/usr/bin/aarch64-linux-gnu-ld.bfd');
+      check(tools['linkerPath']).equals('/usr/bin/ld.bfd');
+      check(
+        tools['linkerResolvedPath'],
+      ).equals('/usr/bin/aarch64-linux-gnu-ld.bfd');
       check(tools['hostLibc']).equals('glibc 2.43');
       check(tools['hostLibcBanner']).equals(
         'GNU C Library (Ubuntu GLIBC 2.43-2ubuntu2.4) stable release version '
         '2.43',
       );
       check(tools['hostLibcPath']).equals('/lib/aarch64-linux-gnu/libc.so.6');
-      check(tools.keys.take(8)).deepEquals([
+      check(tools.keys.take(9)).deepEquals([
         'clang',
         'clangPath',
         'linker',
         'linkerPackage',
         'linkerPath',
+        'linkerResolvedPath',
         'hostLibc',
         'hostLibcBanner',
         'hostLibcPath',
