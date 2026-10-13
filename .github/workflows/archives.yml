@@ -144,12 +144,12 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: archive-linux-arm64
-          path: archive
+          path: ${{ runner.temp }}/archive
 
       # actions/attest v4.2.2
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
-          subject-path: archive/grammars-linux-arm64.tar.gz
+          subject-path: ${{ runner.temp }}/archive/grammars-linux-arm64.tar.gz
 
   attach:
     needs: [build, attest]
@@ -204,11 +204,11 @@ jobs:
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           name: archive-linux-arm64
-          path: built
+          path: ${{ runner.temp }}/built
 
       - name: Attach the archive to the draft
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           dart run tool/build_tree_sitter_grammars.dart \
-            --release="$TAG" --attach-built="$PWD/built"
+            --release="$TAG" --attach-built="$RUNNER_TEMP/built"

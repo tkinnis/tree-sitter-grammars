@@ -61,6 +61,15 @@ List<String> workflowProblems(String source) {
           'not allow',
         );
       }
+      // A file left in the checkout makes the working tree dirty, and a
+      // release refuses to build or attach from a dirty one.
+      if (uses is String &&
+          uses.startsWith('actions/download-artifact@') &&
+          !'${(step['with'] as YamlMap?)?['path']}'.startsWith(
+            r'${{ runner.temp }}/',
+          )) {
+        problems.add('job $name downloads an artifact into its checkout');
+      }
       if (uses is String &&
           uses.startsWith('actions/checkout@') &&
           (step['with'] as YamlMap?)?['persist-credentials'] != false) {
@@ -260,6 +269,12 @@ void main() {
       ),
       '',
       'does not assert HEAD',
+    ),
+    (
+      'an artifact downloaded into the checkout',
+      RegExp(r'path: \$\{\{ runner.temp \}\}/built'),
+      'path: built',
+      'downloads an artifact into its checkout',
     ),
     (
       'a concurrency group without the tag',
