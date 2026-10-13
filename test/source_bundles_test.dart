@@ -14,6 +14,22 @@ import 'support/git_fixture.dart';
 const _cliSha256 =
     '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e';
 
+/// The commit of this repository a build of the release reads.
+const _commit = '77ac13625d220bcf955cb12f697e438238c774e0';
+
+/// A toolchain pinning the runtime at [commit], with no files digest.
+Toolchain _toolchain(String commit) => Toolchain.parse(
+  jsonEncode({
+    'treeSitter': {'tag': 'v0.27.0', 'commit': commit, 'filesSha256': '0' * 64},
+    'treeSitterCli': {
+      'version': '0.27.0',
+      'asset': 'tree-sitter-macos-arm64.gz',
+      'sha256': _cliSha256,
+    },
+    'macos': {'arch': 'arm64', 'deploymentTarget': '13.0'},
+  }),
+);
+
 void main() {
   late Directory temporary;
   late FixtureRepository upstream;
@@ -156,21 +172,7 @@ void main() {
   });
 
   test('supplySources refuses a directory with no build_info.json', () async {
-    final toolchain = Toolchain.parse(
-      jsonEncode({
-        'treeSitter': {
-          'tag': 'v0.27.0',
-          'commit': first,
-          'filesSha256': '0' * 64,
-        },
-        'treeSitterCli': {
-          'version': '0.27.0',
-          'asset': 'tree-sitter-macos-arm64.gz',
-          'sha256': _cliSha256,
-        },
-        'macos': {'arch': 'arm64', 'deploymentTarget': '13.0'},
-      }),
-    );
+    final toolchain = _toolchain(first);
     Directory(path('downloads')).createSync();
 
     await check(
@@ -181,12 +183,143 @@ void main() {
         sourceRoot: path('src'),
         bundleDirectory: path('out'),
         patchRoot: path('root'),
-        recordedBundles: path('downloads'),
+        recordedBundles: (
+          directory: path('downloads'),
+          release: 'v1.1.0',
+          commit: _commit,
+        ),
       ),
     ).throws<GrammarSourceException>(
       (it) =>
           it.has((e) => e.message, 'message').contains('no build_info.json'),
     );
+  });
+
+  group('a release\'s build_info.json', () {
+    Map<String, Object?> info({Object? release = 'v1.1.0', Object? commit}) => {
+      'release': release,
+      'repository': {'commit': commit ?? _commit},
+      'sources': const <String, Object?>{},
+    };
+
+    test('of the release and commit a build reads is its own', () {
+      check(
+        recordedReleaseProblems(info(), release: 'v1.1.0', commit: _commit),
+      ).isEmpty();
+    });
+
+    test('of another release or commit is refused', () {
+      check(
+        recordedReleaseProblems(
+          info(release: 'v1.0.0'),
+          release: 'v1.1.0',
+          commit: _commit,
+        ),
+      ).deepEquals([
+        'build_info.json records the release v1.0.0; this build is of '
+            'v1.1.0',
+      ]);
+      check(
+        recordedReleaseProblems(
+          info(commit: '1' * 40),
+          release: 'v1.1.0',
+          commit: _commit,
+        ),
+      ).deepEquals([
+        'build_info.json records the commit ${'1' * 40}; this build is of '
+            '$_commit',
+      ]);
+      check(
+        recordedReleaseProblems(
+          {'sources': const <String, Object?>{}},
+          release: 'v1.1.0',
+          commit: _commit,
+        ),
+      ).deepEquals([
+        'build_info.json records the release null; this build is of v1.1.0',
+        'build_info.json records the commit null; this build is of $_commit',
+      ]);
+    });
+
+    test('of a release is read by a build of no release at its commit', () {
+      // Every published build_info.json records its tag, so a build
+      // without --release checks the commit alone.
+      check(
+        recordedReleaseProblems(
+          info(release: 'v1.1.0'),
+          release: null,
+          commit: _commit,
+        ),
+      ).isEmpty();
+      check(
+        recordedReleaseProblems(
+          info(release: 'v1.1.0', commit: '1' * 40),
+          release: null,
+          commit: _commit,
+        ),
+      ).deepEquals([
+        'build_info.json records the commit ${'1' * 40}; this build is of '
+            '$_commit',
+      ]);
+    });
+
+    test('of a release passes a build of no release at its commit on to '
+        'its bundles', () async {
+      Directory(path('downloads')).createSync();
+      File(
+        path('downloads/build_info.json'),
+      ).writeAsStringSync(jsonEncode(info(release: 'v1.1.0')));
+
+      // The record is accepted, so the build goes on to the runtime's
+      // bundle, which this record does not list.
+      await check(
+        supplySources(
+          root: path('root'),
+          toolchain: _toolchain(first),
+          entries: const [],
+          sourceRoot: path('src'),
+          bundleDirectory: path('out'),
+          patchRoot: path('root'),
+          recordedBundles: (
+            directory: path('downloads'),
+            release: null,
+            commit: _commit,
+          ),
+        ),
+      ).throws<Exception>(
+        (it) => it
+            .has((e) => '$e', 'text')
+            .not((it) => it.contains('is not the record of this build')),
+      );
+    });
+
+    test('of another release is refused before any bundle is read', () async {
+      Directory(path('downloads')).createSync();
+      File(
+        path('downloads/build_info.json'),
+      ).writeAsStringSync(jsonEncode(info(release: 'v1.0.0')));
+
+      await check(
+        supplySources(
+          root: path('root'),
+          toolchain: _toolchain(first),
+          entries: const [],
+          sourceRoot: path('src'),
+          bundleDirectory: path('out'),
+          patchRoot: path('root'),
+          recordedBundles: (
+            directory: path('downloads'),
+            release: 'v1.1.0',
+            commit: _commit,
+          ),
+        ),
+      ).throws<GrammarSourceException>(
+        (it) => it.has((e) => e.message, 'message')
+          ..contains('build_info.json records the release v1.0.0')
+          ..contains('download the assets of v1.1.0'),
+      );
+      check(Directory(path('out')).existsSync()).isFalse();
+    });
   });
 
   group('supplySources holds every tree to the digest its pin records', () {
@@ -226,7 +359,9 @@ void main() {
       sourceRoot: path('src'),
       bundleDirectory: path('out'),
       patchRoot: path('root'),
-      recordedBundles: recordedBundles,
+      recordedBundles: recordedBundles == null
+          ? null
+          : (directory: recordedBundles, release: 'v1.1.0', commit: _commit),
     );
 
     Future<String> digestOf(String commit) async =>
@@ -273,9 +408,13 @@ void main() {
             'sha256': await fileSha256(bundle),
           },
         };
-        File(
-          path('downloads/build_info.json'),
-        ).writeAsStringSync(jsonEncode({'sources': recorded}));
+        File(path('downloads/build_info.json')).writeAsStringSync(
+          jsonEncode({
+            'release': 'v1.1.0',
+            'repository': {'commit': _commit},
+            'sources': recorded,
+          }),
+        );
         final source = pinnedSources(pin, const []).single;
 
         await checkRecordedBundle(path('downloads'), source, recorded);

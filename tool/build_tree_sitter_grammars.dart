@@ -23,7 +23,9 @@
 /// `grammars/<repo>` serve only as git object stores; a grammar's working
 /// tree is never read. With `--sources=<dir>`, the bundles come from
 /// `<dir>` instead, checked against the `build_info.json` beside them, and
-/// no object store is read: `<dir>` holds a release's downloaded assets.
+/// no object store is read: `<dir>` holds a release's downloaded assets,
+/// whose `build_info.json` must record the commit this build reads and,
+/// with `--release`, that release.
 /// A grammar whose entry lists `patches` has them applied to its unpacked
 /// tree, read from this repository's `patches/`, and the patched files must
 /// have the `patchedSha256` the entry records; its bundle stays the tree at
@@ -35,8 +37,7 @@
 /// Every library is compiled for the platform the build runs on (see
 /// `tool/src/build_platform.dart`): by Xcode's clang on macOS and by LLVM's
 /// clang on Linux and Windows, with the flags in `tool/src/compiler.dart`,
-/// and
-/// `output/build_info.json` records them and every bundle's sha256.
+/// and `output/build_info.json` records them and every bundle's sha256.
 ///
 /// `--release=vX.Y.Z` first requires a clean working tree whose `HEAD` is
 /// the annotated tag `vX.Y.Z`, and reads this repository's own files (its
@@ -233,7 +234,17 @@ Future<void> _build(String root, BuildOptions options) async {
     sourceRoot: p.join(root, 'build', 'src'),
     bundleDirectory: p.join(outputDirectory, sourcesDirectoryName),
     patchRoot: inputs,
-    recordedBundles: bundles,
+    // The assets' build_info.json must be the record of this release and
+    // commit, or the bundle sha256s this build records would be another
+    // release's.
+    recordedBundles: bundles == null
+        ? null
+        : (
+            directory: bundles,
+            release: release,
+            commit:
+                commit ?? (await runGit(root, ['rev-parse', 'HEAD'])).trim(),
+          ),
   );
   final runtimeDirectory = p.join(root, 'build', 'src', 'tree-sitter');
   final languageVersions = _runtimeLanguageVersions(
@@ -312,7 +323,10 @@ Future<void> _build(String root, BuildOptions options) async {
       ),
     );
   } else if (platform.isLinux) {
-    print('  ${compiler.hostLibc}\n  ${compiler.hostLibcPath}');
+    print(
+      '  ${compiler.linker}\n  ${compiler.linkerPath}\n'
+      '  ${compiler.hostLibc}\n  ${compiler.hostLibcPath}',
+    );
   } else {
     print('  SDK ${compiler.sdkVersion} (${compiler.sdkBuildVersion})');
   }

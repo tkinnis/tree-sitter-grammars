@@ -228,6 +228,40 @@ Future<void> _requireFiles(
   }
 }
 
+/// A release's downloaded assets a build compiles from with `--sources`:
+/// the [directory] that holds them and the `build_info.json` they were
+/// recorded with, and the [release] (`--release`, or null) and [commit] of
+/// this repository the build reads, which that `build_info.json` must
+/// record (the release only when there is one).
+typedef RecordedBundles = ({String directory, String? release, String commit});
+
+/// Every way [info], the `build_info.json` downloaded beside a release's
+/// bundles, records another build than the one that reads them, of
+/// [release] at [commit]; empty when it records the same
+/// `repository.commit` and, when [release] is given, the same `release`.
+///
+/// Bundles of the same pins from another release are the same sources,
+/// but their sha256s are those of that release's assets, which a build
+/// would record as its own. A build of no release checks the commit alone:
+/// every published `build_info.json` records its tag, and the release
+/// tagged at [commit] is the one whose assets it may read.
+List<String> recordedReleaseProblems(
+  Map<Object?, Object?> info, {
+  required String? release,
+  required String commit,
+}) {
+  final repository = info['repository'];
+  final recordedCommit = repository is Map ? repository['commit'] : null;
+  return [
+    if (release != null && info['release'] != release)
+      'build_info.json records the release ${info['release']}; this build is '
+          'of $release',
+    if (recordedCommit != commit)
+      'build_info.json records the commit $recordedCommit; this build is of '
+          '$commit',
+  ];
+}
+
 /// Unpacks the runtime and every grammar repository at its pin into
 /// [sourceRoot]`/<repository>`, writing each one's source bundle into
 /// [bundleDirectory], and returns what `build_info.json` records of the
@@ -237,12 +271,14 @@ Future<void> _requireFiles(
 /// under [root] (`tree-sitter/` for the runtime, `grammars/<repository>`
 /// for a grammar, created and fetched as needed) through [extractCommit].
 /// With it, each bundle comes from that directory instead, checked against
-/// the `build_info.json` there by [checkRecordedBundle]; no object store is
-/// read. Either way the files of every tree must have the `filesSha256` the
-/// pin records in `tool/grammars.json` or `tool/toolchain.json`: in the
-/// object store the commit's listing is read, and a bundle's unpacked files
-/// are hashed, so a bundle is held to the value committed at the tag, not
-/// to the `build_info.json` downloaded beside it.
+/// the `build_info.json` there by [checkRecordedBundle], which must record
+/// the commit the build reads and any release it builds
+/// ([recordedReleaseProblems]); no object store is read. Either way the
+/// files of every tree must have the `filesSha256` the pin records in
+/// `tool/grammars.json` or `tool/toolchain.json`: in the object store the
+/// commit's listing is read, and a bundle's unpacked files are hashed, so a
+/// bundle is held to the value committed at the tag, not to the
+/// `build_info.json` downloaded beside it.
 ///
 /// A grammar whose entry lists `patches` then has them applied, read from
 /// under [patchRoot], this repository's own files, by [patchSource], and
@@ -257,20 +293,37 @@ Future<Map<String, Map<String, Object?>>> supplySources({
   required String sourceRoot,
   required String bundleDirectory,
   required String patchRoot,
-  String? recordedBundles,
+  RecordedBundles? recordedBundles,
 }) async {
   final Map<String, Object?>? recorded;
   if (recordedBundles == null) {
     recorded = null;
   } else {
-    final info = File(p.join(recordedBundles, 'build_info.json'));
+    final (:directory, :release, :commit) = recordedBundles;
+    final info = File(p.join(directory, 'build_info.json'));
     if (!info.existsSync()) {
       throw GrammarSourceException(
-        '$recordedBundles holds no build_info.json; download every asset '
+        '$directory holds no build_info.json; download every asset '
         'of the release, build_info.json among them, into one directory',
       );
     }
-    final sources = (jsonDecode(info.readAsStringSync()) as Map)['sources'];
+    final record = jsonDecode(info.readAsStringSync()) as Map;
+    final problems = recordedReleaseProblems(
+      record,
+      release: release,
+      commit: commit,
+    );
+    if (problems.isNotEmpty) {
+      throw GrammarSourceException(
+        [
+          '${info.path} is not the record of this build:',
+          ...problems,
+          'download the assets of ${release ?? 'the release tagged at '
+                  '$commit'} into an empty directory',
+        ].join('\n  '),
+      );
+    }
+    final sources = record['sources'];
     if (sources is! Map<String, Object?>) {
       throw GrammarSourceException('${info.path} records no sources');
     }
@@ -283,12 +336,9 @@ Future<Map<String, Map<String, Object?>>> supplySources({
     final destination = p.join(sourceRoot, source.name);
     try {
       if (recorded != null) {
-        final digest = await checkRecordedBundle(
-          recordedBundles!,
-          source,
-          recorded,
-        );
-        File(p.join(recordedBundles, source.bundleName)).copySync(bundle);
+        final directory = recordedBundles!.directory;
+        final digest = await checkRecordedBundle(directory, source, recorded);
+        File(p.join(directory, source.bundleName)).copySync(bundle);
         await unpackBundle(bundle, destination);
         await _requireFiles(
           source,
