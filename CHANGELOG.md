@@ -5,13 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.6.1] - 2026-10-14
+
+1.6.0 is a tag with no release; its changes, listed under 1.6.0, ship in 1.6.1.
 
 ### Fixed
 
 - On Windows, the move of `build/out/` to `output/` that ends a build is retried when it is refused as access denied (errno 5), after waits of 0.25, 0.5, 1, 2, 4 and 8 s, and the last refusal is reported naming the 7 attempts: run by an x64 Dart on Windows on arm64, the x64 emulation layer holds a freshly built DLL for up to a few seconds after `tool/check_release.dart`, the first process to load it, exits, and Windows refuses the move while it does, after every check has passed. No check runs again and nothing writes to `build/out/` between the attempts; any other failure, and any failure off Windows, is reported at once
 
 ## [1.6.0] - 2026-10-14
+
+Tagged, never released: the changes below ship in 1.6.1.
 
 ### Changed
 
