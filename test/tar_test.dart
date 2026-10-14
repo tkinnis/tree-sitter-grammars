@@ -7,6 +7,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../tool/src/tar.dart';
+import 'support/raw_tar.dart';
 
 /// 2026-01-01T00:00:00Z.
 const _epoch = 1767225600;
@@ -62,10 +63,10 @@ void main() {
     length = '$length$record'.length;
     final pax = Uint8List.fromList(utf8.encode('$length$record'));
     final stream = BytesBuilder()
-      ..add(_rawHeader('pax', 'x', pax.length))
+      ..add(rawHeader('pax', 'x', pax.length))
       ..add(pax)
       ..add(Uint8List(512 - pax.length))
-      ..add(_rawHeader('short', '0', 0))
+      ..add(rawHeader('short', '0', 0))
       ..add(Uint8List(1024));
 
     check(readTar(stream.takeBytes()).single.path).equals(path);
@@ -129,7 +130,7 @@ void main() {
   ]) {
     test('refuses a member leading out of the destination $name', () async {
       final archive = p.join(scratch, 'x.tar.gz');
-      File(archive).writeAsBytesSync(gzipCompress(_rawStream([member])));
+      File(archive).writeAsBytesSync(gzipCompress(rawStream([member])));
 
       await check(
         unpackTarGz(
@@ -163,7 +164,7 @@ void main() {
       ('mode', 100, 8, '0000648\x00'),
     ]) {
       test('a $field field of "${text.replaceAll('\x00', '')}"', () {
-        final header = _rawHeader(
+        final header = rawHeader(
           'x',
           '0',
           0,
@@ -180,7 +181,7 @@ void main() {
 
     test('a name that is no UTF-8', () {
       // Reddened by dropping _string's catch of utf8's FormatException.
-      final header = _rawHeader(
+      final header = rawHeader(
         'x',
         '0',
         0,
@@ -224,10 +225,10 @@ void main() {
         // Each character of [record] as one byte.
         final pax = latin1.encode(record);
         final stream = BytesBuilder()
-          ..add(_rawHeader('pax', 'x', pax.length))
+          ..add(rawHeader('pax', 'x', pax.length))
           ..add(pax)
           ..add(Uint8List(512 - pax.length))
-          ..add(_rawHeader('short', '0', 0))
+          ..add(rawHeader('short', '0', 0))
           ..add(Uint8List(1024));
 
         refused(
@@ -513,7 +514,7 @@ void main() {
         final archive = p.join(scratch, 'x.tar.gz');
         File(
           archive,
-        ).writeAsBytesSync(gzipCompress(_rawStream(['top/a.c', 'top/$name'])));
+        ).writeAsBytesSync(gzipCompress(rawStream(['top/a.c', 'top/$name'])));
         final destination = p.join(scratch, 'out');
 
         await check(
@@ -532,7 +533,7 @@ void main() {
     final archive = p.join(scratch, 'x.tar.gz');
     File(
       archive,
-    ).writeAsBytesSync(gzipCompress(_rawStream(['top/a.c', 'top/../../evil'])));
+    ).writeAsBytesSync(gzipCompress(rawStream(['top/a.c', 'top/../../evil'])));
     final destination = p.join(scratch, 'out');
 
     await check(
@@ -546,7 +547,7 @@ void main() {
     // writing a member: here a file under a destination that is a file,
     // which no check of the archive's own members can see.
     final archive = p.join(scratch, 'x.tar.gz');
-    File(archive).writeAsBytesSync(gzipCompress(_rawStream(['top/a'])));
+    File(archive).writeAsBytesSync(gzipCompress(rawStream(['top/a'])));
     final destination = p.join(scratch, 'out');
     File(destination).writeAsStringSync('a file, not a directory');
 
@@ -560,7 +561,7 @@ void main() {
 
   group('members that cannot all be unpacked are refused, writing '
       'nothing', () {
-    // Each case's members, as _rawMembers reads them, and the start of the
+    // Each case's members, as rawMembers reads them, and the start of the
     // message refusing the last, after `<archive>: `.
     for (final (problem, members, message) in [
       // Reddened by comparing paths with their case, or not comparing them
@@ -626,7 +627,7 @@ void main() {
     ]) {
       test(problem, () async {
         final archive = p.join(scratch, 'x.tar.gz');
-        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+        File(archive).writeAsBytesSync(gzipCompress(rawMembers(members)));
         final destination = p.join(scratch, 'out');
 
         await check(
@@ -645,7 +646,7 @@ void main() {
       final archive = p.join(scratch, 'x.tar.gz');
       File(archive).writeAsBytesSync(
         gzipCompress(
-          _rawMembers([
+          rawMembers([
             'top/',
             'top/src/',
             'top/src/a.c',
@@ -755,7 +756,7 @@ void main() {
     ]) {
       test('by tarGzRootFile: $problem', () async {
         final archive = p.join(scratch, 'x.tar.gz');
-        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+        File(archive).writeAsBytesSync(gzipCompress(rawMembers(members)));
 
         await check(
           tarGzRootFile(archive, 'build_info.json'),
@@ -769,8 +770,8 @@ void main() {
       final archive = p.join(scratch, 'x.tar.gz');
       File(archive).writeAsBytesSync(
         gzipCompress([
-          ..._rawHeader('build_info.json', '0', 0),
-          ..._rawHeader('link', '2', 0),
+          ...rawHeader('build_info.json', '0', 0),
+          ...rawHeader('link', '2', 0),
           ...Uint8List(1024),
         ]),
       );
@@ -796,7 +797,7 @@ void main() {
     ]) {
       test('by tarGzFile: $problem', () async {
         final archive = p.join(scratch, 'x.tar.gz');
-        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+        File(archive).writeAsBytesSync(gzipCompress(rawMembers(members)));
 
         await check(tarGzFile(archive, 'src/x.c')).throws<TarException>(
           (it) => _message(it).startsWith('$archive: $message'),
@@ -808,7 +809,7 @@ void main() {
       final archive = p.join(scratch, 'x.tar.gz');
       File(
         archive,
-      ).writeAsBytesSync(gzipCompress(_rawMembers(['./', './build_info.json'])));
+      ).writeAsBytesSync(gzipCompress(rawMembers(['./', './build_info.json'])));
 
       check(await tarGzRootFile(archive, 'build_info.json')).isNotNull();
     });
@@ -826,47 +827,3 @@ void main() {
 /// The message of the [TarException] [it] checks.
 Subject<String> _message(Subject<TarException> it) =>
     it.has((e) => e.message, 'message');
-
-/// A ustar header of [type] for a member [name] of [size] bytes, with
-/// [edit] made to it before its checksum is computed.
-Uint8List _rawHeader(
-  String name,
-  String type,
-  int size, {
-  void Function(Uint8List header)? edit,
-}) {
-  final header = Uint8List(512);
-  header.setAll(0, utf8.encode(name));
-  header.setAll(100, ascii.encode('0000644\x00'));
-  header.setAll(
-    124,
-    ascii.encode('${size.toRadixString(8).padLeft(11, '0')}\x00'),
-  );
-  header[156] = type.codeUnitAt(0);
-  header.setAll(257, ascii.encode('ustar\x0000'));
-  edit?.call(header);
-  header.setAll(148, ascii.encode(' ' * 8));
-  final sum = header.fold<int>(0, (a, b) => a + b);
-  header.setAll(
-    148,
-    ascii.encode('${sum.toRadixString(8).padLeft(6, '0')}\x00 '),
-  );
-  return header;
-}
-
-/// A tar stream of an empty file at each of [paths], written header by
-/// header, as ustar would not write some of them, and ended as an archive
-/// is.
-Uint8List _rawStream(List<String> paths) => Uint8List.fromList([
-  for (final path in paths) ..._rawHeader(path, '0', 0),
-  ...Uint8List(1024),
-]);
-
-/// A tar stream of [members], written header by header and ended as an
-/// archive is: a directory for each that ends in `/`, and otherwise an
-/// empty file.
-Uint8List _rawMembers(List<String> members) => Uint8List.fromList([
-  for (final member in members)
-    ..._rawHeader(member, member.endsWith('/') ? '5' : '0', 0),
-  ...Uint8List(1024),
-]);

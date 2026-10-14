@@ -331,6 +331,18 @@ Future<void> unpackTarGz(
   unpackedModes[p.normalize(p.absolute(destination))] = modes;
 }
 
+/// Holds every member of the gzip-compressed tar [archive] to
+/// [_MemberRules], without the first [stripComponents] segments of each
+/// path, as [unpackTarGz] does before it writes anything, but writing
+/// nothing: for a host that unpacks or reads the archive with its own tar,
+/// so it refuses on every host what a build on Windows refuses.
+///
+/// Throws a [TarException] as [unpackTarGz] does for an archive that
+/// cannot be read or is malformed, or for a member the rules refuse.
+Future<void> checkTarGz(String archive, {int stripComponents = 0}) async {
+  await _checkedMembers(archive, stripComponents);
+}
+
 /// Each member of the gzip-compressed tar [archive], as [_readTarGz] reads
 /// it, that [_MemberRules] keeps once the first [stripComponents] segments
 /// of each path are stripped, with the segments of its path that remain.

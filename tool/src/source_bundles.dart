@@ -100,9 +100,12 @@ List<PinnedSource> pinnedSources(
 /// records beside its version.
 String get bundleGit => Platform.isWindows ? _windowsGit : '/usr/bin/git';
 
-/// The executables a build on macOS packs and unpacks with; a build on
-/// Windows does both in Dart, with `tar.dart`.
-const _tar = '/usr/bin/tar';
+/// The tar a build on macOS or Linux packs and unpacks with; a build on
+/// Windows does both in Dart, with `tar.dart`. Tests name one that does not
+/// exist, to show that a refused bundle never reaches it.
+String tarExecutable = '/usr/bin/tar';
+
+/// The gzip a build on macOS or Linux packs with.
 const _gzip = '/usr/bin/gzip';
 
 final String _windowsGit = _onPath('git.exe');
@@ -150,7 +153,7 @@ Future<Map<String, String>> packingToolVersions() async {
   for (final (name, executable) in [
     ('git', bundleGit),
     ('gzip', _gzip),
-    ('tar', _tar),
+    ('tar', tarExecutable),
   ]) {
     final result = await Process.run(executable, ['--version']);
     if (result.exitCode != 0) {
@@ -242,21 +245,31 @@ Future<void> packBundle(
 /// its top-level directory.
 ///
 /// On Windows [unpackTarGz] unpacks it, recording each file's mode, which
-/// NTFS cannot hold, for `unpackedFiles` to read.
-Future<void> unpackBundle(String bundle, String destination) async {
+/// NTFS cannot hold, for `unpackedFiles` to read. Elsewhere [checkTarGz]
+/// holds every member to the rules [unpackTarGz] does, in Dart, before
+/// [tarExecutable] unpacks it, so a bundle is refused alike on every host.
+/// [operatingSystem], as `Platform.operatingSystem` spells it, is by
+/// default the host's; tests name another.
+Future<void> unpackBundle(
+  String bundle,
+  String destination, {
+  String? operatingSystem,
+}) async {
   if (FileSystemEntity.typeSync(destination) != FileSystemEntityType.notFound) {
     throw SourceBundleException('$destination already exists');
   }
   Directory(destination).createSync(recursive: true);
-  if (Platform.isWindows) {
-    try {
+  final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
+  try {
+    if (windows) {
       await unpackTarGz(bundle, destination, stripComponents: 1);
-    } on Exception catch (error) {
-      throw SourceBundleException('could not unpack $bundle: $error');
+      return;
     }
-    return;
+    await checkTarGz(bundle, stripComponents: 1);
+  } on Exception catch (error) {
+    throw SourceBundleException('could not unpack $bundle: $error');
   }
-  final result = await Process.run(_tar, [
+  final result = await Process.run(tarExecutable, [
     '-xzf',
     bundle,
     '-C',
@@ -273,13 +286,27 @@ Future<void> unpackBundle(String bundle, String destination) async {
 
 /// The text of [path], relative to the repository root, in [bundle], or null
 /// when the bundle holds no such file.
-Future<String?> bundleFile(String bundle, String path) async {
+///
+/// Every member is held to the rules [unpackBundle] holds it to first, on
+/// every host, so a bundle naming [path] twice is refused rather than read
+/// at either member. [operatingSystem] is as [unpackBundle] takes it.
+Future<String?> bundleFile(
+  String bundle,
+  String path, {
+  String? operatingSystem,
+}) async {
   final member = '${_prefix(bundle)}/$path';
-  if (Platform.isWindows) {
-    final bytes = await tarGzFile(bundle, path);
-    return bytes == null ? null : utf8.decode(bytes);
+  final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
+  try {
+    if (windows) {
+      final bytes = await tarGzFile(bundle, path);
+      return bytes == null ? null : utf8.decode(bytes);
+    }
+    await checkTarGz(bundle, stripComponents: 1);
+  } on TarException catch (error) {
+    throw SourceBundleException('could not read $path from $bundle: $error');
   }
-  final result = await Process.run(_tar, [
+  final result = await Process.run(tarExecutable, [
     '-xzOf',
     bundle,
     member,

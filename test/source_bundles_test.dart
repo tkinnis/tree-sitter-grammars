@@ -10,8 +10,10 @@ import '../tool/src/files_digest.dart';
 import '../tool/src/grammar_sources.dart';
 import '../tool/src/recorded_build.dart';
 import '../tool/src/source_bundles.dart';
+import '../tool/src/tar.dart';
 import '../tool/src/toolchain.dart';
 import 'support/git_fixture.dart';
+import 'support/raw_tar.dart';
 
 const _cliSha256 =
     '70f7573b2b2e5371a5b58cc5227d2ad981fd5374596b9874e770af486060774e';
@@ -123,6 +125,116 @@ void main() {
     ).equals('int parse(void) { return 0; }\n');
     check(File(path('tree/bin/run')).existsSync()).isTrue();
     check(await bundleCommit(bundle)).equals(first);
+  });
+
+  group('a bundle is checked on every host before tar reads it', () {
+    // On macOS and Linux, unpackBundle and bundleFile ran /usr/bin/tar on
+    // a bundle with none of the refusals unpackTarGz makes on Windows.
+    // Each now runs checkTarGz over the bundle first, in Dart, as here on
+    // any host; the tar named here does not exist, so a bundle that
+    // reached it would throw a ProcessException, not the refusal.
+    late String tar;
+    setUp(() {
+      tar = tarExecutable;
+      tarExecutable = path('no-such-tar');
+    });
+    tearDown(() => tarExecutable = tar);
+
+    /// A bundle of [members], as rawMembers writes them.
+    String bundleOf(List<String> members) {
+      final bundle = path('bundle.tar.gz');
+      File(bundle).writeAsBytesSync(gzipCompress(rawMembers(members)));
+      return bundle;
+    }
+
+    for (final (problem, members, message) in [
+      (
+        'one file twice',
+        ['top/', 'top/a.c', 'top/a.c'],
+        'top/a.c: an earlier member makes "a.c" a file',
+      ),
+      (
+        'one file twice, once under "./"',
+        ['top/a.c', './top/a.c'],
+        './top/a.c: an earlier member makes "a.c" a file',
+      ),
+      (
+        'two files differing only in case',
+        ['top/README', 'top/readme'],
+        'top/readme: "readme" names the same file as "README" on Windows',
+      ),
+      (
+        'a name Windows cannot give a file',
+        ['top/aux.c'],
+        'top/aux.c: "aux.c" names the Windows device AUX',
+      ),
+      (
+        'a member leading out of the archive',
+        ['top/../../evil'],
+        'top/../../evil leads out of the archive',
+      ),
+    ]) {
+      // Reddened by dropping unpackBundle's checkTarGz before tar.
+      test('unpackBundle refuses $problem', () async {
+        final bundle = bundleOf(members);
+
+        await check(
+          unpackBundle(bundle, path('tree'), operatingSystem: 'macos'),
+        ).throws<SourceBundleException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .startsWith('could not unpack $bundle: $bundle: $message'),
+        );
+      });
+    }
+
+    test('unpackBundle refuses a symbolic link', () async {
+      // Reddened by dropping unpackBundle's checkTarGz before tar.
+      final bundle = path('bundle.tar.gz');
+      File(bundle).writeAsBytesSync(
+        gzipCompress([
+          ...rawHeader('top/a.c', '0', 0),
+          ...rawHeader('top/link', '2', 0),
+          ...List.filled(1024, 0),
+        ]),
+      );
+
+      await check(
+        unpackBundle(bundle, path('tree'), operatingSystem: 'macos'),
+      ).throws<SourceBundleException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .contains('top/link is a symbolic link'),
+      );
+    });
+
+    test('bundleFile refuses one file twice', () async {
+      // Reddened by dropping bundleFile's checkTarGz before tar.
+      final bundle = bundleOf(['top/a.c', 'top/a.c']);
+
+      await check(
+        bundleFile(bundle, 'a.c', operatingSystem: 'macos'),
+      ).throws<SourceBundleException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals(
+              'could not read a.c from $bundle: $bundle: top/a.c: an '
+              'earlier member makes "a.c" a file',
+            ),
+      );
+    });
+
+    test('the control: a whole bundle passes the check and reaches '
+        'tar', () async {
+      final bundle = await pack(first, path('bundles'));
+
+      await check(
+        unpackBundle(bundle, path('tree'), operatingSystem: 'macos'),
+      ).throws<ProcessException>();
+      await check(
+        bundleFile(bundle, 'src/parser.c', operatingSystem: 'macos'),
+      ).throws<ProcessException>();
+    });
   });
 
   group('checkRecordedBundle', () {
