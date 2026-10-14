@@ -422,6 +422,41 @@ void main() {
         ...rawHeader('top/x', '0', 0),
       ], 'the tar header at 0 gives the symbolic link top/l 512 bytes of data');
     });
+
+    // readTar read bytes 345 to 499 as the ustar prefix of a header
+    // whatever its magic, where GNU tar and bsdtar read them so only after
+    // the ustar magic, "ustar\0": an old GNU header (magic "ustar  \0")
+    // holds times there, and a v7 header (no magic) nothing. Each case is
+    // reddened by dropping readTar's refusal of a header without the
+    // ustar magic.
+    for (final (kind, magic) in [
+      ('an old GNU header', 'ustar  \x00'),
+      ('a v7 header', '\x00' * 8),
+    ]) {
+      test('$kind, whose bytes 345 on tar reads as no prefix', () async {
+        // Both tars read top/x twice and keep the second, B, where readTar
+        // read top/x and top/top/x, and tarGzRootFile returned A.
+        await refused(
+          [
+            ...rawHeader('top/x', '0', 1),
+            ...'A'.codeUnits,
+            ...Uint8List(511),
+            ...rawHeader(
+              'top/x',
+              '0',
+              1,
+              edit: (header) => header
+                ..setAll(257, latin1.encode(magic))
+                ..setAll(345, ascii.encode('top')),
+            ),
+            ...'B'.codeUnits,
+            ...Uint8List(511),
+          ],
+          'the tar header at 1024 is no ustar header: its magic is '
+          '${jsonEncode(magic)}',
+        );
+      });
+    }
   });
 
   group('an archive that cannot be read is refused', () {

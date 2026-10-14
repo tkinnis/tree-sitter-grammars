@@ -152,7 +152,9 @@ Uint8List _header(TarFile file) {
 /// those [_paxKeys] and [_globalPaxKeys] name, and an extended header
 /// after another, with no member between them; and a directory or a
 /// symbolic link whose header gives it data, which neither tar reads after
-/// a directory and only GNU tar skips after a link.
+/// a directory and only GNU tar skips after a link; and a header without
+/// the ustar magic, as an old GNU or a v7 header is, whose bytes 345 to 499
+/// both tars read as no prefix of its path.
 List<TarMember> readTar(Uint8List bytes) {
   final members = <TarMember>[];
   var offset = 0;
@@ -173,6 +175,15 @@ List<TarMember> readTar(Uint8List bytes) {
     final header = Uint8List.sublistView(bytes, at, at + _block);
     if (header.every((byte) => byte == 0)) break;
     _requireChecksum(header, offset);
+    // GNU tar and bsdtar read bytes 345 to 499 as the prefix of a path only
+    // after this magic: an old GNU header holds times there.
+    if (!_startsWith(header, 257, _ustarMagic)) {
+      final magic = latin1.decode(header.sublist(257, 265));
+      throw TarException(
+        'the tar header at $at is no ustar header: its magic is '
+        '${jsonEncode(magic)}',
+      );
+    }
     final size = _octal(header, 124, 12, 'size', offset);
     final type = String.fromCharCode(header[156]);
     final dataStart = offset + _block;
@@ -276,6 +287,17 @@ const _globalPaxKeys = {
   'gname',
   'comment',
 };
+
+/// The magic a ustar or pax header holds at byte 257, `ustar` and a NUL.
+const _ustarMagic = [0x75, 0x73, 0x74, 0x61, 0x72, 0x00];
+
+/// Whether [bytes] holds [expected] at [start].
+bool _startsWith(Uint8List bytes, int start, List<int> expected) {
+  for (var index = 0; index < expected.length; index++) {
+    if (bytes[start + index] != expected[index]) return false;
+  }
+  return true;
+}
 
 void _requireChecksum(Uint8List header, int offset) {
   var sum = 0;
