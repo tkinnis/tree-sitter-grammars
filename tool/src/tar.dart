@@ -42,7 +42,16 @@ typedef TarMember = ({
 });
 
 /// The kinds of member [readTar] returns.
-enum TarMemberType { file, symlink, directory }
+enum TarMemberType {
+  file('file'),
+  symlink('symbolic link'),
+  directory('directory');
+
+  const TarMemberType(this.label);
+
+  /// The member type as a message names it.
+  final String label;
+}
 
 const _block = 512;
 
@@ -141,7 +150,9 @@ Uint8List _header(TarFile file) {
 /// It also throws for a stream GNU tar or bsdtar would read otherwise, so
 /// that what is checked here is what tar unpacks: a pax record other than
 /// those [_paxKeys] and [_globalPaxKeys] name, and an extended header
-/// after another, with no member between them.
+/// after another, with no member between them; and a directory or a
+/// symbolic link whose header gives it data, which neither tar reads after
+/// a directory and only GNU tar skips after a link.
 List<TarMember> readTar(Uint8List bytes) {
   final members = <TarMember>[];
   var offset = 0;
@@ -206,6 +217,15 @@ List<TarMember> readTar(Uint8List bytes) {
       '5' => TarMemberType.directory,
       _ => throw TarException('$path: tar member type "$type" is not read'),
     };
+    if (memberType != TarMemberType.file && size != 0) {
+      // GNU tar and bsdtar read no data after a directory, and only GNU
+      // tar skips the data a symbolic link's header gives, so the header
+      // after it is another for each.
+      throw TarException(
+        'the tar header at $at gives the ${memberType.label} $path $size '
+        'bytes of data',
+      );
+    }
     members.add((
       path: path,
       type: memberType,

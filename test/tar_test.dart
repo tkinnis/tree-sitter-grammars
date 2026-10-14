@@ -372,6 +372,58 @@ void main() {
     });
   });
 
+  group('a header tar reads otherwise than readTar did is refused', () {
+    /// Requires readTar of [members], ended as an archive is, to throw a
+    /// TarException whose message is [message], and checkTarGz, at either
+    /// strip, and tarGzRootFile to refuse it.
+    Future<void> refused(List<int> members, String message) async {
+      final bytes = Uint8List.fromList([...members, ...Uint8List(1024)]);
+      _message(
+        check(() => readTar(bytes)).throws<TarException>(),
+      ).equals(message);
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(gzipCompress(bytes));
+      for (final strip in [0, 1]) {
+        await check(
+          checkTarGz(archive, stripComponents: strip),
+        ).throws<TarException>(
+          (it) => _message(it).equals('$archive: $message'),
+        );
+      }
+      await check(tarGzRootFile(archive, 'top/x')).throws<TarException>();
+    }
+
+    final link = rawHeader(
+      'top/evil',
+      '2',
+      0,
+      edit: (header) => header.setAll(157, ascii.encode('/etc')),
+    );
+
+    // Each case is reddened by dropping readTar's refusal of a size other
+    // than 0 for a member that is no file.
+    test('a directory whose header gives it data', () async {
+      // GNU tar and bsdtar read no data after a directory's header,
+      // whatever size it gives, where readTar skipped that size: the
+      // symbolic link to /etc after it was a member to both tars and
+      // none to readTar.
+      await refused([
+        ...rawHeader('top/d/', '5', 512),
+        ...link,
+      ], 'the tar header at 0 gives the directory top/d/ 512 bytes of data');
+    });
+
+    test('a symbolic link whose header gives it data', () async {
+      // GNU tar skips the size a symbolic link's header gives, and bsdtar
+      // reads a header there: top/x is a member to bsdtar and none to GNU
+      // tar.
+      await refused([
+        ...rawHeader('top/l', '2', 512),
+        ...rawHeader('top/x', '0', 0),
+      ], 'the tar header at 0 gives the symbolic link top/l 512 bytes of data');
+    });
+  });
+
   group('an archive that cannot be read is refused', () {
     test('when the file is missing', () async {
       // Reddened by dropping _readTarGz's catch of the FileSystemException
