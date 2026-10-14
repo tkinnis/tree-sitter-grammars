@@ -332,6 +332,92 @@ void main() {
     });
   });
 
+  group('bundleFile reads only a file, on every host', () {
+    // On Windows, bundleFile reads with tarGzFile, which refuses a bundle
+    // holding a symbolic link and reads a file member alone. Elsewhere tar
+    // reads the member, and tar -O writes nothing for a link or a
+    // directory and succeeds, so bundleFile looks at the type checkTarGz
+    // reports for the member before tar reads it.
+    late String tar;
+    setUp(() {
+      tar = tarExecutable;
+      // The tar Windows ships, a bsdtar, as macOS's is, stands in for
+      // /usr/bin/tar on a Windows host.
+      if (Platform.isWindows) {
+        tarExecutable = p.join(
+          Platform.environment['SystemRoot'] ?? r'C:\Windows',
+          'System32',
+          'tar.exe',
+        );
+      }
+    });
+    tearDown(() => tarExecutable = tar);
+
+    /// A bundle, named for its top-level directory, of the file top/a.c,
+    /// the symbolic link top/link to it unless [link] is false, and the
+    /// directory top/d.
+    String linkedBundle({bool link = true}) {
+      final bundle = path('top.tar.gz');
+      File(bundle).writeAsBytesSync(
+        gzipCompress([
+          ...rawHeader('top/a.c', '0', 2),
+          ...'a\n'.codeUnits,
+          ...List.filled(510, 0),
+          if (link) ...rawLink('top/link', 'a.c'),
+          ...rawHeader('top/d/', '5', 0),
+          ...List.filled(1024, 0),
+        ]),
+      );
+      return bundle;
+    }
+
+    for (final operatingSystem in ['macos', 'linux']) {
+      test('on $operatingSystem, a symbolic link is refused, not read as '
+          'empty', () async {
+        // Mutation: read a symbolic link's path with tar, as a file's;
+        // this reddens.
+        final bundle = linkedBundle();
+
+        await check(
+          bundleFile(bundle, 'link', operatingSystem: operatingSystem),
+        ).throws<SourceBundleException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .equals(
+                'could not read link from $bundle: it is a symbolic link',
+              ),
+        );
+      });
+    }
+
+    for (final operatingSystem in ['windows', 'macos', 'linux']) {
+      test('on $operatingSystem, a directory is no file', () async {
+        // Mutation: read a directory's path with tar, as a file's; this
+        // reddens the macos and linux cases.
+        check(
+          await bundleFile(
+            linkedBundle(link: false),
+            'd',
+            operatingSystem: operatingSystem,
+          ),
+        ).isNull();
+      });
+    }
+
+    for (final operatingSystem in ['macos', 'linux']) {
+      test('the control: on $operatingSystem, the file beside them is '
+          'read', () async {
+        check(
+          await bundleFile(
+            linkedBundle(),
+            'a.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).equals('a\n');
+      });
+    }
+  });
+
   group('checkRecordedBundle', () {
     late String bundle;
     late Map<String, Object?> recorded;

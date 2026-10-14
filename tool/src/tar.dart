@@ -462,19 +462,24 @@ Future<void> unpackTarGz(
 /// `Platform.operatingSystem` spells it, by default this host's, is
 /// Windows. A host that keeps the link still holds it to every other rule.
 ///
+/// Returns the type of each member the rules keep, by its path with the
+/// first [stripComponents] segments stripped, for a host whose tar reads
+/// a member by its path alone, a link or a directory as an empty file.
+///
 /// Throws a [TarException] as [unpackTarGz] does for an archive that
 /// cannot be read or is malformed, or for a member the rules refuse.
-Future<void> checkTarGz(
+Future<Map<String, TarMemberType>> checkTarGz(
   String archive, {
   int stripComponents = 0,
   String? operatingSystem,
-}) async {
-  await _checkedMembers(
+}) async => {
+  for (final (:member, :segments) in await _checkedMembers(
     archive,
     stripComponents,
     symlinks: _keepsSymlinks(operatingSystem),
-  );
-}
+  ))
+    segments.join('/'): member.type,
+};
 
 /// Whether a host on [operatingSystem], by default this one, as
 /// `Platform.operatingSystem` spells it, keeps a symbolic link an archive

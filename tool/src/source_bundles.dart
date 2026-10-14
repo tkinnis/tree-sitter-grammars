@@ -290,14 +290,16 @@ Future<void> unpackBundle(
 }
 
 /// The text of [path], relative to the repository root, in [bundle], or null
-/// when the bundle holds no such file.
+/// when the bundle holds no such file, a directory at [path] included.
 ///
 /// Every member is held to the rules [unpackBundle] holds it to first, on
 /// every host, so a bundle naming [path] twice is refused rather than read
 /// at either member. [operatingSystem] is as [unpackBundle] takes it.
 ///
 /// Throws a [SourceBundleException] for a file that is no UTF-8, read by
-/// [tarGzFile] or by tar alike.
+/// [tarGzFile] or by tar alike, and for a symbolic link at [path], which
+/// is not read on any host: Windows refuses the bundle, and elsewhere tar
+/// would read the link as an empty file.
 Future<String?> bundleFile(
   String bundle,
   String path, {
@@ -327,17 +329,29 @@ Future<List<int>?> _bundleFileBytes(
 }) async {
   final member = '${_prefix(bundle)}/$path';
   final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
+  final Map<String, TarMemberType> types;
   try {
     if (windows) {
       return await tarGzFile(bundle, path, operatingSystem: operatingSystem);
     }
-    await checkTarGz(
+    types = await checkTarGz(
       bundle,
       stripComponents: 1,
       operatingSystem: operatingSystem,
     );
   } on TarException catch (error) {
     throw SourceBundleException('could not read $path from $bundle: $error');
+  }
+  // tar -O writes nothing for a link or a directory, and succeeds; tarGzFile
+  // reads a file member alone.
+  switch (types[path]) {
+    case null || TarMemberType.directory:
+      return null;
+    case TarMemberType.symlink:
+      throw SourceBundleException(
+        'could not read $path from $bundle: it is a symbolic link',
+      );
+    case TarMemberType.file:
   }
   final result = await Process.run(tarExecutable, [
     '-xzOf',
