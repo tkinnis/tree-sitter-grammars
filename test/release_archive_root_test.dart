@@ -12,17 +12,54 @@ import '../tool/src/release_archive.dart';
 import '../tool/src/tar.dart';
 import 'support/release_fixture.dart';
 
-/// A release archive `packArchive` wrote, a handful of members, kept as
-/// the bytes the real packer produced.
-const _committed = 'test/support/release-archive-linux-arm64.tar.gz';
-
 List<TarMember> _members(List<int> gz) =>
     readTar(Uint8List.fromList(gzip.decode(gz)));
 
+/// Packs the files of [fixtureArchiveFiles] for [platform], each holding
+/// what [contents] gives for its path, as a `--release` build packs
+/// `output/`: [archiveFiles] lists them, [normalizeArchiveFiles] gives
+/// them the archive's modes and time, and [packArchive], the real packer
+/// of this host, writes the archive. Returns the archive's path, beside
+/// the output directory in [directory].
+Future<String> _pack(
+  Directory directory,
+  BuildPlatform platform,
+  String Function(String file) contents,
+) async {
+  final output = p.join(directory.path, 'output');
+  for (final file in fixtureArchiveFiles(platform)) {
+    File(p.join(output, file))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(contents(file));
+  }
+  final files = archiveFiles(output, platform: platform);
+  await normalizeArchiveFiles(output, files, 0);
+  final archive = p.join(directory.path, platform.releaseArchiveName);
+  await packArchive(output, files, archive);
+  return archive;
+}
+
 void main() {
+  // A release archive the real packer writes, a handful of members, with
+  // a build_info.json at its root.
+  late String packed;
+  late Directory directory;
+
+  setUpAll(() async {
+    directory = Directory.systemTemp.createTempSync('release_archive_root');
+    packed = await _pack(
+      directory,
+      BuildPlatform.linuxArm64,
+      (file) => file == 'build_info.json'
+          ? jsonEncode({'release': 'v0.0.1', 'platform': 'linux-arm64'})
+          : '$file\n',
+    );
+  });
+  tearDownAll(() => directory.deleteSync(recursive: true));
+
   test('a release archive holds its files at the root, with no top-level '
       'directory', () {
-    final members = _members(File(_committed).readAsBytesSync());
+    final members = _members(File(packed).readAsBytesSync());
 
     check(members.map((m) => m.path)).deepEquals([
       'THIRD_PARTY_NOTICES.md',
@@ -36,20 +73,20 @@ void main() {
 
   test('the root reader finds build_info.json where a reader that skips a '
       'segment finds nothing', () async {
-    final bytes = await tarGzRootFile(_committed, 'build_info.json');
+    final bytes = await tarGzRootFile(packed, 'build_info.json');
 
     check(bytes).isNotNull();
     check(
       jsonDecode(utf8.decode(bytes!)) as Map<String, Object?>,
     ).containsKey('release');
-    check(await tarGzFile(_committed, 'build_info.json')).isNull();
-    check(await tarGzRootFile(_committed, 'missing.json')).isNull();
-    check(await tarGzRootFile(_committed, 'dylibs/ada/libada.so')).isNotNull();
+    check(await tarGzFile(packed, 'build_info.json')).isNull();
+    check(await tarGzRootFile(packed, 'missing.json')).isNull();
+    check(await tarGzRootFile(packed, 'dylibs/ada/libada.so')).isNotNull();
   });
 
   test('attach and finalize read the build_info.json of a real release '
       'archive', () async {
-    final info = await archiveBuildInfo(_committed);
+    final info = await archiveBuildInfo(packed);
 
     check(info['release']).equals('v0.0.1');
     check(info['platform']).equals('linux-arm64');
@@ -60,17 +97,9 @@ void main() {
     final directory = Directory.systemTemp.createTempSync('layout');
     addTearDown(() => directory.deleteSync(recursive: true));
     const platform = BuildPlatform.linuxArm64;
-    for (final file in fixtureArchiveFiles(platform)) {
-      File(p.join(directory.path, file))
-        ..parent.createSync(recursive: true)
-        ..writeAsStringSync('$file\n');
-    }
-    final files = archiveFiles(directory.path, platform: platform);
-    await normalizeArchiveFiles(directory.path, files, 0);
-    final packed = p.join(directory.path, 'real.tar.gz');
-    await packArchive(directory.path, files, packed);
+    final archive = await _pack(directory, platform, (file) => '$file\n');
 
-    final real = _members(File(packed).readAsBytesSync());
+    final real = _members(File(archive).readAsBytesSync());
     final fixture = _members(
       releaseArchiveBytes(platform, {'release': 'v0.0.1'}),
     );
