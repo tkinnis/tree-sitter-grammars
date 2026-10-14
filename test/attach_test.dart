@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:checks/checks.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import '../tool/src/attach.dart';
@@ -177,8 +178,8 @@ void main() {
       'v1.1.0',
       '--repo',
       releaseRepository,
-      '${directory.path}/$_archiveName',
-      '${directory.path}/$_archiveName.sha256',
+      p.join(directory.path, _archiveName),
+      p.join(directory.path, '$_archiveName.sha256'),
     ]);
     check(
       attach.calls.expand((call) => call),
