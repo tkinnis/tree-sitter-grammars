@@ -295,7 +295,32 @@ Future<void> unpackBundle(
 /// Every member is held to the rules [unpackBundle] holds it to first, on
 /// every host, so a bundle naming [path] twice is refused rather than read
 /// at either member. [operatingSystem] is as [unpackBundle] takes it.
+///
+/// Throws a [SourceBundleException] for a file that is no UTF-8, read by
+/// [tarGzFile] or by tar alike.
 Future<String?> bundleFile(
+  String bundle,
+  String path, {
+  String? operatingSystem,
+}) async {
+  final bytes = await _bundleFileBytes(
+    bundle,
+    path,
+    operatingSystem: operatingSystem,
+  );
+  if (bytes == null) return null;
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    throw SourceBundleException(
+      'could not read $path from $bundle: it is no UTF-8',
+    );
+  }
+}
+
+/// The bytes of [path] in [bundle], as [bundleFile] reads them, or null
+/// when the bundle holds no such file.
+Future<List<int>?> _bundleFileBytes(
   String bundle,
   String path, {
   String? operatingSystem,
@@ -304,8 +329,7 @@ Future<String?> bundleFile(
   final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
   try {
     if (windows) {
-      final bytes = await tarGzFile(bundle, path);
-      return bytes == null ? null : utf8.decode(bytes);
+      return await tarGzFile(bundle, path, operatingSystem: operatingSystem);
     }
     await checkTarGz(
       bundle,
@@ -319,8 +343,8 @@ Future<String?> bundleFile(
     '-xzOf',
     bundle,
     member,
-  ], stdoutEncoding: utf8);
-  if (result.exitCode == 0) return result.stdout as String;
+  ], stdoutEncoding: null);
+  if (result.exitCode == 0) return result.stdout as List<int>;
   if ('${result.stderr}'.contains('Not found in archive')) return null;
   throw SourceBundleException(
     'tar could not read $member from $bundle: ${result.stderr}',

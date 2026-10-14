@@ -272,6 +272,65 @@ void main() {
     });
   });
 
+  group('bundleFile refuses a file that is no UTF-8 alike on every host', () {
+    // On Windows bundleFile decoded the file itself, and elsewhere tar's
+    // output was decoded as Process.run read it, and either threw a bare
+    // FormatException, which no caller of bundleFile catches as a
+    // SourceBundleException.
+    late String tar;
+    setUp(() {
+      tar = tarExecutable;
+      // The tar Windows ships, a bsdtar, as macOS's is, stands in for
+      // /usr/bin/tar on a Windows host.
+      if (Platform.isWindows) {
+        tarExecutable = p.join(
+          Platform.environment['SystemRoot'] ?? r'C:\Windows',
+          'System32',
+          'tar.exe',
+        );
+      }
+    });
+    tearDown(() => tarExecutable = tar);
+
+    for (final operatingSystem in ['windows', 'macos']) {
+      test('on $operatingSystem', () async {
+        // The bundle is named for its top-level directory, as tar reads
+        // the file at that prefix.
+        // Mutation: let the FormatException of utf8.decode out of
+        // bundleFile unmapped (catch another type); this reddens.
+        final bundle = path('top.tar.gz');
+        File(bundle).writeAsBytesSync(
+          gzipCompress([
+            ...rawHeader('top/a.c', '0', 2),
+            0x41,
+            0xff,
+            ...List.filled(510, 0),
+            ...List.filled(1024, 0),
+          ]),
+        );
+
+        await check(
+          bundleFile(bundle, 'a.c', operatingSystem: operatingSystem),
+        ).throws<SourceBundleException>(
+          (it) => it
+              .has((e) => e.message, 'message')
+              .equals('could not read a.c from $bundle: it is no UTF-8'),
+        );
+      });
+    }
+
+    test('the control: a file in UTF-8 is read through tar', () async {
+      final bundle = await pack(first, path('bundles'));
+
+      check(
+        await bundleFile(bundle, 'src/parser.c', operatingSystem: 'macos'),
+      ).equals('int parse(void) { return 0; }\n');
+      check(
+        await bundleFile(bundle, 'missing.c', operatingSystem: 'macos'),
+      ).isNull();
+    });
+  });
+
   group('checkRecordedBundle', () {
     late String bundle;
     late Map<String, Object?> recorded;
