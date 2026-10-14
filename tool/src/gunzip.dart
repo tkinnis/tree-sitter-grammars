@@ -23,11 +23,11 @@ import 'dart:typed_data';
 /// CRC-32 or length is not the decoded bytes'; and any byte after the
 /// trailer, a second member's or any other.
 ///
-/// It throws too for a stream that decodes to more than [limit] bytes, by
-/// default [gunzipLimit], having held no more than that in memory: deflate
-/// codes up to 258 bytes in a few bits, so a small file can decode to far
-/// more than memory holds.
-Uint8List gunzip(Uint8List input, {int limit = gunzipLimit}) {
+/// It throws too for a stream that decodes to more than [limit] bytes,
+/// [gunzipLimit] for every reader of a `.tar.gz` (see `tarGzLimit`), having
+/// held no more than that in memory: deflate codes up to 258 bytes in a few
+/// bits, so a small file can decode to far more than memory holds.
+Uint8List gunzip(Uint8List input, {required int limit}) {
   final at = _headerEnd(input);
   final inflater = _Inflater(input, at, limit);
   final output = inflater.inflate();

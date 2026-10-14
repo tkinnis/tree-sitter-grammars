@@ -699,6 +699,45 @@ void main() {
       // Mutation: any other gunzipLimit; this reddens.
       check(gunzipLimit).equals(1 << 30);
     });
+
+    test('an archive is read to gunzipLimit', () {
+      // Every reader of a .tar.gz reads it to tarGzLimit, which tests
+      // lower; it is gunzipLimit unless they do.
+      // Mutation: start tarGzLimit at any other value; this reddens.
+      check(tarGzLimit).equals(gunzipLimit);
+    });
+
+    test('every reader of a .tar.gz reads it to tarGzLimit', () async {
+      // An archive of one empty file decodes to 1536 bytes: its header
+      // and the two zero blocks that end it.
+      // Mutation: decode an archive to another limit than tarGzLimit,
+      // gunzip's default or any other; this reddens.
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(gzipCompress(rawStream(['top/a.c'])));
+      final limit = tarGzLimit;
+      addTearDown(() => tarGzLimit = limit);
+      tarGzLimit = 1535;
+      final message =
+          '$archive is no gzip stream: it decodes to more than 1535 bytes, '
+          'the most a .tar.gz the build reads may hold';
+
+      await check(
+        unpackTarGz(archive, p.join(scratch, 'out'), stripComponents: 1),
+      ).throws<TarException>((it) => _message(it).equals(message));
+      await check(
+        checkTarGz(archive, stripComponents: 1),
+      ).throws<TarException>((it) => _message(it).equals(message));
+      await check(
+        tarGzFile(archive, 'a.c'),
+      ).throws<TarException>((it) => _message(it).equals(message));
+      await check(
+        tarGzRootFile(archive, 'top/a.c'),
+      ).throws<TarException>((it) => _message(it).equals(message));
+
+      // The control: exactly its limit is read.
+      tarGzLimit = 1536;
+      check(await tarGzFile(archive, 'a.c')).isNotNull().isEmpty();
+    });
   });
 
   group('a Huffman code is held to the rules zlib holds it to', () {
@@ -746,7 +785,7 @@ void main() {
         );
 
         check(() => gzip.decode(stream)).throws<Object>();
-        check(() => gunzip(stream))
+        check(() => gunzip(stream, limit: gunzipLimit))
             .throws<FormatException>()
             .has((e) => e.message, 'message')
             .equals('its deflate stream has an incomplete Huffman code');
@@ -780,7 +819,7 @@ void main() {
         );
 
         check(utf8.decode(gzip.decode(stream))).equals(output);
-        check(utf8.decode(gunzip(stream))).equals(output);
+        check(utf8.decode(gunzip(stream, limit: gunzipLimit))).equals(output);
       });
     }
   });
@@ -809,7 +848,7 @@ void main() {
       final stream = withHeaderCrc(abc);
 
       check(utf8.decode(gzip.decode(stream))).equals('abc');
-      check(utf8.decode(gunzip(stream))).equals('abc');
+      check(utf8.decode(gunzip(stream, limit: gunzipLimit))).equals('abc');
     });
 
     test('a header with a wrong CRC-16', () {
@@ -818,7 +857,7 @@ void main() {
       final stream = withHeaderCrc(abc, flip: 1);
 
       check(() => gzip.decode(stream)).throws<Object>();
-      check(() => gunzip(stream))
+      check(() => gunzip(stream, limit: gunzipLimit))
           .throws<FormatException>()
           .has((e) => e.message, 'message')
           .equals('its header has a wrong CRC-16');
@@ -840,7 +879,7 @@ void main() {
       );
 
       check(() => gzip.decode(stream)).throws<Object>();
-      check(() => gunzip(stream))
+      check(() => gunzip(stream, limit: gunzipLimit))
           .throws<FormatException>()
           .has((e) => e.message, 'message')
           .equals(
@@ -865,7 +904,7 @@ void main() {
         ], output: 'AAAA');
 
         check(() => gzip.decode(stream)).throws<Object>();
-        check(() => gunzip(stream))
+        check(() => gunzip(stream, limit: gunzipLimit))
             .throws<FormatException>()
             .has((e) => e.message, 'message')
             .equals(
@@ -884,7 +923,7 @@ void main() {
       ], output: 'AAAA');
 
       check(utf8.decode(gzip.decode(stream))).equals('AAAA');
-      check(utf8.decode(gunzip(stream))).equals('AAAA');
+      check(utf8.decode(gunzip(stream, limit: gunzipLimit))).equals('AAAA');
     });
   });
 

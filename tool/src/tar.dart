@@ -840,12 +840,18 @@ Future<Uint8List?> _tarGzMember(
   return null;
 }
 
+/// The most bytes [_readTarGz], beneath every reader of a `.tar.gz`,
+/// decodes an archive to: [gunzipLimit]. Tests name less, to refuse an
+/// archive past it without allocating that much.
+int tarGzLimit = gunzipLimit;
+
 /// Every member of the gzip-compressed tar [archive], as [readTar] reads
 /// them.
 ///
 /// Throws a [TarException] naming [archive] when it cannot be read, is not
 /// exactly one whole gzip member, which [gunzip] checks to the last byte of
-/// its trailer, or holds a malformed tar stream.
+/// its trailer, or decodes to more than [tarGzLimit] bytes, or holds a
+/// malformed tar stream.
 Future<List<TarMember>> _readTarGz(String archive) async {
   final Uint8List compressed;
   try {
@@ -855,7 +861,7 @@ Future<List<TarMember>> _readTarGz(String archive) async {
   }
   final Uint8List stream;
   try {
-    stream = gunzip(compressed);
+    stream = gunzip(compressed, limit: tarGzLimit);
   } on FormatException catch (error) {
     throw TarException('$archive is no gzip stream: ${error.message}');
   }
