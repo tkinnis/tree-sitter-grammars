@@ -1086,6 +1086,52 @@ void main() {
     });
   });
 
+  group('stripping a path counts its "." segments as tar does', () {
+    // GNU tar and bsdtar strip --strip-components segments of a path as
+    // written, a "." among them, and drop the "." segments that remain:
+    // ./a/B unpacks to a/B. _MemberRules dropped every "." first and
+    // placed it at B, so a member that tar unpacked over another, or into
+    // one file with another on Windows, passed the check. Each case is
+    // reddened by _MemberRules' dropping "." segments before it strips.
+    for (final (problem, members, message) in [
+      (
+        'a/B, from ./a/B, and a/b, which differ only in case',
+        ['top/keep', './a/B', 'x/a/b'],
+        'x/a/b: "a/b" names the same file as "a/B" on Windows',
+      ),
+      (
+        'one file twice, as ./a/b and x/a/b',
+        ['top/keep', './a/b', 'x/a/b'],
+        'x/a/b: an earlier member makes "a/b" a file',
+      ),
+    ]) {
+      test('refused: $problem', () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(gzipCompress(rawMembers(members)));
+
+        await check(
+          checkTarGz(archive, stripComponents: 1),
+        ).throws<TarException>(
+          (it) => _message(it).startsWith('$archive: $message'),
+        );
+        await check(tarGzFile(archive, 'keep')).throws<TarException>();
+      });
+    }
+
+    test('a member under "./" unpacks where tar unpacks it', () async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress(rawMembers(['./', './top/', './top/a/', './top/a/b'])),
+      );
+      final destination = p.join(scratch, 'out');
+
+      await unpackTarGz(archive, destination, stripComponents: 1);
+
+      check(File(p.join(destination, 'top', 'a', 'b')).existsSync()).isTrue();
+      check(await tarGzFile(archive, 'top/a/b')).isNotNull();
+    });
+  });
+
   group('ustar refuses a path that would not unpack as written', () {
     for (final (problem, paths, message) in [
       // Reddened by ustar's checking each segment only against

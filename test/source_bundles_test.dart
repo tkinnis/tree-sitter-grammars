@@ -154,9 +154,11 @@ void main() {
         'top/a.c: an earlier member makes "a.c" a file',
       ),
       (
-        'one file twice, once under "./"',
-        ['top/a.c', './top/a.c'],
-        './top/a.c: an earlier member makes "a.c" a file',
+        // tar strips ./top/a.c of one segment to top/a.c, no duplicate, as
+        // the stripped segment is "."; top/./a.c is a.c.
+        'one file twice, once as "top/./a.c"',
+        ['top/a.c', 'top/./a.c'],
+        'top/./a.c: an earlier member makes "a.c" a file',
       ),
       (
         'two files differing only in case',

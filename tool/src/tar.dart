@@ -507,8 +507,11 @@ final class _MemberRules {
   _MemberRules.written() : _written = true, _stripComponents = 0;
 
   /// The rules for an archive read without the first [stripComponents]
-  /// segments of each path, after each empty and `.` segment is dropped,
-  /// as tar does: `./x` and `a//b` name `x` and `a/b`.
+  /// segments of each path, as GNU tar and bsdtar strip them: a run of `/`
+  /// separates two segments, and one that starts a path none, and a `.`
+  /// segment is stripped as any other is, so `./a/b` stripped of one
+  /// segment is `a/b`. The `.` segments that remain are then dropped, as
+  /// tar drops them: `./x` and `a//b` name `x` and `a/b`.
   _MemberRules.read({int stripComponents = 0})
     : _written = false,
       _stripComponents = stripComponents;
@@ -527,9 +530,11 @@ final class _MemberRules {
   /// Throws a [TarException] starting with [path] when the member is
   /// refused.
   List<String>? check(String path, TarMemberType type) {
+    // The segments as tar strips them, with any `.`, and without it.
+    final List<String> components;
     final List<String> segments;
     if (_written) {
-      segments = path.split('/');
+      segments = components = path.split('/');
       if (segments.any((s) => s.isEmpty || s == '.' || s == '..')) {
         throw TarException(
           '$path: a path with an empty, "." or ".." segment, or that '
@@ -537,9 +542,13 @@ final class _MemberRules {
         );
       }
     } else {
-      segments = [
+      components = [
         for (final segment in path.split('/'))
-          if (segment.isNotEmpty && segment != '.') segment,
+          if (segment.isNotEmpty) segment,
+      ];
+      segments = [
+        for (final segment in components)
+          if (segment != '.') segment,
       ];
       if (segments.isEmpty) {
         // `tar -C dir .` names the directory it packs `./`, which unpacks
@@ -565,7 +574,10 @@ final class _MemberRules {
         '$path is a symbolic link, which is neither unpacked nor read',
       );
     }
-    final kept = segments.skip(_stripComponents).toList();
+    final kept = [
+      for (final segment in components.skip(_stripComponents))
+        if (segment != '.') segment,
+    ];
     if (kept.isEmpty) {
       if (type == TarMemberType.directory) return null;
       throw TarException(
