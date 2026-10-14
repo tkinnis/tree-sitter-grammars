@@ -729,6 +729,109 @@ void main() {
     }
   });
 
+  group('a gzip stream zlib refuses is refused', () {
+    // Each refused stream is asked of zlib, through gzip.decode, too, and
+    // must be refused there as well.
+
+    /// [whole] with the FHCRC flag set and a CRC-16 after its header: the
+    /// low 16 bits of the CRC-32 of the header, with [flip] xored in.
+    Uint8List withHeaderCrc(List<int> whole, {int flip = 0}) {
+      final header = [...whole.take(10)];
+      header[3] |= 0x02;
+      final crc = (crc32(header) & 0xffff) ^ flip;
+      return Uint8List.fromList([
+        ...header,
+        crc & 0xff,
+        crc >> 8,
+        ...whole.skip(10),
+      ]);
+    }
+
+    final abc = gzipCompress(utf8.encode('abc'));
+
+    test('the control: a header with its right CRC-16 is read', () {
+      final stream = withHeaderCrc(abc);
+
+      check(utf8.decode(gzip.decode(stream))).equals('abc');
+      check(utf8.decode(gunzip(stream))).equals('abc');
+    });
+
+    test('a header with a wrong CRC-16', () {
+      // Mutation: skip _headerEnd's comparison of the FHCRC CRC-16 with
+      // the header's (if (false)); this reddens.
+      final stream = withHeaderCrc(abc, flip: 1);
+
+      check(() => gzip.decode(stream)).throws<Object>();
+      check(() => gunzip(stream))
+          .throws<FormatException>()
+          .has((e) => e.message, 'message')
+          .equals('its header has a wrong CRC-16');
+    });
+
+    test('a dynamic block with no end-of-block code', () {
+      // A literal/length code of A and the length symbol 257, a complete
+      // code, so no code is the end of the block, which zlib refuses as
+      // "invalid code -- missing end-of-block". Mutation: skip
+      // _dynamicCodes' refusal of a code length of 0 for symbol 256 (if
+      // (false)); this reddens, as the trailer is decoded as more of the
+      // block.
+      final stream = _gzipOfDynamicBlock(
+        codeLengths: {18: 1, 1: 1},
+        literals: {65: 1, 257: 1},
+        distances: [1],
+        symbols: [(65, null)],
+        output: 'A',
+      );
+
+      check(() => gzip.decode(stream)).throws<Object>();
+      check(() => gunzip(stream))
+          .throws<FormatException>()
+          .has((e) => e.message, 'message')
+          .equals(
+            'its deflate stream has a dynamic block with no end-of-block code',
+          );
+    });
+
+    for (final distance in [30, 31]) {
+      test('the fixed distance symbol $distance, which codes no distance', () {
+        // The fixed distance code has 32 codes of length 5, and 30 and 31
+        // code no distance: zlib refuses them as "invalid distance code".
+        // Mutation: skip _huffman's refusal of a distance symbol of 30 or
+        // more (if (false)); this reddens, as a RangeError.
+        final stream = _gzipOfFixedBlock([
+          // A: 0x30 + 65, in 8 bits.
+          (0x30 + 65, 8),
+          // The length symbol 257, a length of 3: 1, in 7 bits.
+          (1, 7),
+          (distance, 5),
+          // The end of the block: 0, in 7 bits.
+          (0, 7),
+        ], output: 'AAAA');
+
+        check(() => gzip.decode(stream)).throws<Object>();
+        check(() => gunzip(stream))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals(
+              'its deflate stream has the invalid distance symbol $distance',
+            );
+      });
+    }
+
+    test('the control: a fixed block with the distance symbol 0 is '
+        'read', () {
+      final stream = _gzipOfFixedBlock([
+        (0x30 + 65, 8),
+        (1, 7),
+        (0, 5),
+        (0, 7),
+      ], output: 'AAAA');
+
+      check(utf8.decode(gzip.decode(stream))).equals('AAAA');
+      check(utf8.decode(gunzip(stream))).equals('AAAA');
+    });
+  });
+
   group('a name outside printable ASCII is refused', () {
     // Each name is one Windows allows, so only the ASCII rule refuses it.
     // "cafe.c" with an acute e is refused in both its Unicode forms, which
@@ -1571,6 +1674,45 @@ Uint8List _gzipOfDynamicBlock({
     if (distance != null) putCode(distanceLengths, distanceCode, distance);
   }
   if (count > 0) put(0, 8 - count);
+  final decoded = utf8.encode(output);
+  int le(int value, int index) => value >> (8 * index) & 0xff;
+  final crc = crc32(decoded);
+  return Uint8List.fromList([
+    ...[0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 0xff],
+    ...bytes,
+    for (var index = 0; index < 4; index++) le(crc, index),
+    for (var index = 0; index < 4; index++) le(decoded.length, index),
+  ]);
+}
+
+/// A gzip file of one fixed-code deflate block, the last, holding [codes],
+/// each a Huffman code and its length in bits, written from its most
+/// significant bit, as RFC 1951 writes a Huffman code. Its trailer
+/// records [output].
+Uint8List _gzipOfFixedBlock(List<(int, int)> codes, {required String output}) {
+  final bytes = <int>[];
+  var bits = 0;
+  var count = 0;
+  void put(int bit) {
+    bits |= bit << count++;
+    if (count == 8) {
+      bytes.add(bits);
+      bits = 0;
+      count = 0;
+    }
+  }
+
+  put(1); // the last block
+  put(1); // fixed codes, 01, from its least significant bit
+  put(0);
+  for (final (code, length) in codes) {
+    for (var bit = length - 1; bit >= 0; bit--) {
+      put(code >> bit & 1);
+    }
+  }
+  while (count > 0) {
+    put(0);
+  }
   final decoded = utf8.encode(output);
   int le(int value, int index) => value >> (8 * index) & 0xff;
   final crc = crc32(decoded);
