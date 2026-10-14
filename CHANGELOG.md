@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The Windows runtime is compiled without `-D_DARWIN_C_SOURCE`, which only Apple's headers read; macOS keeps it, and Linux never passed it
 - `tool/src/tar.dart` refuses, on every host, to write a path or unpack a member with a segment Windows cannot name a file by: a device name (`CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `COM0` to `COM9` and `LPT0` to `LPT9`, the superscript `COM¹`, `COM²`, `COM³`, `LPT¹`, `LPT²` and `LPT³`, in any case and with any extension, as `nul.txt`), a name ending in a dot or a space, and a name holding a control character or any of `<>:"/\|?*`; unpacking checks every member before it writes the first, so a bundle refused for any of its members leaves nothing behind
 - Unpacking a bundle also refuses, on every host, a member that cannot be unpacked with the members before it: a path that differs only in case from one an earlier member names, as `readme` from `README` or `src/b.c` from `Src/a.c`, which Windows would write over the other or into one directory; a member under a file; a file where a directory is; and one file twice. A directory named by its own member and as a file's parent is allowed
+- `ustar`, which packs the Windows archive, refuses the paths `unpackTarGz` would refuse or not unpack as written: one that is absolute or has an empty, `.` or `..` segment, and paths that differ only in case, a file under another file and one file twice
 
 ### Fixed
 

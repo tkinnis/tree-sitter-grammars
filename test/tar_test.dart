@@ -556,6 +556,49 @@ void main() {
     });
   });
 
+  group('ustar refuses a path that would not unpack as written', () {
+    for (final (problem, paths, message) in [
+      // Reddened by ustar's checking each segment only against
+      // windowsNameProblem, as it did, which leaves "", "." and ".." to
+      // its caller; unpackTarGz refuses a ".." and drops "" and ".".
+      for (final (problem, path) in [
+        ('a leading ..', '../x'),
+        ('a .. inside', 'a/../b'),
+        ('a leading /', '/abs/x'),
+        ('a . segment', './x'),
+        ('an empty segment', 'a//b'),
+        ('a trailing /', 'a/'),
+      ])
+        (problem, [path], '$path: a path with an empty, "." or ".." segment'),
+      // Reddened by ustar's not comparing its paths with one another, as
+      // it did not: unpackTarGz refuses each of these.
+      (
+        'two files differing only in case',
+        ['dylibs/a.dll', 'dylibs/A.dll'],
+        'dylibs/A.dll: "dylibs/A.dll" names the same file as "dylibs/a.dll" '
+            'on Windows',
+      ),
+      (
+        'a file under a file',
+        ['a', 'a/b'],
+        'a/b: an earlier member makes "a" a file',
+      ),
+      ('one file twice', ['a', 'a'], 'a: an earlier member makes "a" a file'),
+    ]) {
+      test(problem, () {
+        check(
+              () => ustar([
+                for (final path in paths)
+                  (path: path, bytes: const [], mode: 0x1a4, epoch: 0),
+              ]),
+            )
+            .throws<TarException>()
+            .has((e) => e.message, 'message')
+            .startsWith(message);
+      });
+    }
+  });
+
   test('hashes a file as sha256 does', () async {
     final file = File(p.join(scratch, 'abc'))..writeAsStringSync('abc');
 

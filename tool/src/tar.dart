@@ -50,16 +50,29 @@ const _block = 512;
 ///
 /// A path longer than the 100 bytes of a header's name field is split at
 /// a `/` into its 155-byte prefix field, as ustar defines; one that fits
-/// neither way throws a [TarException], and so does a path with a segment
-/// Windows cannot name a file by (see [windowsNameProblem]), on every
-/// host, so that an archive this writes unpacks on Windows.
+/// neither way throws a [TarException]. So, on every host, so that an
+/// archive this writes unpacks on Windows as [unpackTarGz] unpacks it, does
+/// a path that is absolute or has an empty, `.` or `..` segment, one with a
+/// segment Windows cannot name a file by (see [windowsNameProblem]), and
+/// one that cannot be unpacked with the paths before it (see [_Layout]).
 Uint8List ustar(List<TarFile> files) {
   final stream = BytesBuilder(copy: false);
+  final layout = _Layout();
   for (final file in files) {
-    for (final segment in file.path.split('/')) {
+    final segments = file.path.split('/');
+    if (segments.any((s) => s.isEmpty || s == '.' || s == '..')) {
+      throw TarException(
+        '${file.path}: a path with an empty, "." or ".." segment, or that '
+        'starts with "/", is not unpacked as written',
+      );
+    }
+    for (final segment in segments) {
       if (windowsNameProblem(segment) case final problem?) {
         throw TarException('${file.path}: $problem');
       }
+    }
+    if (layout.add(segments, isFile: true) case final problem?) {
+      throw TarException('${file.path}: $problem');
     }
     stream.add(_header(file));
     stream.add(file.bytes);
