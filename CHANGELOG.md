@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The Windows runtime is compiled without `-D_DARWIN_C_SOURCE`, which only Apple's headers read; macOS keeps it, and Linux never passed it
 
+### Fixed
+
+- `tool/src/pe.dart` bounds every read of a DLL: an image cut short or malformed anywhere it reads (the PE signature `e_lfanew` points at, the COFF or optional header, the data directories, the section table, the export directory, its name pointers and names, the import and delay-load descriptors and their DLL names) is reported as a `FormatException` naming what is cut short, never a `RangeError`, and a structure that runs past its section's raw data is refused rather than read from the bytes after it
+
 ## [1.5.0] - 2026-10-13
 
 ### Added
