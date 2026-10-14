@@ -64,3 +64,22 @@ Uint8List paxPathMember(String path, {String name = 'named'}) {
     ...rawHeader(name, '0', 0),
   ]);
 }
+
+/// A pax extended header of [type], `x` for the member after it or `g`
+/// for every member after it, holding [records], each a `key=value`, with
+/// its data padded to a block.
+Uint8List paxHeader(String type, List<String> records) {
+  final data = <int>[];
+  for (final record in records) {
+    final text = ' $record\n';
+    // A pax record's length counts its own digits.
+    var length = utf8.encode(text).length + 1;
+    length = utf8.encode('$length$text').length;
+    data.addAll(utf8.encode('$length$text'));
+  }
+  return Uint8List.fromList([
+    ...rawHeader('pax', type, data.length),
+    ...data,
+    ...Uint8List((512 - data.length % 512) % 512),
+  ]);
+}

@@ -137,10 +137,18 @@ Uint8List _header(TarFile file) {
 /// header or holds no `key=value`, and a stream that ends inside a member
 /// or a header or without the zero block that ends an archive, as one cut
 /// short does.
+///
+/// It also throws for a stream GNU tar or bsdtar would read otherwise, so
+/// that what is checked here is what tar unpacks: a pax record other than
+/// those [_paxKeys] and [_globalPaxKeys] name, and an extended header
+/// after another, with no member between them.
 List<TarMember> readTar(Uint8List bytes) {
   final members = <TarMember>[];
   var offset = 0;
   Map<String, String> extended = const {};
+  // Where the extended header the next member takes its records from is,
+  // or null when there is none.
+  int? extendedAt;
   while (true) {
     if (offset + _block > bytes.length) {
       // A stream cut short at a member's end would otherwise read as
@@ -162,13 +170,30 @@ List<TarMember> readTar(Uint8List bytes) {
     }
     final data = Uint8List.sublistView(bytes, dataStart, dataStart + size);
     offset = dataStart + (size + _block - 1) ~/ _block * _block;
-    switch (type) {
-      case 'x':
-        extended = _paxRecords(data, at);
-        continue;
-      case 'g':
-        continue;
+    if (type == 'x' || type == 'g') {
+      if (extendedAt != null) {
+        throw TarException(
+          'the pax header at $at follows the extended header at '
+          '$extendedAt, with no member between them',
+        );
+      }
+      final records = _paxRecords(data, at);
+      final global = type == 'g';
+      for (final key in records.keys) {
+        if (!(global ? _globalPaxKeys : _paxKeys).contains(key)) {
+          throw TarException(
+            'the pax ${global ? 'global ' : ''}header at $at holds a '
+            '"$key" record, which tar reads and this reader does not',
+          );
+        }
+      }
+      if (!global) {
+        extended = records;
+        extendedAt = at;
+      }
+      continue;
     }
+    extendedAt = null;
     final name = _string(header, 0, 100, 'name', at);
     final prefix = _string(header, 345, 155, 'prefix', at);
     final path = extended['path'] ?? (prefix.isEmpty ? name : '$prefix/$name');
@@ -191,6 +216,46 @@ List<TarMember> readTar(Uint8List bytes) {
   }
   return members;
 }
+
+/// The records of a pax extended header (`x`) [readTar] reads, the path
+/// and link target of the member after it, or leaves aside as saying
+/// nothing of where a member is unpacked or what it holds: its times and
+/// owners, and a comment.
+///
+/// GNU tar and bsdtar read more, and a record [readTar] ignored could
+/// have a tar read another member than it read: `size` puts the next
+/// header elsewhere, and `GNU.sparse.name` renames a member. Any record
+/// but these is refused. No archive the build writes or reads holds any:
+/// `git archive` writes `path` and `linkpath`, and the release archives
+/// are written as plain ustar.
+const _paxKeys = {
+  'path',
+  'linkpath',
+  'mtime',
+  'atime',
+  'ctime',
+  'uid',
+  'gid',
+  'uname',
+  'gname',
+  'comment',
+};
+
+/// The records of a pax global header (`g`) [readTar] leaves aside, as
+/// [_paxKeys] does: those of [_paxKeys] that say nothing of where a member
+/// is unpacked or what it holds. GNU tar applies a global header's `path`
+/// to the members after it, where bsdtar ignores it, so it is refused.
+/// `git archive` writes a `comment` naming its commit.
+const _globalPaxKeys = {
+  'mtime',
+  'atime',
+  'ctime',
+  'uid',
+  'gid',
+  'uname',
+  'gname',
+  'comment',
+};
 
 void _requireChecksum(Uint8List header, int offset) {
   var sum = 0;

@@ -263,6 +263,115 @@ void main() {
     });
   });
 
+  group('a pax record tar reads and readTar does not is refused', () {
+    // readTar read a pax header's path and linkpath records and ignored
+    // every other, where GNU tar and bsdtar read more of them: each case
+    // here is one both tars, or GNU tar, list otherwise than readTar did,
+    // and is reddened by dropping readTar's refusal of a record it does
+    // not read (_paxKeys, _globalPaxKeys).
+    final link = rawHeader(
+      'top/evil',
+      '2',
+      0,
+      edit: (header) => header.setAll(157, ascii.encode('/etc')),
+    );
+    for (final (problem, stream, message) in [
+      (
+        // Both tars take the size from the record: top/x is empty, and
+        // the header readTar read as its 512 bytes of data is a symbolic
+        // link to /etc, which tarGzRootFile returned as top/x's bytes.
+        'size, which hides a member in the data the ustar header gives',
+        [
+          ...paxHeader('x', ['size=0']),
+          ...rawHeader('top/x', '0', 512),
+          ...link,
+        ],
+        'the pax header at 0 holds a "size" record, which tar reads and '
+            'this reader does not',
+      ),
+      (
+        // Both tars name the member top/X, which differs from top/x only
+        // in case, where readTar read top/y.
+        'GNU.sparse.name, which renames the member',
+        [
+          ...rawHeader('top/x', '0', 0),
+          ...paxHeader('x', ['GNU.sparse.name=top/X']),
+          ...rawHeader('top/y', '0', 0),
+        ],
+        'the pax header at 512 holds a "GNU.sparse.name" record, which tar '
+            'reads and this reader does not',
+      ),
+      (
+        // GNU tar names the member top/x, where bsdtar and readTar read
+        // top/y.
+        'path in a global header, which GNU tar applies to the members '
+            'after it',
+        [
+          ...paxHeader('g', ['comment=abc', 'path=top/x']),
+          ...rawHeader('top/y', '0', 0),
+        ],
+        'the pax global header at 0 holds a "path" record, which tar reads '
+            'and this reader does not',
+      ),
+    ]) {
+      test(problem, () async {
+        final bytes = Uint8List.fromList([...stream, ...Uint8List(1024)]);
+        _message(
+          check(() => readTar(bytes)).throws<TarException>(),
+        ).equals(message);
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(gzipCompress(bytes));
+        for (final strip in [0, 1]) {
+          await check(
+            checkTarGz(archive, stripComponents: strip),
+          ).throws<TarException>(
+            (it) => _message(it).equals('$archive: $message'),
+          );
+        }
+        await check(tarGzRootFile(archive, 'top/x')).throws<TarException>();
+      });
+    }
+
+    test('two extended headers before one member', () {
+      // A second header's records would be read with the first's, or in
+      // their place, as one tar or another reads them. Reddened by
+      // dropping readTar's refusal of an extended header after another.
+      final bytes = Uint8List.fromList([
+        ...paxHeader('x', ['path=top/x']),
+        ...paxHeader('x', ['mtime=0']),
+        ...rawHeader('top/y', '0', 0),
+        ...Uint8List(1024),
+      ]);
+      _message(check(() => readTar(bytes)).throws<TarException>()).equals(
+        'the pax header at 1024 follows the extended header at 0, with no '
+        'member between them',
+      );
+    });
+
+    test('the control: the records git archive and tar write are read', () {
+      // git archive writes a global comment naming the commit, and a path
+      // or linkpath where the ustar header holds none; tar writes times
+      // and owners.
+      final bytes = Uint8List.fromList([
+        ...paxHeader('g', ['comment=0123abc']),
+        ...paxHeader('x', [
+          'path=top/${'q' * 120}.c',
+          'mtime=1767225600.5',
+          'atime=1767225600',
+          'ctime=1767225600',
+          'uid=0',
+          'gid=0',
+          'uname=root',
+          'gname=wheel',
+          'comment=x',
+        ]),
+        ...rawHeader('top/short', '0', 0),
+        ...Uint8List(1024),
+      ]);
+      check(readTar(bytes).single.path).equals('top/${'q' * 120}.c');
+    });
+  });
+
   group('an archive that cannot be read is refused', () {
     test('when the file is missing', () async {
       // Reddened by dropping _readTarGz's catch of the FileSystemException
