@@ -22,9 +22,14 @@ import 'dart:typed_data';
 /// stream that is malformed or cut short; a trailer cut short, or whose
 /// CRC-32 or length is not the decoded bytes'; and any byte after the
 /// trailer, a second member's or any other.
-Uint8List gunzip(Uint8List input) {
+///
+/// It throws too for a stream that decodes to more than [limit] bytes, by
+/// default [gunzipLimit], having held no more than that in memory: deflate
+/// codes up to 258 bytes in a few bits, so a small file can decode to far
+/// more than memory holds.
+Uint8List gunzip(Uint8List input, {int limit = gunzipLimit}) {
   final at = _headerEnd(input);
-  final inflater = _Inflater(input, at);
+  final inflater = _Inflater(input, at, limit);
   final output = inflater.inflate();
   final end = inflater.end;
   if (input.length - end < 8) {
@@ -58,6 +63,15 @@ Uint8List gunzip(Uint8List input) {
   }
   return output;
 }
+
+/// The most bytes [gunzip] decodes a stream to, 1 GiB.
+///
+/// The largest of 101 real archives, the 51 `.tar.gz` assets of the v1.5.0
+/// release and the 49 source bundles and the archive a Windows build
+/// wrote, is `grammars-linux-arm64.tar.gz`, which decodes to 72151040
+/// bytes (69 MiB) from 6.1 MiB; this is fourteen times that, room for the
+/// grammars to grow, and still a buffer a build host allocates.
+const gunzipLimit = 1 << 30;
 
 int _uint32(Uint8List bytes, int at) =>
     bytes[at] | bytes[at + 1] << 8 | bytes[at + 2] << 16 | bytes[at + 3] << 24;
@@ -249,9 +263,12 @@ final _fixedDistances = _Code.of(List.filled(32, 5));
 
 /// Decodes the deflate stream of [_input] that starts at [_position].
 final class _Inflater {
-  _Inflater(this._input, this._position);
+  _Inflater(this._input, this._position, this._limit);
 
   final Uint8List _input;
+
+  /// The most bytes the stream may decode to.
+  final int _limit;
 
   /// The next byte of [_input] to read into [_bits].
   int _position;
@@ -261,7 +278,7 @@ final class _Inflater {
   int _bits = 0;
   int _count = 0;
 
-  var _output = Uint8List(1 << 16);
+  late var _output = Uint8List(_limit < 1 << 16 ? _limit : 1 << 16);
   int _length = 0;
 
   /// Where the deflate stream ends in [_input], once [inflate] returns: the
@@ -331,12 +348,21 @@ final class _Inflater {
     return entry >> 4;
   }
 
+  /// Makes room in [_output] for [count] more bytes, growing it no
+  /// further than [_limit].
   void _reserve(int count) {
     if (_length + count <= _output.length) return;
+    if (count > _limit - _length) {
+      throw FormatException(
+        'it decodes to more than $_limit bytes, the most a .tar.gz the '
+        'build reads may hold',
+      );
+    }
     var size = _output.length * 2;
     while (size < _length + count) {
       size *= 2;
     }
+    if (size > _limit) size = _limit;
     _output = Uint8List(size)..setRange(0, _length, _output);
   }
 

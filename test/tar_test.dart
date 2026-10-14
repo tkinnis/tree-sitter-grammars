@@ -645,6 +645,62 @@ void main() {
     });
   });
 
+  group('a gzip stream that decodes past its limit is refused', () {
+    // gunzip grew its buffer for as long as the stream decoded, and
+    // deflate codes 258 bytes in a few bits, so a small archive could
+    // decode to more than memory holds. Each case asks for a limit of its
+    // own, to refuse a stream without allocating gunzipLimit.
+    final bytes = List.generate(100000, (i) => i * 7919 % 251);
+    for (final (kind, level) in [
+      ('Huffman-coded blocks', 9),
+      ('stored blocks', 0),
+    ]) {
+      final stream = Uint8List.fromList(GZipCodec(level: level).encode(bytes));
+
+      test('of $kind, one byte past its limit', () {
+        // Mutation: drop _reserve's refusal of a length past the limit;
+        // this reddens.
+        check(() => gunzip(stream, limit: bytes.length - 1))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals(
+              'it decodes to more than ${bytes.length - 1} bytes, the '
+              'most a .tar.gz the build reads may hold',
+            );
+      });
+
+      test('the control: of $kind, exactly its limit is read', () {
+        // Mutation: refuse a length that reaches the limit; this reddens
+        // the stored case, whose last block reserves room to the limit.
+        check(gunzip(stream, limit: bytes.length)).deepEquals(bytes);
+      });
+    }
+
+    test('a limit below the first buffer gunzip allocates', () {
+      // Mutation: allocate the first 64 KiB buffer whatever the limit,
+      // which _reserve does not grow for a stream that fits it; this
+      // reddens.
+      check(
+            () => gunzip(
+              Uint8List.fromList(gzipCompress(utf8.encode('abc'))),
+              limit: 2,
+            ),
+          )
+          .throws<FormatException>()
+          .has((e) => e.message, 'message')
+          .equals(
+            'it decodes to more than 2 bytes, the most a .tar.gz the build '
+            'reads may hold',
+          );
+    });
+
+    test('the limit is 1 GiB', () {
+      // Fourteen times the 69 MiB the largest real archive decodes to.
+      // Mutation: any other gunzipLimit; this reddens.
+      check(gunzipLimit).equals(1 << 30);
+    });
+  });
+
   group('a Huffman code is held to the rules zlib holds it to', () {
     // zlib's inflate_table refuses a code that leaves some bit pattern
     // unused, an incomplete code, unless it is a literal/length or
