@@ -10,10 +10,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The Windows runtime is compiled without `-D_DARWIN_C_SOURCE`, which only Apple's headers read; macOS keeps it, and Linux never passed it
+- `tool/src/tar.dart` refuses, on every host, to write a path or unpack a member with a segment Windows cannot name a file by: a device name (`CON`, `PRN`, `AUX`, `NUL`, `CONIN$`, `CONOUT$`, `COM0` to `COM9` and `LPT0` to `LPT9`, the superscript `COM¹`, `COM²`, `COM³`, `LPT¹`, `LPT²` and `LPT³`, in any case and with any extension, as `nul.txt`), a name ending in a dot or a space, and a name holding a control character or any of `<>:"/\|?*`; unpacking checks every member before it writes the first, so a refused bundle leaves nothing behind
 
 ### Fixed
 
 - `tool/src/pe.dart` bounds every read of a DLL: an image cut short or malformed anywhere it reads (the PE signature `e_lfanew` points at, the COFF or optional header, the data directories, the section table, the export directory, its name pointers and names, the import and delay-load descriptors and their DLL names) is reported as a `FormatException` naming what is cut short, never a `RangeError`, and a structure that runs past its section's raw data is refused rather than read from the bytes after it
+- `tool/src/tar.dart` reports every failure to read or unpack an archive as a `TarException`, never a `RangeError`, `FormatException` or `FileSystemException`: an archive it cannot read, one that is no gzip stream, a header field that is no octal number, a name that is no UTF-8, a malformed pax record, a member the file system will not write, and a stream that ends without the zero block that ends an archive, which a stream cut short, at a member's end or inside a header, read as whole; `--attach` and `--finalize` report an archive that is no well-formed `.tar.gz` as any other they refuse
 
 ## [1.5.0] - 2026-10-13
 

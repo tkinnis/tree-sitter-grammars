@@ -333,10 +333,16 @@ Future<Map<String, Object?>> _embeddedInfo(
 
 /// The `build_info.json` inside the archive at [archive].
 ///
-/// Throws a [PublishException] when the archive holds none, or one that is
-/// not a JSON object.
+/// Throws a [PublishException] when the archive cannot be read or is no
+/// well-formed gzip-compressed tar stream, when it holds no
+/// `build_info.json`, or one that is not a JSON object.
 Future<Map<String, Object?>> archiveBuildInfo(String archive) async {
-  final bytes = await tarGzRootFile(archive, 'build_info.json');
+  final List<int>? bytes;
+  try {
+    bytes = await tarGzRootFile(archive, 'build_info.json');
+  } on TarException catch (error) {
+    throw PublishException('checking the archive: $error');
+  }
   if (bytes == null) {
     throw PublishException(
       'checking the archive: ${p.basename(archive)} holds no build_info.json',

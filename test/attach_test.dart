@@ -141,6 +141,20 @@ void main() {
   setUp(() => directory = Directory.systemTemp.createTempSync('attach_test'));
   tearDown(() => directory.deleteSync(recursive: true));
 
+  test('refuses an archive that is no gzip-compressed tar stream as it '
+      'refuses any other in the wrong state', () async {
+    // Reddened by dropping archiveBuildInfo's catch of the TarException,
+    // which tarGzRootFile throws for an archive it cannot read.
+    final archive = File('${directory.path}/$_archiveName')
+      ..writeAsStringSync('no gzip stream at all');
+
+    await check(archiveBuildInfo(archive.path)).throws<PublishException>(
+      (it) => it
+          .has((e) => e.message, 'message')
+          .startsWith('checking the archive: ${archive.path} is no gzip '),
+    );
+  });
+
   test('uploads the archive and its sha256 to the draft, and reads them '
       'back', () async {
     final attach = _Attach(directory);

@@ -50,10 +50,17 @@ const _block = 512;
 ///
 /// A path longer than the 100 bytes of a header's name field is split at
 /// a `/` into its 155-byte prefix field, as ustar defines; one that fits
-/// neither way throws a [TarException].
+/// neither way throws a [TarException], and so does a path with a segment
+/// Windows cannot name a file by (see [windowsNameProblem]), on every
+/// host, so that an archive this writes unpacks on Windows.
 Uint8List ustar(List<TarFile> files) {
   final stream = BytesBuilder(copy: false);
   for (final file in files) {
+    for (final segment in file.path.split('/')) {
+      if (windowsNameProblem(segment) case final problem?) {
+        throw TarException('${file.path}: $problem');
+      }
+    }
     stream.add(_header(file));
     stream.add(file.bytes);
     final padding = (_block - file.bytes.length % _block) % _block;
@@ -121,34 +128,49 @@ Uint8List _header(TarFile file) {
 /// Reads what `git archive` writes (ustar with pax extended headers, and a
 /// global header naming the commit, which is skipped) and what the macOS
 /// build's `/usr/bin/tar` writes. Throws a [TarException] for a header
-/// whose checksum is wrong and for a member of any other type.
+/// whose checksum is wrong, for a member of any other type, and for a
+/// stream that is malformed anywhere: a numeric field that is no octal
+/// number, a name that is no UTF-8, a pax record that does not fit its
+/// header or holds no `key=value`, and a stream that ends inside a member
+/// or a header or without the zero block that ends an archive, as one cut
+/// short does.
 List<TarMember> readTar(Uint8List bytes) {
   final members = <TarMember>[];
   var offset = 0;
   Map<String, String> extended = const {};
-  while (offset + _block <= bytes.length) {
-    final header = Uint8List.sublistView(bytes, offset, offset + _block);
+  while (true) {
+    if (offset + _block > bytes.length) {
+      // A stream cut short at a member's end would otherwise read as
+      // whole, with the members past the cut missing.
+      throw TarException(
+        'the tar stream ends at $offset without the zero block that ends '
+        'an archive',
+      );
+    }
+    final at = offset;
+    final header = Uint8List.sublistView(bytes, at, at + _block);
     if (header.every((byte) => byte == 0)) break;
     _requireChecksum(header, offset);
-    final size = _octal(header, 124, 12);
+    final size = _octal(header, 124, 12, 'size', offset);
     final type = String.fromCharCode(header[156]);
     final dataStart = offset + _block;
-    if (dataStart + size > bytes.length) {
+    if (size > bytes.length - dataStart) {
       throw TarException('the tar stream ends inside a member at $offset');
     }
     final data = Uint8List.sublistView(bytes, dataStart, dataStart + size);
     offset = dataStart + (size + _block - 1) ~/ _block * _block;
     switch (type) {
       case 'x':
-        extended = _paxRecords(data);
+        extended = _paxRecords(data, at);
         continue;
       case 'g':
         continue;
     }
-    final name = _string(header, 0, 100);
-    final prefix = _string(header, 345, 155);
+    final name = _string(header, 0, 100, 'name', at);
+    final prefix = _string(header, 345, 155, 'prefix', at);
     final path = extended['path'] ?? (prefix.isEmpty ? name : '$prefix/$name');
-    final linkTarget = extended['linkpath'] ?? _string(header, 157, 100);
+    final linkTarget =
+        extended['linkpath'] ?? _string(header, 157, 100, 'link name', at);
     extended = const {};
     final memberType = switch (type) {
       '0' || '\x00' || '7' => TarMemberType.file,
@@ -159,7 +181,7 @@ List<TarMember> readTar(Uint8List bytes) {
     members.add((
       path: path,
       type: memberType,
-      mode: _octal(header, 100, 8),
+      mode: _octal(header, 100, 8, 'mode', at),
       bytes: data,
       linkTarget: linkTarget,
     ));
@@ -172,37 +194,76 @@ void _requireChecksum(Uint8List header, int offset) {
   for (var index = 0; index < _block; index++) {
     sum += index >= 148 && index < 156 ? 0x20 : header[index];
   }
-  if (sum != _octal(header, 148, 8)) {
+  if (sum != _octal(header, 148, 8, 'checksum', offset)) {
     throw TarException('the tar header at $offset has a wrong checksum');
   }
 }
 
-int _octal(Uint8List header, int offset, int length) {
+/// The octal number in the [field] field of [header], which is at
+/// [offset] in its stream: digits from 0 to 7, padded with spaces or NULs.
+int _octal(Uint8List header, int start, int length, String field, int offset) {
   final text = ascii
-      .decode(header.sublist(offset, offset + length), allowInvalid: true)
+      .decode(header.sublist(start, start + length), allowInvalid: true)
       .replaceAll('\x00', ' ')
       .trim();
+  if (!RegExp(r'^[0-7]*$').hasMatch(text)) {
+    throw TarException(
+      'the tar header at $offset has a $field field that is no octal '
+      'number',
+    );
+  }
   return text.isEmpty ? 0 : int.parse(text, radix: 8);
 }
 
-String _string(Uint8List header, int offset, int length) {
-  final field = header.sublist(offset, offset + length);
-  final end = field.indexOf(0);
-  return utf8.decode(end < 0 ? field : field.sublist(0, end));
+/// The NUL-terminated UTF-8 text in the [field] field of [header], which is
+/// at [offset] in its stream.
+String _string(
+  Uint8List header,
+  int start,
+  int length,
+  String field,
+  int offset,
+) {
+  final bytes = header.sublist(start, start + length);
+  final end = bytes.indexOf(0);
+  try {
+    return utf8.decode(end < 0 ? bytes : bytes.sublist(0, end));
+  } on FormatException {
+    throw TarException(
+      'the tar header at $offset has a $field field that is no UTF-8',
+    );
+  }
 }
 
-/// The `key=value` records of a pax extended header's [data].
-Map<String, String> _paxRecords(Uint8List data) {
+/// The `key=value` records of the pax extended header at [offset], whose
+/// data is [data]: each `<length> <key>=<value>\n`, its length, in decimal,
+/// counting the whole record.
+Map<String, String> _paxRecords(Uint8List data, int offset) {
+  TarException malformed() =>
+      TarException('the pax header at $offset holds a malformed record');
   final records = <String, String>{};
-  var offset = 0;
-  while (offset < data.length) {
-    final space = data.indexOf(0x20, offset);
-    if (space < 0) break;
-    final length = int.parse(ascii.decode(data.sublist(offset, space)));
-    final record = utf8.decode(data.sublist(space + 1, offset + length - 1));
+  var at = 0;
+  while (at < data.length) {
+    final space = data.indexOf(0x20, at);
+    if (space < 0) throw malformed();
+    final digits = ascii.decode(data.sublist(at, space), allowInvalid: true);
+    if (!RegExp(r'^[0-9]+$').hasMatch(digits)) throw malformed();
+    final length = int.parse(digits);
+    // The length must reach past the space and a newline and stay within
+    // the data.
+    final end = at + length;
+    if (length > data.length - at || end < space + 2) throw malformed();
+    if (data[end - 1] != 0x0a) throw malformed();
+    final String record;
+    try {
+      record = utf8.decode(data.sublist(space + 1, end - 1));
+    } on FormatException {
+      throw malformed();
+    }
     final equals = record.indexOf('=');
+    if (equals < 1) throw malformed();
     records[record.substring(0, equals)] = record.substring(equals + 1);
-    offset += length;
+    at = end;
   }
   return records;
 }
@@ -224,19 +285,21 @@ final unpackedModes = <String, Map<String, int>>{};
 /// the first [stripComponents] segments of each path, and records each
 /// file's mode in [unpackedModes].
 ///
-/// A member whose path would lead out of [destination] throws a
-/// [TarException], and so does a symbolic link, which Windows creates only
-/// with a privilege a build should not need.
+/// Every member is checked before the first is written, and any failure
+/// throws a [TarException]: an archive that cannot be read or is
+/// malformed (see [readTar]); a member whose path would lead out of
+/// [destination]; one with a segment Windows cannot name a file by (see
+/// [windowsNameProblem]), refused on every host, as the archive must
+/// unpack on Windows; a symbolic link, which Windows creates only with a
+/// privilege a build should not need; and a member the file system will
+/// not write.
 Future<void> unpackTarGz(
   String archive,
   String destination, {
   int stripComponents = 0,
 }) async {
-  final members = readTar(
-    Uint8List.fromList(gzip.decode(await File(archive).readAsBytes())),
-  );
-  final modes = <String, int>{};
-  for (final member in members) {
+  final unpacked = <({TarMember member, List<String> segments})>[];
+  for (final member in await _readTarGz(archive)) {
     final segments = member.path
         .split('/')
         .where((s) => s.isNotEmpty && s != '.')
@@ -247,20 +310,38 @@ Future<void> unpackTarGz(
     if (segments.any(_leavesItsDirectory) || !p.isWithin(destination, path)) {
       throw TarException('$archive: ${member.path} leads out of the archive');
     }
-    final relative = segments.join('/');
-    switch (member.type) {
-      case TarMemberType.directory:
-        Directory(path).createSync(recursive: true);
-      case TarMemberType.file:
-        File(path)
-          ..parent.createSync(recursive: true)
-          ..writeAsBytesSync(member.bytes);
-        modes[relative] = member.mode;
-      case TarMemberType.symlink:
-        throw TarException(
-          '$archive: ${member.path} is a symbolic link, which a build on '
-          'Windows does not unpack',
-        );
+    for (final segment in segments) {
+      if (windowsNameProblem(segment) case final problem?) {
+        throw TarException('$archive: ${member.path}: $problem');
+      }
+    }
+    if (member.type == TarMemberType.symlink) {
+      throw TarException(
+        '$archive: ${member.path} is a symbolic link, which a build on '
+        'Windows does not unpack',
+      );
+    }
+    unpacked.add((member: member, segments: segments));
+  }
+  final modes = <String, int>{};
+  for (final (:member, :segments) in unpacked) {
+    final path = p.joinAll([destination, ...segments]);
+    try {
+      switch (member.type) {
+        case TarMemberType.directory:
+          Directory(path).createSync(recursive: true);
+        case TarMemberType.file:
+          File(path)
+            ..parent.createSync(recursive: true)
+            ..writeAsBytesSync(member.bytes);
+          modes[segments.join('/')] = member.mode;
+        case TarMemberType.symlink:
+          throw StateError('a symbolic link is refused before unpacking');
+      }
+    } on FileSystemException catch (error) {
+      throw TarException(
+        '$archive: ${member.path} could not be unpacked: ${_reason(error)}',
+      );
     }
   }
   unpackedModes[p.normalize(p.absolute(destination))] = modes;
@@ -276,6 +357,54 @@ bool _leavesItsDirectory(String segment) =>
     segment.contains(':') ||
     p.isAbsolute(segment) ||
     p.rootPrefix(segment).isNotEmpty;
+
+/// The names Windows reserves for devices, whatever their case and
+/// extension: `NUL.txt` and `nul.tar.gz` name the device `NUL`, as `NUL`
+/// does. `COM` and `LPT` take a digit, or a superscript 1, 2 or 3 (U+00B9,
+/// U+00B2, U+00B3), which Windows counts as digits there; `CONIN$` and
+/// `CONOUT$` name the console's input and output.
+final _reservedName = () {
+  final digits = '0-9${String.fromCharCodes(const [0xb9, 0xb2, 0xb3])}';
+  return RegExp(
+    '^(CON|PRN|AUX|NUL|CONIN\\\$|CONOUT\\\$|COM[$digits]|LPT[$digits])\$',
+  );
+}();
+
+/// Why Windows cannot name a file or directory [segment], one segment of
+/// a path, or null when it can: it holds a control character (U+0000 to
+/// U+001F) or one of `<>:"/\|?*`, ends in a dot or a space, which Windows
+/// strips, so the file it writes has another name, or is a device name
+/// (see [_reservedName]), so that Windows opens the device rather than
+/// writing a file.
+///
+/// `.` and `..` are not file names, and are left to the caller.
+String? windowsNameProblem(String segment) {
+  if (segment == '.' || segment == '..') return null;
+  final name = jsonEncode(segment);
+  for (final rune in segment.runes) {
+    if (rune < 0x20) {
+      final code = rune.toRadixString(16).padLeft(4, '0').toUpperCase();
+      return '$name holds the control character U+$code, which Windows '
+          'does not allow in a name';
+    }
+    final character = String.fromCharCode(rune);
+    if (r'<>:"/\|?*'.contains(character)) {
+      return '$name holds ${jsonEncode(character)}, which Windows does not '
+          'allow in a name';
+    }
+  }
+  if (segment.endsWith('.') || segment.endsWith(' ')) {
+    final end = segment.endsWith('.') ? 'dot' : 'space';
+    return '$name ends in a $end, which Windows strips from a name';
+  }
+  // Windows reads a device name before the first dot, ignoring the spaces
+  // that end it: `NUL .txt` is NUL.
+  final base = segment.split('.').first.trimRight().toUpperCase();
+  if (_reservedName.hasMatch(base)) {
+    return '$name names the Windows device $base';
+  }
+  return null;
+}
 
 /// The bytes of the file at [path] relative to the top-level directory
 /// of the gzip-compressed tar [archive], or null when it holds no such
@@ -301,16 +430,45 @@ Future<Uint8List?> _tarGzMember(
   String archive,
   bool Function(TarMember member) matches,
 ) async {
-  final members = readTar(
-    Uint8List.fromList(gzip.decode(await File(archive).readAsBytes())),
-  );
-  for (final member in members) {
+  for (final member in await _readTarGz(archive)) {
     if (member.type == TarMemberType.file && matches(member)) {
       return member.bytes;
     }
   }
   return null;
 }
+
+/// Every member of the gzip-compressed tar [archive], as [readTar] reads
+/// them.
+///
+/// Throws a [TarException] naming [archive] when it cannot be read, is no
+/// gzip stream or holds a malformed tar stream.
+Future<List<TarMember>> _readTarGz(String archive) async {
+  final List<int> compressed;
+  try {
+    compressed = await File(archive).readAsBytes();
+  } on FileSystemException catch (error) {
+    throw TarException('$archive could not be read: ${_reason(error)}');
+  }
+  final List<int> stream;
+  try {
+    stream = gzip.decode(compressed);
+  } on FormatException catch (error) {
+    throw TarException('$archive is no gzip stream: ${error.message}');
+  }
+  try {
+    return readTar(Uint8List.fromList(stream));
+  } on TarException catch (error) {
+    throw TarException('$archive: $error');
+  }
+}
+
+/// What [error] says, with the operating system's own words when it has
+/// them.
+String _reason(FileSystemException error) => [
+  error.message,
+  if (error.osError case final osError?) osError.message,
+].where((part) => part.isNotEmpty).join(': ');
 
 /// Whether a build on [operatingSystem], by default the one this process
 /// runs on, as `Platform.operatingSystem` spells it, computes sha256
