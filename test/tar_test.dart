@@ -743,9 +743,9 @@ void main() {
   group('a Huffman code is held to the rules zlib holds it to', () {
     // zlib's inflate_table refuses a code that leaves some bit pattern
     // unused, an incomplete code, unless it is a literal/length or
-    // distance code of a single code of length 1; gunzip allowed any,
-    // and so read streams gzip.decode, GNU tar and bsdtar refuse. Each
-    // refused case is reddened by dropping _Code.of's refusal of an
+    // distance code of a single code of length 1, and gunzip refuses it
+    // too, so it reads no stream gzip.decode, GNU tar and bsdtar refuse.
+    // Each refused case is reddened by dropping _Code.of's refusal of an
     // incomplete code, and each control by refusing every incomplete code.
     // zlib, through gzip.decode, is asked too, and must agree.
 
@@ -1528,7 +1528,7 @@ void main() {
       ),
       // tar writes a member under a link through it, out of the archive
       // when the link names /tmp: a link is a leaf of the tree, as a file
-      // is, where _Layout counted it as a directory.
+      // is, and _Layout counts it as a file.
       (
         'a file under a link, which tar would write through it',
         [rawLink('top/d', '/tmp'), rawHeader('top/d/x', '0', 0)],
@@ -1546,8 +1546,8 @@ void main() {
         // each case but the link leading out of the archive, which those
         // rules follow. Mutation: skip the check of a path leading out of
         // the archive for an allowed link; this reddens that case.
-        // Mutation: count a link as a directory in _Layout, as it was;
-        // this reddens the two cases of a link and a directory.
+        // Mutation: count a link as a directory in _Layout; this reddens
+        // the two cases of a link and a directory.
         final archive = archiveOf(members);
 
         await check(
