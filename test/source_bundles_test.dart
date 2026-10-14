@@ -128,10 +128,11 @@ void main() {
   });
 
   group('a bundle is checked on every host before tar reads it', () {
-    // On macOS and Linux, unpackBundle and bundleFile ran /usr/bin/tar on
-    // a bundle with none of the refusals unpackTarGz makes on Windows.
-    // Each now runs checkTarGz over the bundle first, in Dart, as here on
-    // any host; the tar named here does not exist, so a bundle that
+    // On macOS and Linux, unpackBundle and bundleFile hold a bundle to the
+    // refusals unpackTarGz makes on Windows, but for a symbolic link, by
+    // running checkTarGz over it, in Dart, before /usr/bin/tar reads it.
+    // The check is run here on any host, with operatingSystem naming
+    // macOS or Linux; the tar named here does not exist, so a bundle that
     // reached it would throw a ProcessException, not the refusal.
     late String tar;
     setUp(() {
@@ -273,10 +274,10 @@ void main() {
   });
 
   group('bundleFile refuses a file that is no UTF-8 alike on every host', () {
-    // On Windows bundleFile decoded the file itself, and elsewhere tar's
-    // output was decoded as Process.run read it, and either threw a bare
-    // FormatException, which no caller of bundleFile catches as a
-    // SourceBundleException.
+    // bundleFile reads the bytes of the file, tarGzFile's on Windows and
+    // tar's elsewhere, and decodes them in one place, which refuses a
+    // file that is no UTF-8 as a SourceBundleException, as its callers
+    // catch, not a bare FormatException.
     late String tar;
     setUp(() {
       tar = tarExecutable;
