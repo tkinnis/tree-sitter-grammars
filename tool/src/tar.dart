@@ -59,23 +59,9 @@ const _block = 512;
 /// one that cannot be unpacked with the paths before it (see [_Layout]).
 Uint8List ustar(List<TarFile> files) {
   final stream = BytesBuilder(copy: false);
-  final layout = _Layout();
+  final rules = _MemberRules.written();
   for (final file in files) {
-    final segments = file.path.split('/');
-    if (segments.any((s) => s.isEmpty || s == '.' || s == '..')) {
-      throw TarException(
-        '${file.path}: a path with an empty, "." or ".." segment, or that '
-        'starts with "/", is not unpacked as written',
-      );
-    }
-    for (final segment in segments) {
-      if (windowsNameProblem(segment) case final problem?) {
-        throw TarException('${file.path}: $problem');
-      }
-    }
-    if (layout.add(segments, isFile: true) case final problem?) {
-      throw TarException('${file.path}: $problem');
-    }
+    rules.check(file.path, TarMemberType.file);
     stream.add(_header(file));
     stream.add(file.bytes);
     final padding = (_block - file.bytes.length % _block) % _block;
@@ -304,49 +290,22 @@ final unpackedModes = <String, Map<String, int>>{};
 ///
 /// Every member is checked before the first is written, and any failure
 /// throws a [TarException]: an archive that cannot be read or is
-/// malformed (see [readTar]); a member whose path would lead out of
-/// [destination]; one with a segment Windows cannot name a file by (see
-/// [windowsNameProblem]) or that cannot be unpacked with the members
-/// before it (see [_Layout]), both refused on every host, as the archive
-/// must unpack on Windows; a symbolic link, which Windows creates only
-/// with a privilege a build should not need; and a member the file system
-/// will not write, which no check of the archive can foresee, as when
-/// [destination] is a file, and which may leave the members before it
-/// written.
+/// malformed (see [readTar]); a member [_MemberRules] refuses, on every
+/// host, as the archive must unpack on Windows; one whose path would lead
+/// out of [destination]; and a member the file system will not write,
+/// which no check of the archive can foresee, as when [destination] is a
+/// file, and which may leave the members before it written.
 Future<void> unpackTarGz(
   String archive,
   String destination, {
   int stripComponents = 0,
 }) async {
-  final unpacked = <({TarMember member, List<String> segments})>[];
-  final layout = _Layout();
-  for (final member in await _readTarGz(archive)) {
-    final segments = member.path
-        .split('/')
-        .where((s) => s.isNotEmpty && s != '.')
-        .skip(stripComponents)
-        .toList();
-    if (segments.isEmpty) continue;
+  final unpacked = await _checkedMembers(archive, stripComponents);
+  for (final (:member, :segments) in unpacked) {
     final path = p.joinAll([destination, ...segments]);
-    if (segments.any(_leavesItsDirectory) || !p.isWithin(destination, path)) {
+    if (!p.isWithin(destination, path)) {
       throw TarException('$archive: ${member.path} leads out of the archive');
     }
-    for (final segment in segments) {
-      if (windowsNameProblem(segment) case final problem?) {
-        throw TarException('$archive: ${member.path}: $problem');
-      }
-    }
-    if (member.type == TarMemberType.symlink) {
-      throw TarException(
-        '$archive: ${member.path} is a symbolic link, which a build on '
-        'Windows does not unpack',
-      );
-    }
-    final isFile = member.type == TarMemberType.file;
-    if (layout.add(segments, isFile: isFile) case final problem?) {
-      throw TarException('$archive: ${member.path}: $problem');
-    }
-    unpacked.add((member: member, segments: segments));
   }
   final modes = <String, int>{};
   for (final (:member, :segments) in unpacked) {
@@ -370,6 +329,105 @@ Future<void> unpackTarGz(
     }
   }
   unpackedModes[p.normalize(p.absolute(destination))] = modes;
+}
+
+/// Each member of the gzip-compressed tar [archive], as [_readTarGz] reads
+/// it, that [_MemberRules] keeps once the first [stripComponents] segments
+/// of each path are stripped, with the segments of its path that remain.
+///
+/// Throws a [TarException] naming [archive] for the first member the rules
+/// refuse, having checked every member before it.
+Future<List<({TarMember member, List<String> segments})>> _checkedMembers(
+  String archive,
+  int stripComponents,
+) async {
+  final rules = _MemberRules.read(stripComponents: stripComponents);
+  final kept = <({TarMember member, List<String> segments})>[];
+  for (final member in await _readTarGz(archive)) {
+    final List<String>? segments;
+    try {
+      segments = rules.check(member.path, member.type);
+    } on TarException catch (error) {
+      throw TarException('$archive: $error');
+    }
+    if (segments != null) kept.add((member: member, segments: segments));
+  }
+  return kept;
+}
+
+/// The rules every member of an archive is held to, the same wherever an
+/// archive is written ([ustar]), unpacked ([unpackTarGz]) or read
+/// ([tarGzFile], [tarGzRootFile]), so that what is checked is what is
+/// unpacked or read and the rules cannot drift between them.
+///
+/// A member is refused when a segment of its path leads out of the
+/// directory it is unpacked into (see [_leavesItsDirectory]); when Windows
+/// cannot name a file by a segment (see [windowsNameProblem]); when it is
+/// a symbolic link, which Windows creates only with a privilege a build
+/// should not need, and whose target a reader would have to follow; and
+/// when it cannot be unpacked with the members before it (see [_Layout]),
+/// which refuses one path twice and so leaves no doubt which of two
+/// members a reader sees.
+final class _MemberRules {
+  /// The rules for an archive [ustar] writes, whose paths are written as
+  /// they are given, so a path that would not unpack as written, one that
+  /// is absolute or has an empty, `.` or `..` segment, is refused.
+  _MemberRules.written() : _written = true, _stripComponents = 0;
+
+  /// The rules for an archive read without the first [stripComponents]
+  /// segments of each path, after each empty and `.` segment is dropped,
+  /// as tar does: `./x` and `a//b` name `x` and `a/b`.
+  _MemberRules.read({int stripComponents = 0})
+    : _written = false,
+      _stripComponents = stripComponents;
+
+  final bool _written;
+  final int _stripComponents;
+  final _layout = _Layout();
+
+  /// The segments the member at [path] of [type] is unpacked or read at,
+  /// or null when stripping takes every segment of its path, as it takes
+  /// the top-level directory of a source bundle.
+  ///
+  /// Throws a [TarException] starting with [path] when the member is
+  /// refused.
+  List<String>? check(String path, TarMemberType type) {
+    final List<String> segments;
+    if (_written) {
+      segments = path.split('/');
+      if (segments.any((s) => s.isEmpty || s == '.' || s == '..')) {
+        throw TarException(
+          '$path: a path with an empty, "." or ".." segment, or that '
+          'starts with "/", is not unpacked as written',
+        );
+      }
+    } else {
+      segments = [
+        for (final segment in path.split('/'))
+          if (segment.isNotEmpty && segment != '.') segment,
+      ];
+      if (segments.any(_leavesItsDirectory)) {
+        throw TarException('$path leads out of the archive');
+      }
+    }
+    for (final segment in segments) {
+      if (windowsNameProblem(segment) case final problem?) {
+        throw TarException('$path: $problem');
+      }
+    }
+    if (type == TarMemberType.symlink) {
+      throw TarException(
+        '$path is a symbolic link, which is neither unpacked nor read',
+      );
+    }
+    final kept = segments.skip(_stripComponents).toList();
+    if (kept.isEmpty) return null;
+    final isFile = type == TarMemberType.file;
+    if (_layout.add(kept, isFile: isFile) case final problem?) {
+      throw TarException('$path: $problem');
+    }
+    return kept;
+  }
 }
 
 /// The paths of an archive's members so far, each as its `/`-separated
@@ -495,27 +553,34 @@ String? windowsNameProblem(String segment) {
 /// file.
 ///
 /// A source bundle is a tree `git archive` writes under one top-level
-/// directory; a release archive has none (see [tarGzRootFile]).
-Future<Uint8List?> tarGzFile(String archive, String path) => _tarGzMember(
-  archive,
-  (member) => member.path.split('/').skip(1).join('/') == path,
-);
+/// directory; a release archive has none (see [tarGzRootFile]). Every
+/// member is held to [_MemberRules] first, as [unpackTarGz] holds it, so
+/// an archive naming one path twice, as `./x` and `x` or under two
+/// top-level directories, is refused rather than read at either member.
+Future<Uint8List?> tarGzFile(String archive, String path) =>
+    _tarGzMember(archive, path, stripComponents: 1);
 
 /// The bytes of the file at [path] in the gzip-compressed tar [archive],
-/// named as the archive names it, or null when it holds no such file.
+/// named as the archive names it, after any `./`, or null when it holds no
+/// such file.
 ///
 /// A release archive holds its files at the root, `build_info.json` and
 /// `dylibs/<language>/...` with no top-level directory, so no path segment
-/// is skipped.
+/// is skipped. Every member is held to [_MemberRules] first, as
+/// [tarGzFile] holds it.
 Future<Uint8List?> tarGzRootFile(String archive, String path) =>
-    _tarGzMember(archive, (member) => member.path == path);
+    _tarGzMember(archive, path, stripComponents: 0);
 
 Future<Uint8List?> _tarGzMember(
   String archive,
-  bool Function(TarMember member) matches,
-) async {
-  for (final member in await _readTarGz(archive)) {
-    if (member.type == TarMemberType.file && matches(member)) {
+  String path, {
+  required int stripComponents,
+}) async {
+  for (final (:member, :segments) in await _checkedMembers(
+    archive,
+    stripComponents,
+  )) {
+    if (member.type == TarMemberType.file && segments.join('/') == path) {
       return member.bytes;
     }
   }

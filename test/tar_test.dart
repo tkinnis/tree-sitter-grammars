@@ -711,6 +711,109 @@ void main() {
     }
   });
 
+  group('reading one file of an archive holds every member to the rules '
+      'unpacking does', () {
+    // tarGzRootFile and tarGzFile returned the first member of the path
+    // they were asked for and checked no member, where GNU tar and bsdtar
+    // keep the last of two: a checker reading build_info.json through
+    // them and a consumer unpacking the archive could see two different
+    // files. Each case is reddened by _tarGzMember's reading the members
+    // as _readTarGz returns them, unchecked, as it did.
+    for (final (problem, members, message) in [
+      (
+        'one file twice',
+        ['build_info.json', 'build_info.json'],
+        'build_info.json: an earlier member makes "build_info.json" a file',
+      ),
+      (
+        'one file twice, once under "./"',
+        ['build_info.json', './build_info.json'],
+        './build_info.json: an earlier member makes "build_info.json" a '
+            'file',
+      ),
+      (
+        'one file twice, first under "./"',
+        ['./build_info.json', 'build_info.json'],
+        'build_info.json: an earlier member makes "build_info.json" a file',
+      ),
+      (
+        'two files differing only in case',
+        ['Build_Info.json', 'build_info.json'],
+        'build_info.json: "build_info.json" names the same file as '
+            '"Build_Info.json" on Windows',
+      ),
+      (
+        'a name Windows cannot give a file',
+        ['build_info.json', 'dylibs/aux/x.dll'],
+        'dylibs/aux/x.dll: "aux" names the Windows device AUX',
+      ),
+      (
+        'a member leading out of the archive',
+        ['../build_info.json'],
+        '../build_info.json leads out of the archive',
+      ),
+    ]) {
+      test('by tarGzRootFile: $problem', () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+
+        await check(
+          tarGzRootFile(archive, 'build_info.json'),
+        ).throws<TarException>(
+          (it) => _message(it).startsWith('$archive: $message'),
+        );
+      });
+    }
+
+    test('by tarGzRootFile: a symbolic link', () async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress([
+          ..._rawHeader('build_info.json', '0', 0),
+          ..._rawHeader('link', '2', 0),
+          ...Uint8List(1024),
+        ]),
+      );
+
+      await check(
+        tarGzRootFile(archive, 'build_info.json'),
+      ).throws<TarException>(
+        (it) => _message(it).startsWith('$archive: link is a symbolic link'),
+      );
+    });
+
+    for (final (problem, members, message) in [
+      (
+        'one file twice under two top-level directories',
+        ['a/src/x.c', 'b/src/x.c'],
+        'b/src/x.c: an earlier member makes "src/x.c" a file',
+      ),
+      (
+        'one file twice, once as "top/./"',
+        ['top/src/x.c', 'top/./src/x.c'],
+        'top/./src/x.c: an earlier member makes "src/x.c" a file',
+      ),
+    ]) {
+      test('by tarGzFile: $problem', () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+
+        await check(tarGzFile(archive, 'src/x.c')).throws<TarException>(
+          (it) => _message(it).startsWith('$archive: $message'),
+        );
+      });
+    }
+
+    test('the control: a file named under "./" is read by its path', () async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(
+        archive,
+      ).writeAsBytesSync(gzipCompress(_rawMembers(['./', './build_info.json'])));
+
+      check(await tarGzRootFile(archive, 'build_info.json')).isNotNull();
+    });
+  });
+
   test('hashes a file as sha256 does', () async {
     final file = File(p.join(scratch, 'abc'))..writeAsStringSync('abc');
 
