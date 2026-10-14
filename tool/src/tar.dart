@@ -665,14 +665,14 @@ final class _MemberRules {
 ///
 /// A path names a file or a directory, as its member does, a symbolic
 /// link counting as a file, and each path a member is under names a
-/// directory. A member is refused when a path it
-/// names differs only in case from one an earlier member names, as
-/// `readme` from `README`, for Windows would write the one over the other
-/// or unpack both into one directory; when it is under a file; when it is
-/// a file at a path that names a directory or a file already, for the file
-/// system would refuse the one or write it over the other only once the
-/// members before it are written. A directory named again, by its own
-/// member or as a parent, is one directory everywhere and is allowed.
+/// directory. A member is refused when a path it names differs only in
+/// case from one an earlier member names, as `readme` from `README`, for
+/// Windows would write the one over the other or unpack both into one
+/// directory; when it is under a file; when it is a file at a path that
+/// names a directory or a file already, for the file system would refuse
+/// the one or write it over the other only once the members before it are
+/// written. A directory named again, by its own member or as a parent, is
+/// one directory everywhere and is allowed.
 final class _Layout {
   /// Each path named so far, by its [_foldCase]d spelling: as it was first
   /// spelled, and whether it is a file.
