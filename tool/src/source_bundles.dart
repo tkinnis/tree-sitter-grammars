@@ -249,18 +249,21 @@ Future<void> packBundle(
 /// holds every member to the rules [unpackTarGz] does, in Dart, before
 /// [tarExecutable] unpacks it, so a bundle is refused alike on every host,
 /// but for a symbolic link, which tar unpacks there and a build on Windows
-/// refuses. [operatingSystem], as `Platform.operatingSystem` spells it, is by
+/// refuses. [operatingSystem], as [buildHost] reads it, in any case, is by
 /// default the host's; tests name another.
+///
+/// Throws an [ArgumentError] naming [operatingSystem] for a host a build
+/// does not run on, before [destination] is created.
 Future<void> unpackBundle(
   String bundle,
   String destination, {
   String? operatingSystem,
 }) async {
+  final windows = buildHost(operatingSystem) == 'windows';
   if (FileSystemEntity.typeSync(destination) != FileSystemEntityType.notFound) {
     throw SourceBundleException('$destination already exists');
   }
   Directory(destination).createSync(recursive: true);
-  final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
   try {
     if (windows) {
       await unpackTarGz(bundle, destination, stripComponents: 1);
@@ -299,7 +302,8 @@ Future<void> unpackBundle(
 /// Throws a [SourceBundleException] for a file that is no UTF-8, read by
 /// [tarGzFile] or by tar alike, and for a symbolic link at [path], which
 /// is not read on any host: Windows refuses the bundle, and elsewhere tar
-/// would read the link as an empty file.
+/// would read the link as an empty file. Throws an [ArgumentError] as
+/// [unpackBundle] does for a host a build does not run on.
 Future<String?> bundleFile(
   String bundle,
   String path, {
@@ -328,7 +332,7 @@ Future<List<int>?> _bundleFileBytes(
   String? operatingSystem,
 }) async {
   final member = '${_prefix(bundle)}/$path';
-  final windows = (operatingSystem ?? Platform.operatingSystem) == 'windows';
+  final windows = buildHost(operatingSystem) == 'windows';
   final Map<String, TarMemberType> types;
   try {
     if (windows) {

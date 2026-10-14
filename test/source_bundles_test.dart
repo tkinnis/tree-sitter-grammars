@@ -271,6 +271,71 @@ void main() {
         bundleFile(bundle, 'src/parser.c', operatingSystem: 'macos'),
       ).throws<ProcessException>();
     });
+
+    // The host is named in any case, as checkTarGz reads it, so a name
+    // takes the same path here as there.
+    for (final operatingSystem in ['Windows', 'WINDOWS']) {
+      test('on $operatingSystem, a bundle is read in Dart, not by '
+          'tar', () async {
+        // Mutation: compare the name to exactly "windows" in unpackBundle
+        // and bundleFile; this reddens, as the tar named here does not
+        // exist.
+        final bundle = await pack(first, path('bundles'));
+
+        await unpackBundle(
+          bundle,
+          path('tree'),
+          operatingSystem: operatingSystem,
+        );
+        check(
+          File(path('tree/src/parser.c')).readAsStringSync(),
+        ).equals('int parse(void) { return 0; }\n');
+        check(
+          await bundleFile(
+            bundle,
+            'src/parser.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).equals('int parse(void) { return 0; }\n');
+      });
+    }
+
+    for (final operatingSystem in ['MacOS', 'LINUX']) {
+      test('on $operatingSystem, a bundle reaches tar', () async {
+        // Mutation: read the bundle in Dart for any name but exactly
+        // "macos" or "linux"; this reddens.
+        final bundle = await pack(first, path('bundles'));
+
+        await check(
+          unpackBundle(bundle, path('tree'), operatingSystem: operatingSystem),
+        ).throws<ProcessException>();
+        await check(
+          bundleFile(bundle, 'src/parser.c', operatingSystem: operatingSystem),
+        ).throws<ProcessException>();
+      });
+    }
+
+    for (final operatingSystem in ['android', '']) {
+      test('on "$operatingSystem", a bundle is refused before anything is '
+          'written', () async {
+        // Mutation: create the destination before the name is read; this
+        // reddens, leaving it behind.
+        final bundle = await pack(first, path('bundles'));
+        void refused(Subject<ArgumentError> it) => it
+          ..has((e) => e.name, 'name').equals('operatingSystem')
+          ..has((e) => e.invalidValue, 'invalidValue').equals(operatingSystem);
+
+        await check(
+          unpackBundle(bundle, path('tree'), operatingSystem: operatingSystem),
+        ).throws<ArgumentError>(refused);
+        check(
+          FileSystemEntity.typeSync(path('tree')),
+        ).equals(FileSystemEntityType.notFound);
+        await check(
+          bundleFile(bundle, 'src/parser.c', operatingSystem: operatingSystem),
+        ).throws<ArgumentError>(refused);
+      });
+    }
   });
 
   group('bundleFile refuses a file that is no UTF-8 alike on every host', () {

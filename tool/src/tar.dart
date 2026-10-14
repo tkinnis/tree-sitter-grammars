@@ -484,18 +484,22 @@ Future<Map<String, TarMemberType>> checkTarGz(
     segments.join('/'): member.type,
 };
 
-/// Whether a host on [operatingSystem], by default this one, as
-/// `Platform.operatingSystem` spells it, in any case, keeps a symbolic link
-/// an archive holds: macOS and Linux do, and Windows does not.
+/// Whether a host on [operatingSystem], as [buildHost] reads it, keeps a
+/// symbolic link an archive holds: macOS and Linux do, and Windows does
+/// not.
+bool _keepsSymlinks(String? operatingSystem) =>
+    buildHost(operatingSystem) != 'windows';
+
+/// The host a build runs on, `macos`, `linux` or `windows`, that
+/// [operatingSystem], by default this one, as `Platform.operatingSystem`
+/// spells it, in any case, names.
 ///
 /// Throws an [ArgumentError] naming [operatingSystem] for any other host,
-/// one a build does not run on, rather than take it for one that keeps a
-/// link.
-bool _keepsSymlinks(String? operatingSystem) {
+/// one a build does not run on, rather than take it for one of the three.
+String buildHost([String? operatingSystem]) {
   final name = operatingSystem ?? Platform.operatingSystem;
   return switch (name.toLowerCase()) {
-    'macos' || 'linux' => true,
-    'windows' => false,
+    final host && ('macos' || 'linux' || 'windows') => host,
     _ => throw ArgumentError.value(
       name,
       'operatingSystem',
