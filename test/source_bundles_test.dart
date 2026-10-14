@@ -190,25 +190,58 @@ void main() {
       });
     }
 
-    test('unpackBundle refuses a symbolic link', () async {
-      // Reddened by dropping unpackBundle's checkTarGz before tar.
+    /// A bundle of the file top/a.c and the symbolic link top/link to it.
+    String linkedBundle() {
       final bundle = path('bundle.tar.gz');
       File(bundle).writeAsBytesSync(
         gzipCompress([
           ...rawHeader('top/a.c', '0', 0),
-          ...rawHeader('top/link', '2', 0),
+          ...rawLink('top/link', 'a.c'),
           ...List.filled(1024, 0),
         ]),
       );
+      return bundle;
+    }
+
+    test('on Windows, unpackBundle and bundleFile refuse a symbolic '
+        'link', () async {
+      // Mutation: allow a symbolic link whatever operatingSystem names;
+      // this reddens.
+      final bundle = linkedBundle();
 
       await check(
-        unpackBundle(bundle, path('tree'), operatingSystem: 'macos'),
+        unpackBundle(bundle, path('tree'), operatingSystem: 'windows'),
+      ).throws<SourceBundleException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .contains('top/link is a symbolic link'),
+      );
+      await check(
+        bundleFile(bundle, 'a.c', operatingSystem: 'windows'),
       ).throws<SourceBundleException>(
         (it) => it
             .has((e) => e.message, 'message')
             .contains('top/link is a symbolic link'),
       );
     });
+
+    for (final operatingSystem in ['macos', 'linux']) {
+      test('on $operatingSystem, a symbolic link passes the check and '
+          'reaches tar', () async {
+        // A build on macOS or Linux keeps a committed link, as
+        // grammar_sources_test's "extractCommit checks a committed
+        // symbolic link by its target" does there. Mutation: refuse a
+        // symbolic link whatever operatingSystem names; this reddens.
+        final bundle = linkedBundle();
+
+        await check(
+          unpackBundle(bundle, path('tree'), operatingSystem: operatingSystem),
+        ).throws<ProcessException>();
+        await check(
+          bundleFile(bundle, 'a.c', operatingSystem: operatingSystem),
+        ).throws<ProcessException>();
+      });
+    }
 
     test('bundleFile refuses one file twice', () async {
       // Reddened by dropping bundleFile's checkTarGz before tar.

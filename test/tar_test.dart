@@ -1132,6 +1132,176 @@ void main() {
     });
   });
 
+  group('a symbolic link is refused on Windows alone', () {
+    // A build on Windows unpacks no symbolic link, which Windows creates
+    // only with a privilege a build should not need, while one on macOS or
+    // Linux keeps a committed link, as tar unpacks it. Each host is named
+    // here by the operatingSystem the check takes, so every case runs on
+    // any host.
+
+    /// An archive of [members], ended as an archive is.
+    String archiveOf(List<List<int>> members) {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress([
+          for (final member in members) ...member,
+          ...Uint8List(1024),
+        ]),
+      );
+      return archive;
+    }
+
+    for (final operatingSystem in ['macos', 'linux']) {
+      test('on $operatingSystem, a symbolic link passes the check', () async {
+        // Mutation: refuse a symbolic link whatever operatingSystem names,
+        // as _MemberRules did; this reddens.
+        final archive = archiveOf([
+          rawHeader('top/src/parser.c', '0', 0),
+          rawLink('top/src/alias.c', 'parser.c'),
+        ]);
+
+        await checkTarGz(
+          archive,
+          stripComponents: 1,
+          operatingSystem: operatingSystem,
+        );
+        check(
+          await tarGzFile(
+            archive,
+            'src/parser.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).isNotNull();
+        check(
+          await tarGzRootFile(
+            archive,
+            'top/src/parser.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).isNotNull();
+      });
+    }
+
+    test('on windows, a symbolic link is refused', () async {
+      // Mutation: allow a symbolic link whatever operatingSystem names;
+      // this reddens.
+      final archive = archiveOf([
+        rawHeader('top/src/parser.c', '0', 0),
+        rawLink('top/src/alias.c', 'parser.c'),
+      ]);
+      const message =
+          'top/src/alias.c is a symbolic link, which a build on Windows '
+          'neither unpacks nor reads';
+
+      await check(
+        checkTarGz(archive, stripComponents: 1, operatingSystem: 'windows'),
+      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
+      await check(
+        tarGzFile(archive, 'src/parser.c', operatingSystem: 'windows'),
+      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
+      await check(
+        tarGzRootFile(archive, 'top/src/parser.c', operatingSystem: 'windows'),
+      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
+    });
+
+    test('unpackTarGz, which unpacks on Windows, refuses a symbolic link on '
+        'every host', () async {
+      // Mutation: allow a symbolic link in unpackTarGz's rules; this
+      // reddens, as a StateError.
+      final archive = archiveOf([
+        rawHeader('top/a.c', '0', 0),
+        rawLink('top/alias.c', 'a.c'),
+      ]);
+      final destination = p.join(scratch, 'out');
+
+      await check(
+        unpackTarGz(archive, destination, stripComponents: 1),
+      ).throws<TarException>(
+        (it) => _message(it).startsWith(
+          '$archive: top/alias.c is a symbolic '
+          'link',
+        ),
+      );
+      check(File(p.join(destination, 'a.c')).existsSync()).isFalse();
+    });
+
+    // On macOS and Linux, a symbolic link is held to every other rule a
+    // member is held to.
+    for (final (problem, members, message) in [
+      (
+        'a link Windows cannot name',
+        [rawLink('top/aux.c', 'a.c')],
+        'top/aux.c: "aux.c" names the Windows device AUX',
+      ),
+      (
+        'a link named outside printable ASCII',
+        [rawLink('top/ä.c', 'a.c')],
+        'top/ä.c: "ä.c" holds U+00E4, outside printable ASCII',
+      ),
+      (
+        'a link leading out of the archive',
+        [rawLink('top/../../evil', '/etc')],
+        'top/../../evil leads out of the archive',
+      ),
+      (
+        'a link differing only in case from a file',
+        [rawHeader('top/a.c', '0', 0), rawLink('top/A.c', 'b.c')],
+        'top/A.c: "A.c" names the same file as "a.c" on Windows',
+      ),
+      (
+        'a link where a file is',
+        [rawHeader('top/a.c', '0', 0), rawLink('top/a.c', 'b.c')],
+        'top/a.c: an earlier member makes "a.c" a file',
+      ),
+      // tar writes a member under a link through it, out of the archive
+      // when the link names /tmp: a link is a leaf of the tree, as a file
+      // is, where _Layout counted it as a directory.
+      (
+        'a file under a link, which tar would write through it',
+        [rawLink('top/d', '/tmp'), rawHeader('top/d/x', '0', 0)],
+        'top/d/x: an earlier member makes "d" a file',
+      ),
+      (
+        'a link where a directory is',
+        [rawHeader('top/d/', '5', 0), rawLink('top/d', '/tmp')],
+        'top/d: an earlier member makes "d" a directory',
+      ),
+    ]) {
+      test('on macos, refused: $problem', () async {
+        // Mutation: return a symbolic link's segments before the name,
+        // ASCII and layout rules where the link is allowed; this reddens
+        // each case but the link leading out of the archive, which those
+        // rules follow. Mutation: skip the check of a path leading out of
+        // the archive for an allowed link; this reddens that case.
+        // Mutation: count a link as a directory in _Layout, as it was;
+        // this reddens the two cases of a link and a directory.
+        final archive = archiveOf(members);
+
+        await check(
+          checkTarGz(archive, stripComponents: 1, operatingSystem: 'macos'),
+        ).throws<TarException>(
+          (it) => _message(it).startsWith('$archive: $message'),
+        );
+      });
+    }
+
+    test('on macos, a link whose header gives it data is refused', () async {
+      // Mutation: drop readTar's refusal of data after a symbolic link;
+      // this reddens, as no Windows-only refusal of the link stands in
+      // its place.
+      final archive = archiveOf([rawHeader('top/l', '2', 512), Uint8List(512)]);
+
+      await check(
+        checkTarGz(archive, stripComponents: 1, operatingSystem: 'macos'),
+      ).throws<TarException>(
+        (it) => _message(it).equals(
+          '$archive: the tar header at 0 gives the symbolic link top/l 512 '
+          'bytes of data',
+        ),
+      );
+    });
+  });
+
   group('ustar refuses a path that would not unpack as written', () {
     for (final (problem, paths, message) in [
       // Reddened by ustar's checking each segment only against
@@ -1229,7 +1399,7 @@ void main() {
       });
     }
 
-    test('by tarGzRootFile: a symbolic link', () async {
+    test('by tarGzRootFile on Windows: a symbolic link', () async {
       final archive = p.join(scratch, 'x.tar.gz');
       File(archive).writeAsBytesSync(
         gzipCompress([
@@ -1240,7 +1410,7 @@ void main() {
       );
 
       await check(
-        tarGzRootFile(archive, 'build_info.json'),
+        tarGzRootFile(archive, 'build_info.json', operatingSystem: 'windows'),
       ).throws<TarException>(
         (it) => _message(it).startsWith('$archive: link is a symbolic link'),
       );

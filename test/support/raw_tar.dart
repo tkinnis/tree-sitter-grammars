@@ -83,3 +83,11 @@ Uint8List paxHeader(String type, List<String> records) {
     ...Uint8List((512 - data.length % 512) % 512),
   ]);
 }
+
+/// A ustar header of a symbolic link [name] whose target is [target].
+Uint8List rawLink(String name, String target) => rawHeader(
+  name,
+  '2',
+  0,
+  edit: (header) => header.setAll(157, utf8.encode(target)),
+);

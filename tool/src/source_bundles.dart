@@ -247,8 +247,9 @@ Future<void> packBundle(
 /// On Windows [unpackTarGz] unpacks it, recording each file's mode, which
 /// NTFS cannot hold, for `unpackedFiles` to read. Elsewhere [checkTarGz]
 /// holds every member to the rules [unpackTarGz] does, in Dart, before
-/// [tarExecutable] unpacks it, so a bundle is refused alike on every host.
-/// [operatingSystem], as `Platform.operatingSystem` spells it, is by
+/// [tarExecutable] unpacks it, so a bundle is refused alike on every host,
+/// but for a symbolic link, which tar unpacks there and a build on Windows
+/// refuses. [operatingSystem], as `Platform.operatingSystem` spells it, is by
 /// default the host's; tests name another.
 Future<void> unpackBundle(
   String bundle,
@@ -265,7 +266,11 @@ Future<void> unpackBundle(
       await unpackTarGz(bundle, destination, stripComponents: 1);
       return;
     }
-    await checkTarGz(bundle, stripComponents: 1);
+    await checkTarGz(
+      bundle,
+      stripComponents: 1,
+      operatingSystem: operatingSystem,
+    );
   } on Exception catch (error) {
     throw SourceBundleException('could not unpack $bundle: $error');
   }
@@ -302,7 +307,11 @@ Future<String?> bundleFile(
       final bytes = await tarGzFile(bundle, path);
       return bytes == null ? null : utf8.decode(bytes);
     }
-    await checkTarGz(bundle, stripComponents: 1);
+    await checkTarGz(
+      bundle,
+      stripComponents: 1,
+      operatingSystem: operatingSystem,
+    );
   } on TarException catch (error) {
     throw SourceBundleException('could not read $path from $bundle: $error');
   }

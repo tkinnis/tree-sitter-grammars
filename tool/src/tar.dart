@@ -418,7 +418,11 @@ Future<void> unpackTarGz(
   String destination, {
   int stripComponents = 0,
 }) async {
-  final unpacked = await _checkedMembers(archive, stripComponents);
+  final unpacked = await _checkedMembers(
+    archive,
+    stripComponents,
+    symlinks: false,
+  );
   for (final (:member, :segments) in unpacked) {
     final path = p.joinAll([destination, ...segments]);
     if (!p.isWithin(destination, path)) {
@@ -453,13 +457,30 @@ Future<void> unpackTarGz(
 /// [_MemberRules], without the first [stripComponents] segments of each
 /// path, as [unpackTarGz] does before it writes anything, but writing
 /// nothing: for a host that unpacks or reads the archive with its own tar,
-/// so it refuses on every host what a build on Windows refuses.
+/// so it refuses on every host what a build on Windows refuses, but for a
+/// symbolic link, which it refuses only when [operatingSystem], as
+/// `Platform.operatingSystem` spells it, by default this host's, is
+/// Windows. A host that keeps the link still holds it to every other rule.
 ///
 /// Throws a [TarException] as [unpackTarGz] does for an archive that
 /// cannot be read or is malformed, or for a member the rules refuse.
-Future<void> checkTarGz(String archive, {int stripComponents = 0}) async {
-  await _checkedMembers(archive, stripComponents);
+Future<void> checkTarGz(
+  String archive, {
+  int stripComponents = 0,
+  String? operatingSystem,
+}) async {
+  await _checkedMembers(
+    archive,
+    stripComponents,
+    symlinks: _keepsSymlinks(operatingSystem),
+  );
 }
+
+/// Whether a host on [operatingSystem], by default this one, as
+/// `Platform.operatingSystem` spells it, keeps a symbolic link an archive
+/// holds: every host but Windows.
+bool _keepsSymlinks(String? operatingSystem) =>
+    (operatingSystem ?? Platform.operatingSystem) != 'windows';
 
 /// Each member of the gzip-compressed tar [archive], as [_readTarGz] reads
 /// it, that [_MemberRules] keeps once the first [stripComponents] segments
@@ -469,9 +490,13 @@ Future<void> checkTarGz(String archive, {int stripComponents = 0}) async {
 /// refuse, having checked every member before it.
 Future<List<({TarMember member, List<String> segments})>> _checkedMembers(
   String archive,
-  int stripComponents,
-) async {
-  final rules = _MemberRules.read(stripComponents: stripComponents);
+  int stripComponents, {
+  required bool symlinks,
+}) async {
+  final rules = _MemberRules.read(
+    stripComponents: stripComponents,
+    symlinks: symlinks,
+  );
   final kept = <({TarMember member, List<String> segments})>[];
   for (final member in await _readTarGz(archive)) {
     final List<String>? segments;
@@ -494,17 +519,28 @@ Future<List<({TarMember member, List<String> segments})>> _checkedMembers(
 /// A member is refused when a segment of its path leads out of the
 /// directory it is unpacked into (see [_leavesItsDirectory]); when Windows
 /// cannot name a file by a segment (see [windowsNameProblem]) or a segment
-/// holds a character outside printable ASCII (see [_asciiProblem]); when it is
-/// a symbolic link, which Windows creates only with a privilege a build
-/// should not need, and whose target a reader would have to follow; and
+/// holds a character outside printable ASCII (see [_asciiProblem]); and
 /// when it cannot be unpacked with the members before it (see [_Layout]),
 /// which refuses one path twice and so leaves no doubt which of two
 /// members a reader sees.
+///
+/// On Windows alone, a symbolic link is refused too: Windows creates one
+/// only with a privilege a build should not need. A build on macOS or
+/// Linux keeps a committed link, as tar unpacks it, and holds it to every
+/// rule above. Its target is not checked, as `extractCommit` checks only
+/// that it is the committed one: tar unpacks a link without following it,
+/// and [_Layout] refuses any member under a link, which tar would write
+/// through it, so no member is written where a link leads. What a link
+/// names is read only by what reads the unpacked tree, which a committed
+/// source file could reach as well, by an `#include` of the same path.
 final class _MemberRules {
   /// The rules for an archive [ustar] writes, whose paths are written as
   /// they are given, so a path that would not unpack as written, one that
   /// is absolute or has an empty, `.` or `..` segment, is refused.
-  _MemberRules.written() : _written = true, _stripComponents = 0;
+  _MemberRules.written()
+    : _written = true,
+      _stripComponents = 0,
+      _symlinks = false;
 
   /// The rules for an archive read without the first [stripComponents]
   /// segments of each path, as GNU tar and bsdtar strip them: a run of `/`
@@ -512,12 +548,16 @@ final class _MemberRules {
   /// segment is stripped as any other is, so `./a/b` stripped of one
   /// segment is `a/b`. The `.` segments that remain are then dropped, as
   /// tar drops them: `./x` and `a//b` name `x` and `a/b`.
-  _MemberRules.read({int stripComponents = 0})
+  ///
+  /// A symbolic link is refused unless [symlinks] is true.
+  _MemberRules.read({int stripComponents = 0, bool symlinks = false})
     : _written = false,
-      _stripComponents = stripComponents;
+      _stripComponents = stripComponents,
+      _symlinks = symlinks;
 
   final bool _written;
   final int _stripComponents;
+  final bool _symlinks;
   final _layout = _Layout();
 
   /// The segments the member at [path] of [type] is unpacked or read at,
@@ -569,9 +609,10 @@ final class _MemberRules {
         throw TarException('$path: $problem');
       }
     }
-    if (type == TarMemberType.symlink) {
+    if (type == TarMemberType.symlink && !_symlinks) {
       throw TarException(
-        '$path is a symbolic link, which is neither unpacked nor read',
+        '$path is a symbolic link, which a build on Windows neither unpacks '
+        'nor reads',
       );
     }
     final kept = [
@@ -585,7 +626,9 @@ final class _MemberRules {
         'each path',
       );
     }
-    final isFile = type == TarMemberType.file;
+    // A symbolic link is a leaf, as a file is: tar would write a member
+    // under it through the link, wherever it leads.
+    final isFile = type != TarMemberType.directory;
     if (_layout.add(kept, isFile: isFile) case final problem?) {
       throw TarException('$path: $problem');
     }
@@ -598,8 +641,9 @@ final class _MemberRules {
 /// before it, on any host or on Windows, where a name matches another
 /// whatever the case of its letters.
 ///
-/// A path names a file or a directory, as its member does, and each path
-/// a member is under names a directory. A member is refused when a path it
+/// A path names a file or a directory, as its member does, a symbolic
+/// link counting as a file, and each path a member is under names a
+/// directory. A member is refused when a path it
 /// names differs only in case from one an earlier member names, as
 /// `readme` from `README`, for Windows would write the one over the other
 /// or unpack both into one directory; when it is under a file; when it is
@@ -741,8 +785,18 @@ String? windowsNameProblem(String segment) {
 /// member is held to [_MemberRules] first, as [unpackTarGz] holds it, so
 /// an archive naming one path twice, as `./x` and `x` or under two
 /// top-level directories, is refused rather than read at either member.
-Future<Uint8List?> tarGzFile(String archive, String path) =>
-    _tarGzMember(archive, path, stripComponents: 1);
+/// [operatingSystem] is as [checkTarGz] takes it: a symbolic link is
+/// refused on Windows alone.
+Future<Uint8List?> tarGzFile(
+  String archive,
+  String path, {
+  String? operatingSystem,
+}) => _tarGzMember(
+  archive,
+  path,
+  stripComponents: 1,
+  operatingSystem: operatingSystem,
+);
 
 /// The bytes of the file at [path] in the gzip-compressed tar [archive],
 /// named as the archive names it, after any `./`, or null when it holds no
@@ -751,18 +805,28 @@ Future<Uint8List?> tarGzFile(String archive, String path) =>
 /// A release archive holds its files at the root, `build_info.json` and
 /// `dylibs/<language>/...` with no top-level directory, so no path segment
 /// is skipped. Every member is held to [_MemberRules] first, as
-/// [tarGzFile] holds it.
-Future<Uint8List?> tarGzRootFile(String archive, String path) =>
-    _tarGzMember(archive, path, stripComponents: 0);
+/// [tarGzFile] holds it. [operatingSystem] is as [checkTarGz] takes it.
+Future<Uint8List?> tarGzRootFile(
+  String archive,
+  String path, {
+  String? operatingSystem,
+}) => _tarGzMember(
+  archive,
+  path,
+  stripComponents: 0,
+  operatingSystem: operatingSystem,
+);
 
 Future<Uint8List?> _tarGzMember(
   String archive,
   String path, {
   required int stripComponents,
+  String? operatingSystem,
 }) async {
   for (final (:member, :segments) in await _checkedMembers(
     archive,
     stripComponents,
+    symlinks: _keepsSymlinks(operatingSystem),
   )) {
     if (member.type == TarMemberType.file && segments.join('/') == path) {
       return member.bytes;
