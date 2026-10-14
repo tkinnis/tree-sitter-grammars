@@ -3,11 +3,13 @@
 library;
 
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:path/path.dart' as p;
 
 import 'build_platform.dart';
 import 'compiler.dart';
+import 'gunzip.dart';
 import 'tar.dart';
 import 'toolchain.dart';
 
@@ -32,6 +34,19 @@ Future<String> sha256Of(String path) async {
   return (result.stdout as String).split(' ').first;
 }
 
+/// The most bytes [ensureCli] decompresses the CLI's asset to, 256 MiB.
+///
+/// The largest of the four assets `tool/toolchain.json` pins for 0.27.0,
+/// `tree-sitter-linux-arm64.gz`, decodes to 24267016 bytes (23 MiB) from
+/// 7.6 MiB; `tree-sitter-macos-arm64.gz` decodes to 21581328,
+/// `tree-sitter-windows-x64.gz` to 9745408 and
+/// `tree-sitter-windows-arm64.gz` to 8348160. This is eleven times the
+/// largest, room for the CLI to grow, and [gunzip] holds 384 MiB at most
+/// to reach it: the 256 MiB buffer and the 128 MiB one it grows from.
+/// Tests name less, to refuse an asset past it without allocating that
+/// much.
+int cliAssetLimit = 256 << 20;
+
 /// Fetches [url] into the file [destination].
 typedef Downloader = Future<void> Function(Uri url, String destination);
 
@@ -42,8 +57,12 @@ typedef Downloader = Future<void> Function(Uri url, String destination);
 /// the platform this process runs on, and its executable ends in `.exe` on
 /// Windows. The asset's sha256 is checked against `toolchain.json` every
 /// time, and the executable is decompressed afresh from the checked asset,
-/// so a modified executable in the cache never runs. Throws a
-/// [CliException] when the fetched asset's digest is not the pinned one.
+/// so a modified executable in the cache never runs. It is decompressed
+/// by [gunzip], to [cliAssetLimit] bytes at most.
+///
+/// Throws a [CliException] when the fetched asset's digest is not the
+/// pinned one, or when it is not exactly one whole gzip member or decodes
+/// to more than [cliAssetLimit] bytes.
 Future<String> ensureCli(
   String root,
   Toolchain toolchain, {
@@ -73,9 +92,13 @@ Future<String> ensureCli(
     cache.path,
     'tree-sitter-${toolchain.cliVersion}${platform.isWindows ? '.exe' : ''}',
   );
-  File(
-    executable,
-  ).writeAsBytesSync(gzip.decode(File(asset).readAsBytesSync()), flush: true);
+  final Uint8List decoded;
+  try {
+    decoded = gunzip(File(asset).readAsBytesSync(), limit: cliAssetLimit);
+  } on FormatException catch (error) {
+    throw CliException('could not decompress $asset: ${error.message}');
+  }
+  File(executable).writeAsBytesSync(decoded, flush: true);
   // NTFS has no execute bit to set: Windows runs any .exe.
   if (Platform.isWindows) return executable;
   final chmod = await Process.run('chmod', ['755', executable]);

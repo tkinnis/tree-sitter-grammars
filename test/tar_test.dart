@@ -665,7 +665,7 @@ void main() {
             .has((e) => e.message, 'message')
             .equals(
               'it decodes to more than ${bytes.length - 1} bytes, the '
-              'most a .tar.gz the build reads may hold',
+              'most its reader allows',
             );
       });
 
@@ -701,8 +701,7 @@ void main() {
           .throws<FormatException>()
           .has((e) => e.message, 'message')
           .equals(
-            'it decodes to more than 2 bytes, the most a .tar.gz the build '
-            'reads may hold',
+            'it decodes to more than 2 bytes, the most its reader allows',
           );
     });
 
@@ -731,7 +730,7 @@ void main() {
       tarGzLimit = 1535;
       final message =
           '$archive is no gzip stream: it decodes to more than 1535 bytes, '
-          'the most a .tar.gz the build reads may hold';
+          'the most its reader allows';
 
       await check(
         unpackTarGz(archive, p.join(scratch, 'out'), stripComponents: 1),

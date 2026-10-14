@@ -168,6 +168,68 @@ void main() {
     check(downloads).length.equals(1);
   });
 
+  group('the asset is decompressed to cliAssetLimit and no further', () {
+    // A small asset can decode to far more than memory holds; each case
+    // lowers cliAssetLimit, to refuse an asset without allocating it.
+    test('the limit is 256 MiB', () {
+      // Eleven times the 23 MiB the largest pinned asset decodes to.
+      // Mutation: any other cliAssetLimit; this reddens.
+      check(cliAssetLimit).equals(256 << 20);
+    });
+
+    test('an asset one byte past it is refused', () async {
+      // Mutation: decompress with gzip.decode, or to another limit than
+      // cliAssetLimit; this reddens.
+      final limit = cliAssetLimit;
+      addTearDown(() => cliAssetLimit = limit);
+      cliAssetLimit = _executable.length - 1;
+
+      await check(
+        ensureCli(root, toolchain, download: serving(asset), platform: _macos),
+      ).throws<CliException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .equals(
+              'could not decompress '
+              '${cached('tree-sitter-0.27.0-tree-sitter-macos-arm64.gz')}: '
+              'it decodes to more than ${_executable.length - 1} bytes, the '
+              'most its reader allows',
+            ),
+      );
+      check(File(cached('tree-sitter-0.27.0')).existsSync()).isFalse();
+
+      // The control: exactly its limit is read.
+      cliAssetLimit = _executable.length;
+      final cli = await ensureCli(
+        root,
+        toolchain,
+        download: serving(asset),
+        platform: _macos,
+      );
+      check(File(cli).readAsStringSync()).equals(_executable);
+    });
+
+    test('an asset that is not one whole gzip member is refused', () async {
+      // gzip.decode ignores a byte after the trailer; gunzip refuses it.
+      // Mutation: decompress with gzip.decode; this reddens.
+      final trailing = [...asset, 0];
+      toolchain = _toolchain(_sha256(trailing, root));
+
+      await check(
+        ensureCli(
+          root,
+          toolchain,
+          download: serving(trailing),
+          platform: _macos,
+        ),
+      ).throws<CliException>(
+        (it) => it
+            .has((e) => e.message, 'message')
+            .endsWith('-macos-arm64.gz: 1 byte follows its trailer'),
+      );
+    });
+  });
+
   test('generateParser refuses a grammar that commits parser.c', () async {
     File(p.join(root, 'grammar', 'src', 'parser.c'))
       ..parent.createSync(recursive: true)

@@ -24,13 +24,15 @@ import 'dart:typed_data';
 /// trailer, a second member's or any other.
 ///
 /// It throws too for a stream that decodes to more than [limit] bytes,
-/// [gunzipLimit] for every reader of a `.tar.gz` (see `tarGzLimit`):
-/// deflate codes up to 258 bytes in a few bits, so a small file can decode
-/// to far more than memory holds. The buffer it decodes into doubles from
-/// 64 KiB as the stream needs, each growth clamped to [limit], so it never
-/// holds more than [limit] bytes; while it grows, it holds the buffer it
-/// grows from too, less than [limit] bytes more, and half [limit] more for
-/// a [limit] of 64 KiB times a power of two, as [gunzipLimit] is.
+/// [gunzipLimit] for every reader of a `.tar.gz` (see `tarGzLimit`) and
+/// `cliAssetLimit` for the tree-sitter CLI's release asset: deflate codes
+/// up to 258 bytes in a few bits, so a small file can decode to far more
+/// than memory holds. The buffer it decodes into doubles from 64 KiB as
+/// the stream needs, each growth clamped to [limit], so it never holds
+/// more than [limit] bytes; while it grows, it holds the buffer it grows
+/// from too, less than [limit] bytes more, and half [limit] more for a
+/// [limit] of 64 KiB times a power of two, as [gunzipLimit] and
+/// `cliAssetLimit` are.
 Uint8List gunzip(Uint8List input, {required int limit}) {
   final at = _headerEnd(input);
   final inflater = _Inflater(input, at, limit);
@@ -359,8 +361,7 @@ final class _Inflater {
     if (_length + count <= _output.length) return;
     if (count > _limit - _length) {
       throw FormatException(
-        'it decodes to more than $_limit bytes, the most a .tar.gz the '
-        'build reads may hold',
+        'it decodes to more than $_limit bytes, the most its reader allows',
       );
     }
     var size = _output.length * 2;
