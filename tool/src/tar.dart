@@ -291,16 +291,20 @@ final unpackedModes = <String, Map<String, int>>{};
 /// throws a [TarException]: an archive that cannot be read or is
 /// malformed (see [readTar]); a member whose path would lead out of
 /// [destination]; one with a segment Windows cannot name a file by (see
-/// [windowsNameProblem]), refused on every host, as the archive must
-/// unpack on Windows; a symbolic link, which Windows creates only with a
-/// privilege a build should not need; and a member the file system will
-/// not write.
+/// [windowsNameProblem]) or that cannot be unpacked with the members
+/// before it (see [_Layout]), both refused on every host, as the archive
+/// must unpack on Windows; a symbolic link, which Windows creates only
+/// with a privilege a build should not need; and a member the file system
+/// will not write, which no check of the archive can foresee, as when
+/// [destination] is a file, and which may leave the members before it
+/// written.
 Future<void> unpackTarGz(
   String archive,
   String destination, {
   int stripComponents = 0,
 }) async {
   final unpacked = <({TarMember member, List<String> segments})>[];
+  final layout = _Layout();
   for (final member in await _readTarGz(archive)) {
     final segments = member.path
         .split('/')
@@ -322,6 +326,10 @@ Future<void> unpackTarGz(
         '$archive: ${member.path} is a symbolic link, which a build on '
         'Windows does not unpack',
       );
+    }
+    final isFile = member.type == TarMemberType.file;
+    if (layout.add(segments, isFile: isFile) case final problem?) {
+      throw TarException('$archive: ${member.path}: $problem');
     }
     unpacked.add((member: member, segments: segments));
   }
@@ -348,6 +356,65 @@ Future<void> unpackTarGz(
   }
   unpackedModes[p.normalize(p.absolute(destination))] = modes;
 }
+
+/// The paths of an archive's members so far, each as its `/`-separated
+/// segments, to refuse a member that cannot be unpacked with the members
+/// before it, on any host or on Windows, where a name matches another
+/// whatever the case of its letters.
+///
+/// A path names a file or a directory, as its member does, and each path
+/// a member is under names a directory. A member is refused when a path it
+/// names differs only in case from one an earlier member names, as
+/// `readme` from `README`, for Windows would write the one over the other
+/// or unpack both into one directory; when it is under a file; when it is
+/// a file at a path that names a directory or a file already, for the file
+/// system would refuse the one or write it over the other only once the
+/// members before it are written. A directory named again, by its own
+/// member or as a parent, is one directory everywhere and is allowed.
+final class _Layout {
+  /// Each path named so far, by its [_foldCase]d spelling: as it was first
+  /// spelled, and whether it is a file.
+  final _paths = <String, ({String spelling, bool isFile})>{};
+
+  /// Why the member at [segments], a file if [isFile] and otherwise a
+  /// directory, cannot be unpacked with the members before it, or null
+  /// when it can.
+  String? add(List<String> segments, {required bool isFile}) {
+    for (var count = 1; count <= segments.length; count++) {
+      final path = segments.take(count).join('/');
+      final key = _foldCase(path);
+      final named = _paths[key];
+      final last = count == segments.length;
+      if (named != null) {
+        if (named.spelling != path) {
+          return '${jsonEncode(path)} names the same file as '
+              '${jsonEncode(named.spelling)} on Windows, which matches names '
+              'whatever their case';
+        }
+        if (named.isFile) {
+          return 'an earlier member makes ${jsonEncode(path)} a file';
+        }
+        if (last && isFile) {
+          return 'an earlier member makes ${jsonEncode(path)} a directory';
+        }
+      }
+      _paths[key] = (spelling: path, isFile: last && isFile);
+    }
+    return null;
+  }
+}
+
+/// [path] with each character that has a single uppercase character in
+/// its place, as Windows compares names: NTFS maps each UTF-16 unit to its
+/// uppercase in its own table, and leaves one with no single uppercase,
+/// such as `ß`, as it is.
+String _foldCase(String path) => String.fromCharCodes([
+  for (final rune in path.runes)
+    switch (String.fromCharCode(rune).toUpperCase().runes.toList()) {
+      [final upper] => upper,
+      _ => rune,
+    },
+]);
 
 /// Whether the path segment [segment] of a tar member could lead a joined
 /// path out of the directory it is unpacked into: `..`, or, since Windows

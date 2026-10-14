@@ -431,19 +431,129 @@ void main() {
 
   test('a member the file system will not write is refused', () async {
     // Reddened by dropping unpackTarGz's catch of the FileSystemException
-    // writing a member: here a file under a path that is a file.
+    // writing a member: here a file under a destination that is a file,
+    // which no check of the archive's own members can see.
     final archive = p.join(scratch, 'x.tar.gz');
-    File(
-      archive,
-    ).writeAsBytesSync(gzipCompress(_rawStream(['top/a', 'top/a/b'])));
+    File(archive).writeAsBytesSync(gzipCompress(_rawStream(['top/a'])));
     final destination = p.join(scratch, 'out');
+    File(destination).writeAsStringSync('a file, not a directory');
 
     await check(
       unpackTarGz(archive, destination, stripComponents: 1),
     ).throws<TarException>(
       (it) =>
-          _message(it).startsWith('$archive: top/a/b could not be unpacked: '),
+          _message(it).startsWith('$archive: top/a could not be unpacked: '),
     );
+  });
+
+  group('members that cannot all be unpacked are refused, writing '
+      'nothing', () {
+    // Each case's members, as _rawMembers reads them, and the start of the
+    // message refusing the last, after `<archive>: `.
+    for (final (problem, members, message) in [
+      // Reddened by comparing paths with their case, or not comparing them
+      // at all, as unpackTarGz did: Windows writes the second over the
+      // first.
+      (
+        'two files differing only in case',
+        ['top/README', 'top/readme'],
+        'top/readme: "readme" names the same file as "README" on Windows',
+      ),
+      // Reddened by the same mutation: Windows unpacks both into one
+      // directory, which unpackedModes would not know.
+      (
+        'two directories differing only in case',
+        ['top/Src/a.c', 'top/src/b.c'],
+        'top/src/b.c: "src" names the same file as "Src" on Windows',
+      ),
+      (
+        'a directory member and a file\'s directory differing only in case',
+        ['top/src/', 'top/SRC/a.c'],
+        'top/SRC/a.c: "SRC" names the same file as "src" on Windows',
+      ),
+      (
+        'a member under a file differing only in case',
+        ['top/a', 'top/A/b'],
+        'top/A/b: "A" names the same file as "a" on Windows',
+      ),
+      // Reddened by dropping the refusal of a member under a path an
+      // earlier member makes a file, after which the file system refuses
+      // the second only once the first is written.
+      (
+        'a member under a file',
+        ['top/a', 'top/a/b'],
+        'top/a/b: an earlier member makes "a" a file',
+      ),
+      // Reddened by dropping the refusal of a member at the path an earlier
+      // member makes a file, after which the file system refuses a
+      // directory there only once the file is written, and a second file
+      // is written over the first.
+      (
+        'a directory member where a file is',
+        ['top/a', 'top/a/'],
+        'top/a/: an earlier member makes "a" a file',
+      ),
+      (
+        'one file twice',
+        ['top/a.c', 'top/a.c'],
+        'top/a.c: an earlier member makes "a.c" a file',
+      ),
+      // Reddened by dropping the refusal of a file at a path an earlier
+      // member makes a directory, after which the file system refuses it
+      // only once the directory is written.
+      (
+        'a file where a directory is',
+        ['top/a/b', 'top/a'],
+        'top/a: an earlier member makes "a" a directory',
+      ),
+      (
+        'a file where a directory member is',
+        ['top/a/', 'top/a'],
+        'top/a: an earlier member makes "a" a directory',
+      ),
+    ]) {
+      test(problem, () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(gzipCompress(_rawMembers(members)));
+        final destination = p.join(scratch, 'out');
+
+        await check(
+          unpackTarGz(archive, destination, stripComponents: 1),
+        ).throws<TarException>(
+          (it) => _message(it).startsWith('$archive: $message'),
+        );
+        check(Directory(destination).existsSync()).isFalse();
+      });
+    }
+
+    test('but a directory a file is also under is unpacked', () async {
+      // The control of the cases above: a directory named by its own
+      // member and as a file's parent, in either order and in one case, is
+      // one directory everywhere.
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress(
+          _rawMembers([
+            'top/',
+            'top/src/',
+            'top/src/a.c',
+            'top/lib/b.c',
+            'top/lib/',
+            'top/src/',
+            'top/Readme.md',
+          ]),
+        ),
+      );
+      final destination = p.join(scratch, 'out');
+
+      await unpackTarGz(archive, destination, stripComponents: 1);
+
+      check(File(p.join(destination, 'src', 'a.c')).existsSync()).isTrue();
+      check(File(p.join(destination, 'lib', 'b.c')).existsSync()).isTrue();
+      check(unpackedModes[p.normalize(p.absolute(destination))])
+          .isNotNull()
+          .deepEquals({'src/a.c': 0x1a4, 'lib/b.c': 0x1a4, 'Readme.md': 0x1a4});
+    });
   });
 
   test('hashes a file as sha256 does', () async {
@@ -491,5 +601,14 @@ Uint8List _rawHeader(
 /// is.
 Uint8List _rawStream(List<String> paths) => Uint8List.fromList([
   for (final path in paths) ..._rawHeader(path, '0', 0),
+  ...Uint8List(1024),
+]);
+
+/// A tar stream of [members], written header by header and ended as an
+/// archive is: a directory for each that ends in `/`, and otherwise an
+/// empty file.
+Uint8List _rawMembers(List<String> members) => Uint8List.fromList([
+  for (final member in members)
+    ..._rawHeader(member, member.endsWith('/') ? '5' : '0', 0),
   ...Uint8List(1024),
 ]);
