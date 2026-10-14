@@ -111,6 +111,7 @@ A build on Windows checks the same pins, digests, patches, notices and queries, 
 - The CLI that generates latex and swift is the release asset `tool/toolchain.json` pins for the architecture under `windows`; what it generates must have the same `generatedSha256` as on macOS.
 - The archive carries `THIRD_PARTY_NOTICES.md` with each library named as Windows names it; the committed file, which names them as macOS does, must still be what the pinned sources produce.
 - `build_info.json` records the platform (`windows-arm64` or `windows-x64`), LLVM's clang, the MSVC tools and the Windows SDK, each with its path, in place of the deployment target, Xcode's clang and the macOS SDK.
+- The move of `build/out/` to `output/`, refused as access denied while the x64 emulation layer of an arm64 host still holds open a DLL `tool/check_release.dart` loaded, is tried again for up to 15.75 s, with no check run again, since nothing writes to `build/out/` in between.
 
 ### Building on Linux
 

@@ -73,8 +73,11 @@
 /// it changes anything and again after, and reads the release back.
 ///
 /// The build writes into `build/out/` and moves it to `output/` only after
-/// every check passes, so a failed build leaves no `output/`. Any failure
-/// exits non-zero before anything is packed.
+/// every check passes, so a failed build leaves no `output/`. On Windows, a
+/// move refused as access denied, as an x64 DLL the emulation layer of an
+/// arm64 host still holds makes it, is tried again for up to 15.75 s (see
+/// `tool/src/output_rename.dart`); no check runs again. Any failure exits
+/// non-zero before anything is packed.
 library;
 
 import 'dart:convert';
@@ -97,6 +100,7 @@ import 'src/grammar_sources.dart';
 import 'src/macho.dart';
 import 'src/manifest.dart';
 import 'src/notices.dart';
+import 'src/output_rename.dart';
 import 'src/pe.dart';
 import 'src/pool.dart';
 import 'src/publish.dart';
@@ -505,7 +509,11 @@ Future<void> _build(String root, BuildOptions options) async {
     await checkUnchangedSince(runGit, root, commit);
     print('  the working tree is still clean at $commit');
   }
-  final output = Directory(outputDirectory).renameSync(p.join(root, 'output'));
+  final output = await renameOutput(
+    outputDirectory,
+    p.join(root, 'output'),
+    isWindows: Platform.isWindows,
+  );
 
   print(
     '\n✓ Built ${platform.runtimeFileName}, ${builds.length} grammar '
