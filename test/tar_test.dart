@@ -542,6 +542,59 @@ void main() {
     check(File(p.join(destination, 'a.c')).existsSync()).isFalse();
   });
 
+  group('a member whose path names nothing is refused, writing nothing', () {
+    // A pax path= record of "", "." or "/" leaves a member no segment once
+    // "." and empty segments are dropped, and unpackTarGz skipped it
+    // without a word. Reddened by _MemberRules' returning null for such a
+    // member, as unpackTarGz's `if (segments.isEmpty) continue;` did.
+    for (final path in ['', '.', './', '/', './/.']) {
+      test('a pax path of ${jsonEncode(path)}', () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(archive).writeAsBytesSync(
+          gzipCompress([
+            ...rawHeader('top/a.c', '0', 0),
+            ...paxPathMember(path, name: 'top/b.c'),
+            ...Uint8List(1024),
+          ]),
+        );
+        final destination = p.join(scratch, 'out');
+
+        await check(
+          unpackTarGz(archive, destination, stripComponents: 1),
+        ).throws<TarException>(
+          (it) => _message(it).equals(
+            '$archive: a member named ${jsonEncode(path)} names no file or '
+            'directory',
+          ),
+        );
+        check(Directory(destination).existsSync()).isFalse();
+        await check(tarGzRootFile(archive, 'top/a.c')).throws<TarException>();
+      });
+    }
+
+    test('a file the stripped segments take whole', () async {
+      // tar --strip-components skips such a file, as unpackTarGz did; a
+      // bundle holds every file under its top-level directory. Reddened by
+      // _MemberRules' returning null for a file it strips whole, as it
+      // does for a directory.
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(
+        gzipCompress(rawMembers(['top/', 'README', 'top/a.c'])),
+      );
+      final destination = p.join(scratch, 'out');
+
+      await check(
+        unpackTarGz(archive, destination, stripComponents: 1),
+      ).throws<TarException>(
+        (it) => _message(it).equals(
+          '$archive: README is a file outside the top-level directory '
+          'stripped from each path',
+        ),
+      );
+      check(Directory(destination).existsSync()).isFalse();
+    });
+  });
+
   test('a member the file system will not write is refused', () async {
     // Reddened by dropping unpackTarGz's catch of the FileSystemException
     // writing a member: here a file under a destination that is a file,

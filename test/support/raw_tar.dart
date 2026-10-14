@@ -48,3 +48,19 @@ Uint8List rawMembers(List<String> members) => Uint8List.fromList([
     ...rawHeader(member, member.endsWith('/') ? '5' : '0', 0),
   ...Uint8List(1024),
 ]);
+
+/// A pax extended header giving the member after it the path [path],
+/// followed by that member, an empty file whose own header names [name].
+Uint8List paxPathMember(String path, {String name = 'named'}) {
+  final record = ' path=$path\n';
+  // A pax record's length counts its own digits.
+  var length = utf8.encode(record).length + 1;
+  length = utf8.encode('$length$record').length;
+  final pax = utf8.encode('$length$record');
+  return Uint8List.fromList([
+    ...rawHeader('pax', 'x', pax.length),
+    ...pax,
+    ...Uint8List((512 - pax.length % 512) % 512),
+    ...rawHeader(name, '0', 0),
+  ]);
+}

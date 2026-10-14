@@ -72,14 +72,24 @@ void main() {
   });
 
   test('the root reader finds build_info.json where a reader that skips a '
-      'segment finds nothing', () async {
+      'segment refuses the archive', () async {
     final bytes = await tarGzRootFile(packed, 'build_info.json');
 
     check(bytes).isNotNull();
     check(
       jsonDecode(utf8.decode(bytes!)) as Map<String, Object?>,
     ).containsKey('release');
-    check(await tarGzFile(packed, 'build_info.json')).isNull();
+    // A file at the root has no segment left once the top-level directory
+    // a source bundle has is stripped, which tar would skip; tarGzFile
+    // refuses it rather than finding nothing.
+    await check(tarGzFile(packed, 'build_info.json')).throws<TarException>(
+      (it) => it
+          .has((e) => e.message, 'message')
+          .endsWith(
+            'is a file outside the top-level directory stripped from each '
+            'path',
+          ),
+    );
     check(await tarGzRootFile(packed, 'missing.json')).isNull();
     check(await tarGzRootFile(packed, 'dylibs/ada/libada.so')).isNotNull();
   });

@@ -398,8 +398,11 @@ final class _MemberRules {
   final _layout = _Layout();
 
   /// The segments the member at [path] of [type] is unpacked or read at,
-  /// or null when stripping takes every segment of its path, as it takes
-  /// the top-level directory of a source bundle.
+  /// or null for a directory that stripping takes whole, as it takes the
+  /// top-level directory of a source bundle, or as `./` names the root. A
+  /// path that names nothing but as a directory `.` or `./`, such as the
+  /// "" or "/" a pax path= record may give or a file named ".", and a file
+  /// that stripping takes whole, which tar would skip, are refused.
   ///
   /// Throws a [TarException] starting with [path] when the member is
   /// refused.
@@ -418,6 +421,15 @@ final class _MemberRules {
         for (final segment in path.split('/'))
           if (segment.isNotEmpty && segment != '.') segment,
       ];
+      if (segments.isEmpty) {
+        // `tar -C dir .` names the directory it packs `./`, which unpacks
+        // to the destination itself.
+        final root = path == '.' || path == './';
+        if (root && type == TarMemberType.directory) return null;
+        throw TarException(
+          'a member named ${jsonEncode(path)} names no file or directory',
+        );
+      }
       if (segments.any(_leavesItsDirectory)) {
         throw TarException('$path leads out of the archive');
       }
@@ -433,7 +445,13 @@ final class _MemberRules {
       );
     }
     final kept = segments.skip(_stripComponents).toList();
-    if (kept.isEmpty) return null;
+    if (kept.isEmpty) {
+      if (type == TarMemberType.directory) return null;
+      throw TarException(
+        '$path is a file outside the top-level directory stripped from '
+        'each path',
+      );
+    }
     final isFile = type == TarMemberType.file;
     if (_layout.add(kept, isFile: isFile) case final problem?) {
       throw TarException('$path: $problem');
