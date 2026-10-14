@@ -922,6 +922,35 @@ void main() {
       });
     }
 
+    // A superscript 1, 2 or 3 is outside printable ASCII, so ustar and
+    // unpackTarGz refuse such a name for that first, and the device rule
+    // is asked here by itself.
+    for (final (name, device) in [
+      for (final digit in const [0xb9, 0xb2, 0xb3]) ...[
+        (
+          'COM${String.fromCharCode(digit)}',
+          'COM${String.fromCharCode(digit)}',
+        ),
+        (
+          'lpt${String.fromCharCode(digit)}.h',
+          'LPT${String.fromCharCode(digit)}',
+        ),
+      ],
+    ]) {
+      test('names a device with a superscript digit: ${jsonEncode(name)}', () {
+        // Mutation: narrow _reservedName's digits after COM and LPT to
+        // [0-9]; this reddens.
+        check(
+          windowsNameProblem(name),
+        ).equals('${jsonEncode(name)} names the Windows device $device');
+      });
+    }
+
+    test('the control: a superscript 4 names no device', () {
+      // Windows counts only the superscript 1, 2 and 3 as digits there.
+      check(windowsNameProblem('COM${String.fromCharCode(0x2074)}')).isNull();
+    });
+
     test('is refused by ustar in a directory segment as well', () {
       // Reddened by dropping ustar's check of each segment against
       // windowsNameProblem.
