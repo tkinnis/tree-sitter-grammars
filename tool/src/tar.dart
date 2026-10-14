@@ -154,7 +154,8 @@ Uint8List _header(TarFile file) {
 /// symbolic link whose header gives it data, which neither tar reads after
 /// a directory and only GNU tar skips after a link; and a header without
 /// the ustar magic, as an old GNU or a v7 header is, whose bytes 345 to 499
-/// both tars read as no prefix of its path.
+/// both tars read as no prefix of its path; and a file whose path ends in
+/// `/`, which both tars read as a directory.
 List<TarMember> readTar(Uint8List bytes) {
   final members = <TarMember>[];
   var offset = 0;
@@ -228,6 +229,14 @@ List<TarMember> readTar(Uint8List bytes) {
       '5' => TarMemberType.directory,
       _ => throw TarException('$path: tar member type "$type" is not read'),
     };
+    if (memberType == TarMemberType.file && path.endsWith('/')) {
+      // GNU tar and bsdtar read such a file as a directory, and disagree
+      // on whether data follows it.
+      throw TarException(
+        '$path: a file whose name ends in "/", which tar reads as a '
+        'directory',
+      );
+    }
     if (memberType != TarMemberType.file && size != 0) {
       // GNU tar and bsdtar read no data after a directory, and only GNU
       // tar skips the data a symbolic link's header gives, so the header

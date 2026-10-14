@@ -457,6 +457,30 @@ void main() {
         );
       });
     }
+
+    // GNU tar and bsdtar read a regular file whose name ends in "/" as a
+    // directory, where readTar read a file, which unpackTarGz wrote as an
+    // empty file d where tar made a directory; and given data, GNU tar
+    // skips it and bsdtar reads a header there. Each case is reddened by
+    // dropping readTar's refusal of a file whose path ends in "/".
+    for (final (type, size) in [('0', 0), ('\x00', 512)]) {
+      test('a file of type ${jsonEncode(type)} whose name ends in "/", '
+          'given $size bytes', () async {
+        await refused(
+          [...rawHeader('top/d/', type, size), ...rawHeader('top/x', '0', 0)],
+          'top/d/: a file whose name ends in "/", which tar reads as a '
+          'directory',
+        );
+      });
+    }
+
+    test('a file whose pax path ends in "/"', () async {
+      await refused(
+        paxPathMember('top/d/', name: 'top/f'),
+        'top/d/: a file whose name ends in "/", which tar reads as a '
+        'directory',
+      );
+    });
   });
 
   group('an archive that cannot be read is refused', () {
@@ -881,11 +905,13 @@ void main() {
   });
 
   group('a member whose path names nothing is refused, writing nothing', () {
-    // A pax path= record of "", "." or "/" leaves a member no segment once
+    // A pax path= record of "", "." or "/." leaves a member no segment once
     // "." and empty segments are dropped, and unpackTarGz skipped it
     // without a word. Reddened by _MemberRules' returning null for such a
-    // member, as unpackTarGz's `if (segments.isEmpty) continue;` did.
-    for (final path in ['', '.', './', '/', './/.']) {
+    // member, as unpackTarGz's `if (segments.isEmpty) continue;` did. A
+    // file named "./" or "/" ends in "/" and is refused before, by
+    // readTar, as a file tar reads as a directory.
+    for (final path in ['', '.', '/.', './/.']) {
       test('a pax path of ${jsonEncode(path)}', () async {
         final archive = p.join(scratch, 'x.tar.gz');
         File(archive).writeAsBytesSync(
