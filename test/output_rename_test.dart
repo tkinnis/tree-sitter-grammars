@@ -123,6 +123,30 @@ void main() {
       ]);
     });
 
+    test('on Windows, names the directory it renames where the last error '
+        'names no path', () async {
+      // Mutation: name '' in place of [from] where the error has no path;
+      // this reddens.
+      const failure = FileSystemException(
+        'Rename failed',
+        null,
+        OSError('Access is denied', 5),
+      );
+      final rename = _FakeRename([for (var i = 0; i < 7; i++) failure]);
+
+      await check(
+        renameOutput(
+          'out',
+          'output',
+          isWindows: true,
+          rename: rename.call,
+          delay: _FakeDelay().call,
+        ),
+      ).throws<PathAccessException>(
+        (it) => it..has((e) => e.path, 'path').equals('out'),
+      );
+    });
+
     test('on Windows, does not retry a rename refused with another errno or '
         'none', () async {
       // ERROR_SHARING_VIOLATION, ERROR_ALREADY_EXISTS and an error with no
