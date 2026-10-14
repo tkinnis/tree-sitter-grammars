@@ -43,6 +43,12 @@ List<int> _libc(String release) => latin1.encode(
   'stable release version $release.\nCopyright (C) 2026\x00more\x00',
 );
 
+/// [argument] in double quotes with `"`, `\` and `$` escaped by a
+/// backslash, as `clang -###` writes each argument, so a Windows path's
+/// separators are written doubled.
+String _quoted(String argument) =>
+    '"${argument.replaceAllMapped(RegExp(r'["\\$]'), (m) => '\\${m[0]}')}"';
+
 /// What `clang -###` writes to its standard error for a link whose
 /// arguments end with `<object> -o <output>`: its version lines, then the
 /// one command it would run, every argument quoted as clang quotes it,
@@ -54,8 +60,6 @@ String _driverOutput(
   required String startup,
   required String gcc,
 }) {
-  String quoted(String argument) =>
-      '"${argument.replaceAllMapped(RegExp(r'["\\$]'), (m) => '\\${m[0]}')}"';
   final object = arguments[arguments.length - 3];
   final output = arguments.last;
   return [
@@ -63,7 +67,7 @@ String _driverOutput(
     'Target: aarch64-unknown-linux-gnu',
     'Thread model: posix',
     'InstalledDir: /usr/lib/llvm-21/bin',
-    ' ${[linker, '-EL', '-shared', '-o', output, p.join(startup, 'crti.o'), p.join(gcc, 'crtbeginS.o'), '-L$gcc', '-z', 'defs', '-soname', 'libprobe.so', object, '-lgcc', '-lc', '-lgcc', p.join(gcc, 'crtendS.o'), p.join(startup, 'crtn.o')].map(quoted).join(' ')}',
+    ' ${[linker, '-EL', '-shared', '-o', output, p.join(startup, 'crti.o'), p.join(gcc, 'crtbeginS.o'), '-L$gcc', '-z', 'defs', '-soname', 'libprobe.so', object, '-lgcc', '-lc', '-lgcc', p.join(gcc, 'crtendS.o'), p.join(startup, 'crtn.o')].map(_quoted).join(' ')}',
   ].join('\n');
 }
 
@@ -111,7 +115,7 @@ void main() {
       File(crti)
         ..parent.createSync(recursive: true)
         ..writeAsStringSync('');
-      Link(p.join(scratch.path, 'lib64')).createSync('usr/lib');
+      Link(p.join(scratch.path, 'lib64')).createSync(p.join('usr', 'lib'));
       startup = p.join(scratch.path, 'lib64', 'aarch64-linux-gnu');
       gcc = p.join(
         scratch.path,
@@ -304,7 +308,10 @@ void main() {
     test('refuses a linker path whose normalised form names another file '
         'than clang would run', () async {
       // Through a symbolic link, `..` leaves the directory the link
-      // names, not the one it sits in.
+      // names, not the one it sits in. Windows resolves `..` in a path
+      // before any link, as p.normalize does, so there no path names
+      // another file than its normalised form, and the case above checks
+      // that a linker named through `..` is accepted.
       final elsewhere = p.join(scratch.path, 'elsewhere', 'bin');
       File(p.join(elsewhere, 'ld.bfd'))
         ..parent.createSync(recursive: true)
@@ -328,7 +335,7 @@ void main() {
               'names',
             ),
       );
-    });
+    }, testOn: '!windows');
 
     test('records the package and revision that installed the linker, '
         'which its --version leaves out', () async {
@@ -424,7 +431,7 @@ void main() {
         (List<String> arguments) =>
             linking(ld)(arguments).replaceAll(RegExp(r'"[^"]*crti\.o" '), ''),
         (List<String> arguments) =>
-            linking(ld)(arguments).replaceFirst('"-shared"', '"$other"'),
+            linking(ld)(arguments).replaceFirst('"-shared"', _quoted(other)),
         linking(ld, startupDirectory: p.join(scratch.path, 'nowhere')),
         linking(ld, startupDirectory: 'lib'),
       ]) {
@@ -460,7 +467,7 @@ void main() {
           arguments,
         ).replaceAll(RegExp(r'"[^"]*crtbeginS\.o" '), ''),
         (List<String> arguments) =>
-            linking(ld)(arguments).replaceFirst('"-shared"', '"$other"'),
+            linking(ld)(arguments).replaceFirst('"-shared"', _quoted(other)),
         linking(ld, gccDirectory: p.join(scratch.path, 'nowhere')),
         linking(ld, gccDirectory: 'gcc'),
       ]) {
@@ -566,11 +573,11 @@ void main() {
       for (final answer in [
         'clang version 21.1.8\nTarget: aarch64-unknown-linux-gnu',
         (List<String> arguments) =>
-            '${linking(ld)(arguments)}\n "$ld" "-o" "x"',
+            '${linking(ld)(arguments)}\n ${_quoted(ld)} "-o" "x"',
         // A link of other objects than the probe's.
         (List<String> arguments) => linking(ld)(
           arguments,
-        ).replaceAll(arguments[arguments.length - 3], 'other.o'),
+        ).replaceAll(_quoted(arguments[arguments.length - 3]), '"other.o"'),
       ]) {
         await check(resolve({'-###': answer})).throws<CompilerException>(
           (it) => it
