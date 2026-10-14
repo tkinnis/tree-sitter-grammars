@@ -36,10 +36,11 @@ Uint8List gunzip(Uint8List input) {
     final rest = input.length - end - 8;
     final secondMember =
         input[end + 8] == 0x1f && (rest == 1 || input[end + 9] == 0x8b);
+    final follow = rest == 1 ? '1 byte follows' : '$rest bytes follow';
     throw FormatException(
       secondMember
           ? 'a second gzip member follows the first'
-          : '${rest == 1 ? '1 byte follows' : '$rest bytes follow'} its trailer',
+          : '$follow its trailer',
     );
   }
   final crc = _uint32(input, end);

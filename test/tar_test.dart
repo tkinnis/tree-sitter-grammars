@@ -424,6 +424,63 @@ void main() {
     });
   });
 
+  group('a name outside printable ASCII is refused', () {
+    // Each name is one Windows allows, so only the ASCII rule refuses it.
+    // "cafe.c" with an acute e is refused in both its Unicode forms, which
+    // NTFS and ext4 keep as two names and APFS reads as one: composed
+    // (NFC, U+00E9) and decomposed (NFD, e and the combining acute
+    // U+0301). DEL, U+007F, is no control character to Windows, and
+    // windowsNameProblem allowed it; printable ASCII ends at U+007E.
+    for (final (label, name, code) in [
+      ('an acute e, composed (NFC)', 'caf\u00e9.c', 'U+00E9'),
+      ('an acute e, decomposed (NFD)', 'cafe\u0301.c', 'U+0301'),
+      ('DEL', 'x\x7f', 'U+007F'),
+      ('a superscript 1 in no device name', 'lpt\u00b9x', 'U+00B9'),
+      ('a snowman', 'snow\u2603', 'U+2603'),
+      ('a character past the BMP', 'emoji\u{1f600}', 'U+1F600'),
+    ]) {
+      final problem =
+          '${jsonEncode(name)} holds $code, outside printable ASCII (U+0020 '
+          'to U+007E), which a member\'s name must keep to';
+
+      // Reddened by dropping _MemberRules' ASCII rule, after which ustar
+      // writes the name.
+      test('by ustar: $label', () {
+        check(
+              () => ustar([
+                (path: 'dir/$name', bytes: const [], mode: 0x1a4, epoch: 0),
+              ]),
+            )
+            .throws<TarException>()
+            .has((e) => e.message, 'message')
+            .equals('dir/$name: $problem');
+      });
+
+      // Reddened by the same mutation, after which each unpacks or reads
+      // the archive.
+      test('by unpackTarGz, checkTarGz and tarGzRootFile, writing nothing: '
+          '$label', () async {
+        final archive = p.join(scratch, 'x.tar.gz');
+        File(
+          archive,
+        ).writeAsBytesSync(gzipCompress(rawStream(['top/a.c', 'top/$name'])));
+        final destination = p.join(scratch, 'out');
+        final message = '$archive: top/$name: $problem';
+
+        await check(
+          unpackTarGz(archive, destination, stripComponents: 1),
+        ).throws<TarException>((it) => _message(it).equals(message));
+        check(Directory(destination).existsSync()).isFalse();
+        await check(
+          checkTarGz(archive, stripComponents: 1),
+        ).throws<TarException>((it) => _message(it).equals(message));
+        await check(
+          tarGzRootFile(archive, 'top/a.c'),
+        ).throws<TarException>((it) => _message(it).equals(message));
+      });
+    }
+  });
+
   group('a name Windows cannot give a file', () {
     final superscriptOne = String.fromCharCode(0xb9);
     final superscriptThree = String.fromCharCode(0xb3);
@@ -435,11 +492,11 @@ void main() {
       'a*b', r'a\b', 'a\x01b', 'a\x1fb', 'a\tb',
     ];
     // The control of the cases: names Windows gives files, some close to
-    // the refused ones, are written and unpacked.
+    // the refused ones, in printable ASCII, are written and unpacked.
     final allowedNames = [
       'CONSOLE', 'con_x.c', 'nul-x', 'COM10', 'COM', 'LPT', 'auxiliary.h', //
-      'x.NUL', 'x.con.c', 'a.b.c', '.hidden', 'COMx', 'lpt${superscriptOne}x',
-      'caf\u00e9.c', 'a b.c', 'a+b=c,d;e[f]g{h}~', 'x\x7f',
+      'x.NUL', 'x.con.c', 'a.b.c', '.hidden', 'COMx', 'a b.c', //
+      'a+b=c,d;e[f]g{h}~',
     ];
 
     for (final name in refusedNames) {

@@ -54,9 +54,11 @@ const _block = 512;
 /// a `/` into its 155-byte prefix field, as ustar defines; one that fits
 /// neither way throws a [TarException]. So, on every host, so that an
 /// archive this writes unpacks on Windows as [unpackTarGz] unpacks it, does
-/// a path that is absolute or has an empty, `.` or `..` segment, one with a
-/// segment Windows cannot name a file by (see [windowsNameProblem]), and
-/// one that cannot be unpacked with the paths before it (see [_Layout]).
+/// a path [_MemberRules] refuses: one that is absolute or has an empty, `.`
+/// or `..` segment, one with a segment Windows cannot name a file by (see
+/// [windowsNameProblem]) or that holds a character outside printable ASCII
+/// (see [_asciiProblem]), and one that cannot be unpacked with the paths
+/// before it (see [_Layout]).
 Uint8List ustar(List<TarFile> files) {
   final stream = BytesBuilder(copy: false);
   final rules = _MemberRules.written();
@@ -368,13 +370,15 @@ Future<List<({TarMember member, List<String> segments})>> _checkedMembers(
 }
 
 /// The rules every member of an archive is held to, the same wherever an
-/// archive is written ([ustar]), unpacked ([unpackTarGz]) or read
-/// ([tarGzFile], [tarGzRootFile]), so that what is checked is what is
+/// archive is written ([ustar]), unpacked ([unpackTarGz]), checked before
+/// another tar unpacks it ([checkTarGz]) or read ([tarGzFile],
+/// [tarGzRootFile]), so that what is checked is what is
 /// unpacked or read and the rules cannot drift between them.
 ///
 /// A member is refused when a segment of its path leads out of the
 /// directory it is unpacked into (see [_leavesItsDirectory]); when Windows
-/// cannot name a file by a segment (see [windowsNameProblem]); when it is
+/// cannot name a file by a segment (see [windowsNameProblem]) or a segment
+/// holds a character outside printable ASCII (see [_asciiProblem]); when it is
 /// a symbolic link, which Windows creates only with a privilege a build
 /// should not need, and whose target a reader would have to follow; and
 /// when it cannot be unpacked with the members before it (see [_Layout]),
@@ -435,7 +439,8 @@ final class _MemberRules {
       }
     }
     for (final segment in segments) {
-      if (windowsNameProblem(segment) case final problem?) {
+      if (windowsNameProblem(segment) ?? _asciiProblem(segment)
+          case final problem?) {
         throw TarException('$path: $problem');
       }
     }
@@ -529,6 +534,27 @@ bool _leavesItsDirectory(String segment) =>
     segment.contains(':') ||
     p.isAbsolute(segment) ||
     p.rootPrefix(segment).isNotEmpty;
+
+/// Why the path segment [segment] of a member is refused for a character
+/// outside printable ASCII, U+0020 to U+007E, or null when it holds none.
+///
+/// A name outside ASCII has more than one spelling a file system may keep
+/// apart or not: an acute e composed (NFC) and decomposed (NFD) is two names
+/// on NTFS and ext4 and one on APFS, so two members may unpack to one file
+/// on one host and two on another, and one name may not be found by the
+/// spelling another host gives it. Every name the source bundles and the
+/// release archives have held is printable ASCII. DEL, U+007F, which
+/// [windowsNameProblem] allows as Windows does, is refused here; the
+/// control characters below U+0020 are refused there first.
+String? _asciiProblem(String segment) {
+  for (final rune in segment.runes) {
+    if (rune >= 0x20 && rune <= 0x7e) continue;
+    final code = rune.toRadixString(16).padLeft(4, '0').toUpperCase();
+    return '${jsonEncode(segment)} holds U+$code, outside printable ASCII '
+        "(U+0020 to U+007E), which a member's name must keep to";
+  }
+  return null;
+}
 
 /// The names Windows reserves for devices, whatever their case and
 /// extension: `NUL.txt` and `nul.tar.gz` name the device `NUL`, as `NUL`

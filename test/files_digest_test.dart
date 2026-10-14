@@ -62,7 +62,7 @@ void main() {
     await upstream.commit({
       'src/parser.c': bytes('int parse(void);\n'),
       'bin/run': bytes('#!/bin/sh\n'),
-      'z/ä.txt': bytes('umlaut\n'),
+      'z/umlaut.txt': bytes('umlaut\n'),
     });
     if (Platform.isWindows) {
       // NTFS has no execute bit for chmod to set, and a build on Windows
@@ -102,12 +102,33 @@ void main() {
     check(committed.map((f) => '${f.mode} ${f.path}')).unorderedEquals([
       '100644 src/parser.c',
       '100755 bin/run',
-      '100644 z/ä.txt',
+      '100644 z/umlaut.txt',
       if (!Platform.isWindows) '120000 link',
     ]);
     check(
       await filesDigest(await unpackedFiles(tree)),
     ).equals(await filesDigest(committed));
+  });
+
+  test('a name outside ASCII is listed as UTF-8, and its bundle is refused '
+      'before anything is unpacked', () async {
+    // committedFiles reads git's -z listing as UTF-8; tar.dart refuses a
+    // member name outside printable ASCII, so such a commit's bundle is
+    // refused on every host.
+    final named = await upstream.commit({'z/ä.txt': bytes('umlaut\n')});
+    final bundle = p.join(temporary.path, 'x-$named.tar.gz');
+    await packBundle(upstream.path, named, bundle);
+
+    check(
+      (await committedFiles(upstream.path, named)).map((f) => f.path),
+    ).contains('z/ä.txt');
+    await check(
+      unpackBundle(bundle, p.join(temporary.path, 'tree')),
+    ).throws<SourceBundleException>(
+      (it) => it
+          .has((e) => e.message, 'message')
+          .contains('"ä.txt" holds U+00E4, outside printable ASCII'),
+    );
   });
 
   test('a changed byte, mode or name changes the digest', () async {
