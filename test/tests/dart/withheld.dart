@@ -20,9 +20,9 @@ void main() {
   for (final value in values) {
     test('in a loop', () {});
   }
-
+  // dart format off
   test('one', () {}); test('two', () {});
-
+  // dart format on
   setUp(() {
     test('in a callback', () {});
   });
