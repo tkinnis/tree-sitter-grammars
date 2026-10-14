@@ -203,6 +203,11 @@ void main() {
       // Reddened by dropping _paxRecords' requirement of decimal digits,
       // after which int.parse throws a FormatException.
       ('a length that is no number', 'x path=a\n'),
+      // Reddened by parsing the length with int.parse, as _paxRecords did,
+      // which throws a FormatException for digits past the largest int,
+      // 2^63 - 1, as both of these are.
+      ('a length of 20 digits', '99999999999999999999 path=x\n'),
+      ('a length of 2^63', '9223372036854775808 path=x\n'),
       // Reddened by _paxRecords' stopping, as it did, at a record with no
       // space, after which the record is ignored.
       ('no length', 'path=a'),

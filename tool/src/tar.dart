@@ -248,7 +248,9 @@ Map<String, String> _paxRecords(Uint8List data, int offset) {
     if (space < 0) throw malformed();
     final digits = ascii.decode(data.sublist(at, space), allowInvalid: true);
     if (!RegExp(r'^[0-9]+$').hasMatch(digits)) throw malformed();
-    final length = int.parse(digits);
+    // Digits past the largest int are no length a record has.
+    final length = int.tryParse(digits);
+    if (length == null) throw malformed();
     // The length must reach past the space and a newline and stay within
     // the data.
     final end = at + length;
