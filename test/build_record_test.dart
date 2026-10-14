@@ -125,6 +125,18 @@ void main() {
     }
   });
 
+  test("the macOS runtime defines the source macros tree-sitter's build "
+      'does, _DARWIN_C_SOURCE among them', () {
+    // Reddened by dropping '-D_DARWIN_C_SOURCE' from the macOS runtime
+    // list in BuildFlags, as well as from the Windows one.
+    check(flags.runtime).containsEqualInOrder([
+      '-D_POSIX_C_SOURCE=200112L',
+      '-D_DEFAULT_SOURCE',
+      '-D_BSD_SOURCE',
+      '-D_DARWIN_C_SOURCE',
+    ]);
+  });
+
   test('build_info of a macOS build records what it did before Linux '
       'builds recorded a glibc requirement', () {
     final record = _info(flags);
@@ -980,6 +992,24 @@ void main() {
       }
       check(windowsFlags.runtime).contains('-Wl,/def:../../tree-sitter.def');
       check(windowsFlags.runtime).contains('-Wl,/version:0.27');
+    });
+
+    test('defines the POSIX, default and BSD sources for the runtime, and no '
+        'Darwin source, which only Apple headers read', () {
+      // Reddened by putting '-D_DARWIN_C_SOURCE' back in the Windows
+      // runtime list in BuildFlags._windows.
+      check(windowsFlags.runtime).containsEqualInOrder([
+        '-D_POSIX_C_SOURCE=200112L',
+        '-D_DEFAULT_SOURCE',
+        '-D_BSD_SOURCE',
+      ]);
+      for (final list in [
+        windowsFlags.runtime,
+        windowsFlags.grammarCompile,
+        windowsFlags.grammarLink,
+      ]) {
+        check(list).not((it) => it.contains('-D_DARWIN_C_SOURCE'));
+      }
     });
 
     test('records the platform, the MSVC tools, the SDK and the CLI it '

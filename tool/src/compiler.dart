@@ -903,9 +903,10 @@ final class BuildFlags {
   }
 
   /// The flags of a build for Windows: those of macOS where Windows has
-  /// them (`-O3` and no `NDEBUG`, C11 and the runtime's defines, the
-  /// prefix map), with the target's triple and the MSVC tools and SDK in
-  /// place of `-arch` and `-isysroot`.
+  /// them (`-O3` and no `NDEBUG`, C11 and the runtime's POSIX, default and
+  /// BSD source defines, the prefix map), with the target's triple and the
+  /// MSVC tools and SDK in place of `-arch` and `-isysroot`. The runtime
+  /// takes no `_DARWIN_C_SOURCE`, which only Apple's headers read.
   ///
   /// Every link is by `lld-link`, with `/brepro` so that the same objects
   /// link to the same bytes, `/noimplib` so that no import library lands
@@ -940,7 +941,6 @@ final class BuildFlags {
         '-D_POSIX_C_SOURCE=200112L',
         '-D_DEFAULT_SOURCE',
         '-D_BSD_SOURCE',
-        '-D_DARWIN_C_SOURCE',
         '-Ilib/src',
         '-Ilib/src/wasm',
         '-Ilib/include',
