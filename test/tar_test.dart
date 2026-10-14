@@ -286,11 +286,10 @@ void main() {
       );
     });
 
-    test('when its gzip stream is cut short', () async {
-      // dart:io's gzip decodes what it is given and does not report the
-      // missing end, so the tar stream it holds is cut short, here inside
-      // a member. Reddened by _readTarGz's rethrowing readTar's
-      // TarException as it is, which does not name the archive.
+    test('when its gzip stream is cut short inside a tar member', () async {
+      // gunzip refuses the gzip stream before readTar sees the tar stream
+      // cut short. Reddened by dropping _readTarGz's catch of gunzip's
+      // FormatException, which is no TarException and names no archive.
       final archive = p.join(scratch, 'x.tar.gz');
       final whole = gzipCompress(
         ustar([
@@ -306,7 +305,120 @@ void main() {
       File(archive).writeAsBytesSync(whole.sublist(0, whole.length ~/ 2));
 
       await check(tarGzRootFile(archive, 'f63.c')).throws<TarException>(
-        (it) => _message(it).startsWith('$archive: the tar stream ends '),
+        (it) => _message(
+          it,
+        ).equals('$archive is no gzip stream: its deflate stream is cut short'),
+      );
+    });
+  });
+
+  group('a gzip stream that is not one whole member is refused', () {
+    // dart:io's gzip.decode, which _readTarGz ran, checks none of a gzip
+    // stream's ends: it decodes a stream cut short, in its trailer or its
+    // deflate data, to the bytes it holds so far, and a second member or
+    // a stray byte after the first without a word. The tar stream here
+    // ends in zero blocks, as GNU tar pads an archive to its 10 KiB
+    // record, so a cut near the gzip stream's end leaves a tar stream that
+    // readTar reads as whole.
+    final whole = gzipCompress([
+      ...ustar([
+        (
+          path: 'build_info.json',
+          bytes: List.generate(3000, (i) => (i * 7919) % 251),
+          mode: 0x1a4,
+          epoch: 0,
+        ),
+      ]),
+      ...Uint8List(8192),
+    ]);
+    // 512 bytes of header, 3072 of data, 1024 that end the archive, 8192
+    // of padding.
+    const length = 12800;
+
+    /// Requires [tarGzRootFile] of an archive holding [bytes] to throw a
+    /// [TarException] saying the archive is no gzip stream, for [reason].
+    Future<void> refused(List<int> bytes, String reason) async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(bytes);
+      await check(
+        tarGzRootFile(archive, 'build_info.json'),
+      ).throws<TarException>(
+        (it) => _message(it).equals('$archive is no gzip stream: $reason'),
+      );
+    }
+
+    test('the control: the whole stream is read', () async {
+      final archive = p.join(scratch, 'x.tar.gz');
+      File(archive).writeAsBytesSync(whole);
+
+      check(await tarGzRootFile(archive, 'build_info.json')).isNotNull();
+    });
+
+    // Reddened by dropping gunzip's requirement of the 8 trailer bytes
+    // after the deflate stream. On 05e54e7, gzip.decode read each whole.
+    for (var cut = 1; cut <= 8; cut++) {
+      test('a trailer cut short by $cut bytes', () async {
+        await refused(
+          whole.sublist(0, whole.length - cut),
+          'its trailer is cut short: ${8 - cut} of its 8 bytes',
+        );
+      });
+    }
+
+    // Reddened by _Inflater's reading the bits past the input as zeros,
+    // as _fill does, rather than refusing them. On 05e54e7, gzip.decode
+    // returned the bytes decoded so far.
+    for (final cut in [1, 16]) {
+      test('a deflate stream cut short by $cut bytes', () async {
+        await refused(
+          whole.sublist(0, whole.length - 8 - cut),
+          'its deflate stream is cut short',
+        );
+      });
+    }
+
+    // Reddened by dropping gunzip's refusal of bytes after the trailer.
+    // On 05e54e7, gzip.decode decoded a second member after the first,
+    // and ignored a byte or two that start none.
+    test('a second member', () async {
+      await refused([
+        ...whole,
+        ...whole,
+      ], 'a second gzip member follows the first');
+    });
+
+    test('a second member cut down to its magic number', () async {
+      await refused([
+        ...whole,
+        0x1f,
+        0x8b,
+      ], 'a second gzip member follows the first');
+    });
+
+    test('a stray byte after the trailer', () async {
+      await refused([...whole, 0], '1 byte follows its trailer');
+    });
+
+    // Reddened by dropping gunzip's comparison of the trailer's CRC-32, or
+    // its length, with the decoded bytes'. zlib, beneath gzip.decode,
+    // checks both when the trailer is whole, so 05e54e7 refused these too,
+    // as "Filter error, bad data".
+    test('a trailer with a wrong CRC-32', () async {
+      final bytes = [...whole];
+      bytes[bytes.length - 8] ^= 0x01;
+      await refused(
+        bytes,
+        'its trailer records another CRC-32 than the decoded bytes have',
+      );
+    });
+
+    test('a trailer with a wrong length', () async {
+      final bytes = [...whole];
+      bytes[bytes.length - 4] ^= 0x01;
+      await refused(
+        bytes,
+        'its trailer records a length of ${length ^ 1} bytes, and it '
+        'decodes to $length',
       );
     });
   });

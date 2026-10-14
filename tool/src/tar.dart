@@ -16,6 +16,8 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:path/path.dart' as p;
 
+import 'gunzip.dart';
+
 /// Thrown when a tar stream cannot be written or read.
 final class TarException implements Exception {
   const TarException(this.message);
@@ -523,23 +525,24 @@ Future<Uint8List?> _tarGzMember(
 /// Every member of the gzip-compressed tar [archive], as [readTar] reads
 /// them.
 ///
-/// Throws a [TarException] naming [archive] when it cannot be read, is no
-/// gzip stream or holds a malformed tar stream.
+/// Throws a [TarException] naming [archive] when it cannot be read, is not
+/// exactly one whole gzip member, which [gunzip] checks to the last byte of
+/// its trailer, or holds a malformed tar stream.
 Future<List<TarMember>> _readTarGz(String archive) async {
-  final List<int> compressed;
+  final Uint8List compressed;
   try {
     compressed = await File(archive).readAsBytes();
   } on FileSystemException catch (error) {
     throw TarException('$archive could not be read: ${_reason(error)}');
   }
-  final List<int> stream;
+  final Uint8List stream;
   try {
-    stream = gzip.decode(compressed);
+    stream = gunzip(compressed);
   } on FormatException catch (error) {
     throw TarException('$archive is no gzip stream: ${error.message}');
   }
   try {
-    return readTar(Uint8List.fromList(stream));
+    return readTar(stream);
   } on TarException catch (error) {
     throw TarException('$archive: $error');
   }
