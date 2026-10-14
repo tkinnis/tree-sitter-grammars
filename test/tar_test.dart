@@ -1378,10 +1378,13 @@ void main() {
       return archive;
     }
 
-    for (final operatingSystem in ['macos', 'linux']) {
+    // Platform.operatingSystem spells each host in lower case; a name is
+    // matched whatever the case of its letters.
+    for (final operatingSystem in ['macos', 'linux', 'MacOS', 'LINUX']) {
       test('on $operatingSystem, a symbolic link passes the check', () async {
-        // Mutation: refuse a symbolic link whatever operatingSystem names,
-        // as _MemberRules did; this reddens.
+        // Mutation: refuse a symbolic link whatever operatingSystem names;
+        // this reddens. Mutation: match the name in its own case; this
+        // reddens MacOS and LINUX.
         final archive = archiveOf([
           rawHeader('top/src/parser.c', '0', 0),
           rawLink('top/src/alias.c', 'parser.c'),
@@ -1409,27 +1412,70 @@ void main() {
       });
     }
 
-    test('on windows, a symbolic link is refused', () async {
-      // Mutation: allow a symbolic link whatever operatingSystem names;
-      // this reddens.
-      final archive = archiveOf([
-        rawHeader('top/src/parser.c', '0', 0),
-        rawLink('top/src/alias.c', 'parser.c'),
-      ]);
-      const message =
-          'top/src/alias.c is a symbolic link, which a build on Windows '
-          'neither unpacks nor reads';
+    for (final operatingSystem in ['windows', 'Windows', 'WINDOWS']) {
+      test('on $operatingSystem, a symbolic link is refused', () async {
+        // Mutation: allow a symbolic link whatever operatingSystem names;
+        // this reddens. Mutation: match the name in its own case; this
+        // reddens Windows and WINDOWS.
+        final archive = archiveOf([
+          rawHeader('top/src/parser.c', '0', 0),
+          rawLink('top/src/alias.c', 'parser.c'),
+        ]);
+        final message =
+            '$archive: top/src/alias.c is a symbolic link, which a build on '
+            'Windows neither unpacks nor reads';
 
-      await check(
-        checkTarGz(archive, stripComponents: 1, operatingSystem: 'windows'),
-      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
-      await check(
-        tarGzFile(archive, 'src/parser.c', operatingSystem: 'windows'),
-      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
-      await check(
-        tarGzRootFile(archive, 'top/src/parser.c', operatingSystem: 'windows'),
-      ).throws<TarException>((it) => _message(it).equals('$archive: $message'));
-    });
+        await check(
+          checkTarGz(
+            archive,
+            stripComponents: 1,
+            operatingSystem: operatingSystem,
+          ),
+        ).throws<TarException>((it) => _message(it).equals(message));
+        await check(
+          tarGzFile(archive, 'src/parser.c', operatingSystem: operatingSystem),
+        ).throws<TarException>((it) => _message(it).equals(message));
+        await check(
+          tarGzRootFile(
+            archive,
+            'top/src/parser.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).throws<TarException>((it) => _message(it).equals(message));
+      });
+    }
+
+    // A build runs on macOS, Linux or Windows alone; any other name, one
+    // Platform.operatingSystem gives included, is refused rather than taken
+    // for a host that keeps a link.
+    for (final operatingSystem in ['android', 'ios', 'fuchsia', 'bsd', '']) {
+      test('on "$operatingSystem", reading an archive is refused', () async {
+        // Mutation: keep a symbolic link on any host but Windows; this
+        // reddens.
+        final archive = archiveOf([rawHeader('top/src/parser.c', '0', 0)]);
+        void refused(Subject<ArgumentError> it) => it
+          ..has((e) => e.name, 'name').equals('operatingSystem')
+          ..has((e) => e.invalidValue, 'invalidValue').equals(operatingSystem);
+
+        await check(
+          checkTarGz(
+            archive,
+            stripComponents: 1,
+            operatingSystem: operatingSystem,
+          ),
+        ).throws<ArgumentError>(refused);
+        await check(
+          tarGzFile(archive, 'src/parser.c', operatingSystem: operatingSystem),
+        ).throws<ArgumentError>(refused);
+        await check(
+          tarGzRootFile(
+            archive,
+            'top/src/parser.c',
+            operatingSystem: operatingSystem,
+          ),
+        ).throws<ArgumentError>(refused);
+      });
+    }
 
     test('unpackTarGz, which unpacks on Windows, refuses a symbolic link on '
         'every host', () async {

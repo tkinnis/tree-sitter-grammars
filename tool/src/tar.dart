@@ -459,15 +459,18 @@ Future<void> unpackTarGz(
 /// nothing: for a host that unpacks or reads the archive with its own tar,
 /// so it refuses on every host what a build on Windows refuses, but for a
 /// symbolic link, which it refuses only when [operatingSystem], as
-/// `Platform.operatingSystem` spells it, by default this host's, is
-/// Windows. A host that keeps the link still holds it to every other rule.
+/// `Platform.operatingSystem` spells it, in any case, by default this
+/// host's, is Windows; macOS and Linux keep it. A host that keeps the link
+/// still holds it to every other rule.
 ///
 /// Returns the type of each member the rules keep, by its path with the
 /// first [stripComponents] segments stripped, for a host whose tar reads
 /// a member by its path alone, a link or a directory as an empty file.
 ///
 /// Throws a [TarException] as [unpackTarGz] does for an archive that
-/// cannot be read or is malformed, or for a member the rules refuse.
+/// cannot be read or is malformed, or for a member the rules refuse, and
+/// an [ArgumentError] for an [operatingSystem] a build does not run on,
+/// before reading anything.
 Future<Map<String, TarMemberType>> checkTarGz(
   String archive, {
   int stripComponents = 0,
@@ -482,10 +485,24 @@ Future<Map<String, TarMemberType>> checkTarGz(
 };
 
 /// Whether a host on [operatingSystem], by default this one, as
-/// `Platform.operatingSystem` spells it, keeps a symbolic link an archive
-/// holds: every host but Windows.
-bool _keepsSymlinks(String? operatingSystem) =>
-    (operatingSystem ?? Platform.operatingSystem) != 'windows';
+/// `Platform.operatingSystem` spells it, in any case, keeps a symbolic link
+/// an archive holds: macOS and Linux do, and Windows does not.
+///
+/// Throws an [ArgumentError] naming [operatingSystem] for any other host,
+/// one a build does not run on, rather than take it for one that keeps a
+/// link.
+bool _keepsSymlinks(String? operatingSystem) {
+  final name = operatingSystem ?? Platform.operatingSystem;
+  return switch (name.toLowerCase()) {
+    'macos' || 'linux' => true,
+    'windows' => false,
+    _ => throw ArgumentError.value(
+      name,
+      'operatingSystem',
+      'is no host a build runs on: macos, linux or windows',
+    ),
+  };
+}
 
 /// Each member of the gzip-compressed tar [archive], as [_readTarGz] reads
 /// it, that [_MemberRules] keeps once the first [stripComponents] segments
