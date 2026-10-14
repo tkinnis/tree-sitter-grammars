@@ -176,11 +176,16 @@ final class _Code {
   _Code(this.table, this.bits);
 
   /// The code whose symbols have the code lengths [lengths], by symbol; a
-  /// length of 0 is no code. Throws a [FormatException] for lengths no
-  /// prefix code has; an incomplete code is allowed, as zlib allows one of
-  /// a single distance code, and a stream that reaches a missing code is
-  /// refused as it is decoded.
-  factory _Code.of(List<int> lengths) {
+  /// length of 0 is no code.
+  ///
+  /// Throws a [FormatException], as zlib's `inflate_table` refuses them,
+  /// for lengths no prefix code has and for an incomplete code, one that
+  /// leaves some bit pattern unused, unless it is a single code of length
+  /// 1 and [codeLengths] is false: zlib allows that of a literal/length or
+  /// a distance code, and a code-length code ([codeLengths] true) must be
+  /// complete. A code with no code at all is allowed, as zlib allows it,
+  /// and a stream that reaches it is refused as it is decoded.
+  factory _Code.of(List<int> lengths, {bool codeLengths = false}) {
     final counts = List.filled(16, 0);
     var bits = 0;
     for (final length in lengths) {
@@ -196,6 +201,11 @@ final class _Code {
           'its deflate stream has a Huffman code with too many codes',
         );
       }
+    }
+    if (bits > 0 && left > 0 && (codeLengths || bits != 1)) {
+      throw const FormatException(
+        'its deflate stream has an incomplete Huffman code',
+      );
     }
     final next = List.filled(16, 0);
     for (var length = 1, code = 0; length < 16; length++) {
@@ -233,7 +243,9 @@ final _fixedLengths = _Code.of([
         ? 7
         : 8,
 ]);
-final _fixedDistances = _Code.of(List.filled(30, 5));
+// zlib builds the fixed distance code of 32 codes of length 5, a complete
+// code, and refuses 30 and 31 as they are decoded, as _huffman does.
+final _fixedDistances = _Code.of(List.filled(32, 5));
 
 /// Decodes the deflate stream of [_input] that starts at [_position].
 final class _Inflater {
@@ -365,7 +377,7 @@ final class _Inflater {
     for (var index = 0; index < codeLengthCount; index++) {
       codeLengths[_codeLengthOrder[index]] = _take(3);
     }
-    final codeLengthCode = _Code.of(codeLengths);
+    final codeLengthCode = _Code.of(codeLengths, codeLengths: true);
     final lengths = <int>[];
     final total = lengthCount + distanceCount;
     while (lengths.length < total) {

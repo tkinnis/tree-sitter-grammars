@@ -6,6 +6,7 @@ import 'package:checks/checks.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import '../tool/src/gunzip.dart';
 import '../tool/src/tar.dart';
 import 'support/raw_tar.dart';
 
@@ -422,6 +423,90 @@ void main() {
         'decodes to $length',
       );
     });
+  });
+
+  group('a Huffman code is held to the rules zlib holds it to', () {
+    // zlib's inflate_table refuses a code that leaves some bit pattern
+    // unused, an incomplete code, unless it is a literal/length or
+    // distance code of a single code of length 1; gunzip allowed any,
+    // and so read streams gzip.decode, GNU tar and bsdtar refuse. Each
+    // refused case is reddened by dropping _Code.of's refusal of an
+    // incomplete code, and each control by refusing every incomplete code.
+    // zlib, through gzip.decode, is asked too, and must agree.
+
+    /// The code-length code of these streams: 18 (a run of zero lengths)
+    /// as `0`, 1 as `10` and 2 as `11`, a complete code.
+    const complete = {18: 1, 1: 2, 2: 2};
+
+    for (final (problem, codeLengths, literals, distances) in [
+      (
+        'a literal/length code of two codes of length 2, A and the end of '
+            'the block',
+        complete,
+        {65: 2, 256: 2},
+        [1],
+      ),
+      (
+        'a distance code of two codes of length 2',
+        complete,
+        {65: 1, 256: 2, 257: 2},
+        [2, 2],
+      ),
+      (
+        'a code-length code leaving one of its four codes of length 2 unused',
+        {18: 2, 1: 2, 2: 2},
+        {65: 1, 256: 2, 257: 2},
+        [1],
+      ),
+    ]) {
+      test('refused: $problem', () {
+        final stream = _gzipOfDynamicBlock(
+          codeLengths: codeLengths,
+          literals: literals,
+          distances: distances,
+          // A, then the end of the block.
+          symbols: [(65, null), (256, null)],
+          output: 'A',
+        );
+
+        check(() => gzip.decode(stream)).throws<Object>();
+        check(() => gunzip(stream))
+            .throws<FormatException>()
+            .has((e) => e.message, 'message')
+            .equals('its deflate stream has an incomplete Huffman code');
+      });
+    }
+
+    for (final (problem, codeLengths, literals, symbols, output) in [
+      (
+        'a single distance code of length 1',
+        complete,
+        {65: 1, 256: 2, 257: 2},
+        // A, then 3 bytes from 1 back, then the end of the block.
+        [(65, null), (257, 0), (256, null)],
+        'AAAA',
+      ),
+      (
+        'a single literal/length code of length 1, the end of the block',
+        {18: 1, 1: 1},
+        {256: 1},
+        [(256, null)],
+        '',
+      ),
+    ]) {
+      test('the control, read alike: $problem', () {
+        final stream = _gzipOfDynamicBlock(
+          codeLengths: codeLengths,
+          literals: literals,
+          distances: [1],
+          symbols: symbols,
+          output: output,
+        );
+
+        check(utf8.decode(gzip.decode(stream))).equals(output);
+        check(utf8.decode(gunzip(stream))).equals(output);
+      });
+    }
   });
 
   group('a name outside printable ASCII is refused', () {
@@ -937,3 +1022,124 @@ void main() {
 /// The message of the [TarException] [it] checks.
 Subject<String> _message(Subject<TarException> it) =>
     it.has((e) => e.message, 'message');
+
+/// A gzip file of one dynamic deflate block, whose code-length code gives
+/// each code-length symbol the length [codeLengths] gives it, and whose
+/// literal/length and distance codes give each symbol the length
+/// [literals] and [distances] give it, coding [symbols]: each a
+/// literal/length symbol, with the distance symbol of a length symbol,
+/// whose extra bits are all 0. Its trailer records [output].
+///
+/// Each run of zero lengths is coded with symbol 18, so must be 11 long at
+/// least.
+Uint8List _gzipOfDynamicBlock({
+  required Map<int, int> codeLengths,
+  required Map<int, int> literals,
+  required List<int> distances,
+  required List<(int, int?)> symbols,
+  required String output,
+}) {
+  final bytes = <int>[];
+  var bits = 0;
+  var count = 0;
+  void put(int value, int length) {
+    bits |= value << count;
+    count += length;
+    while (count >= 8) {
+      bytes.add(bits & 0xff);
+      bits >>= 8;
+      count -= 8;
+    }
+  }
+
+  /// The canonical codes of [lengths], by symbol, as RFC 1951 assigns them.
+  Map<int, int> codes(Map<int, int> lengths) {
+    final next = List.filled(16, 0);
+    for (var length = 1, code = 0; length < 16; length++) {
+      next[length] = code;
+      code = (code + lengths.values.where((l) => l == length).length) << 1;
+    }
+    return {
+      for (final symbol in lengths.keys.toList()..sort())
+        if (lengths[symbol]! > 0) symbol: next[lengths[symbol]!]++,
+    };
+  }
+
+  void putCode(Map<int, int> lengths, Map<int, int> code, int symbol) {
+    for (var bit = lengths[symbol]! - 1; bit >= 0; bit--) {
+      put(code[symbol]! >> bit & 1, 1);
+    }
+  }
+
+  const order = [
+    16,
+    17,
+    18,
+    0,
+    8,
+    7,
+    9,
+    6,
+    10,
+    5,
+    11,
+    4,
+    12,
+    3,
+    13,
+    2,
+    14,
+    1,
+    15,
+  ];
+  final literalCount = (literals.keys.toList()..sort()).last + 1;
+  final last = order.lastIndexWhere(codeLengths.containsKey) + 1;
+  put(1, 1); // the last block
+  put(2, 2); // dynamic codes
+  put(literalCount - 257, 5);
+  put(distances.length - 1, 5);
+  put(last - 4, 4);
+  for (final symbol in order.take(last)) {
+    put(codeLengths[symbol] ?? 0, 3);
+  }
+  final codeLengthCode = codes(codeLengths);
+  final lengths = [
+    for (var symbol = 0; symbol < literalCount; symbol++) literals[symbol] ?? 0,
+    ...distances,
+  ];
+  for (var index = 0; index < lengths.length;) {
+    if (lengths[index] != 0) {
+      putCode(codeLengths, codeLengthCode, lengths[index++]);
+      continue;
+    }
+    var run = 0;
+    while (index + run < lengths.length && lengths[index + run] == 0) {
+      run++;
+    }
+    index += run;
+    while (run > 0) {
+      final take = run > 138 ? 138 : run;
+      if (take < 11) throw ArgumentError('a run of $take zero lengths');
+      putCode(codeLengths, codeLengthCode, 18);
+      put(take - 11, 7);
+      run -= take;
+    }
+  }
+  final literalCode = codes(literals);
+  final distanceLengths = distances.asMap();
+  final distanceCode = codes(distanceLengths);
+  for (final (symbol, distance) in symbols) {
+    putCode(literals, literalCode, symbol);
+    if (distance != null) putCode(distanceLengths, distanceCode, distance);
+  }
+  if (count > 0) put(0, 8 - count);
+  final decoded = utf8.encode(output);
+  int le(int value, int index) => value >> (8 * index) & 0xff;
+  final crc = crc32(decoded);
+  return Uint8List.fromList([
+    ...[0x1f, 0x8b, 8, 0, 0, 0, 0, 0, 0, 0xff],
+    ...bytes,
+    for (var index = 0; index < 4; index++) le(crc, index),
+    for (var index = 0; index < 4; index++) le(decoded.length, index),
+  ]);
+}
