@@ -88,5 +88,8 @@ void main() {
         problems(result),
       ).deepEquals([dirty, if (BuildPlatform.host.isLinux) ...missing]);
     }
-  });
+    // Each of the three runs starts a Dart that compiles check_release.dart
+    // from source, which alone takes most of the default 30 seconds on a
+    // slow machine, and more while the rest of the suite runs beside it.
+  }, timeout: const Timeout(Duration(minutes: 3)));
 }
