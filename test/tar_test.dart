@@ -646,10 +646,10 @@ void main() {
   });
 
   group('a gzip stream that decodes past its limit is refused', () {
-    // gunzip grew its buffer for as long as the stream decoded, and
-    // deflate codes 258 bytes in a few bits, so a small archive could
-    // decode to more than memory holds. Each case asks for a limit of its
-    // own, to refuse a stream without allocating gunzipLimit.
+    // Deflate codes 258 bytes in a few bits, so a small archive can decode
+    // to more than memory holds, and gunzip grows its buffer no further
+    // than a limit. Each case asks for a limit of its own, to refuse a
+    // stream without allocating gunzipLimit.
     final bytes = List.generate(100000, (i) => i * 7919 % 251);
     for (final (kind, level) in [
       ('Huffman-coded blocks', 9),
@@ -673,6 +673,18 @@ void main() {
         // Mutation: refuse a length that reaches the limit; this reddens
         // the stored case, whose last block reserves room to the limit.
         check(gunzip(stream, limit: bytes.length)).deepEquals(bytes);
+      });
+
+      test('of $kind, the buffer grows to its limit and no further', () {
+        // The buffer doubles from 64 KiB: to 128 KiB for 100000 bytes,
+        // but for its limit. A limit of 100001 leaves it a byte of room.
+        // Mutation: drop _reserve's clamp of a growth to the limit; this
+        // reddens.
+        for (final limit in [bytes.length, bytes.length + 1]) {
+          final output = gunzip(stream, limit: limit);
+          check(output).deepEquals(bytes);
+          check(output.buffer.lengthInBytes).equals(limit);
+        }
       });
     }
 

@@ -24,9 +24,13 @@ import 'dart:typed_data';
 /// trailer, a second member's or any other.
 ///
 /// It throws too for a stream that decodes to more than [limit] bytes,
-/// [gunzipLimit] for every reader of a `.tar.gz` (see `tarGzLimit`), having
-/// held no more than that in memory: deflate codes up to 258 bytes in a few
-/// bits, so a small file can decode to far more than memory holds.
+/// [gunzipLimit] for every reader of a `.tar.gz` (see `tarGzLimit`):
+/// deflate codes up to 258 bytes in a few bits, so a small file can decode
+/// to far more than memory holds. The buffer it decodes into doubles from
+/// 64 KiB as the stream needs, each growth clamped to [limit], so it never
+/// holds more than [limit] bytes; while it grows, it holds the buffer it
+/// grows from too, less than [limit] bytes more, and half [limit] more for
+/// a [limit] of 64 KiB times a power of two, as [gunzipLimit] is.
 Uint8List gunzip(Uint8List input, {required int limit}) {
   final at = _headerEnd(input);
   final inflater = _Inflater(input, at, limit);
@@ -70,7 +74,8 @@ Uint8List gunzip(Uint8List input, {required int limit}) {
 /// release and the 49 source bundles and the archive a Windows build
 /// wrote, is `grammars-linux-arm64.tar.gz`, which decodes to 72151040
 /// bytes (69 MiB) from 6.1 MiB; this is fourteen times that, room for the
-/// grammars to grow, and still a buffer a build host allocates.
+/// grammars to grow, and still a buffer a build host allocates, with the
+/// 512 MiB one [gunzip] grows it from, 1.5 GiB in all, while it grows.
 const gunzipLimit = 1 << 30;
 
 int _uint32(Uint8List bytes, int at) =>
