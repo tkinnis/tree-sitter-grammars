@@ -112,6 +112,7 @@ A build on Windows checks the same pins, digests, patches, notices and queries, 
 - The archive carries `THIRD_PARTY_NOTICES.md` with each library named as Windows names it; the committed file, which names them as macOS does, must still be what the pinned sources produce.
 - `build_info.json` records the platform (`windows-arm64` or `windows-x64`), LLVM's clang, the MSVC tools and the Windows SDK, each with its path, in place of the deployment target, Xcode's clang and the macOS SDK.
 - The move of `build/out/` to `output/`, refused as access denied while the x64 emulation layer of an arm64 host still holds open a DLL `tool/check_release.dart` loaded, is tried again for up to 15.75 s, with no check run again, since nothing writes to `build/out/` in between.
+- The emulation layer's compile service, `xtac64se.exe`, can hold a fresh build's 50 DLLs for minutes while it translates them, past those retries; the build then fails at that move with every check passed. Wait until `xtac64se.exe` has exited and run the same command again: the build's bytes are the same, the service has already translated them, and the move goes through. An attach is safe to run again.
 
 ### Building on Linux
 
