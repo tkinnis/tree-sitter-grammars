@@ -97,7 +97,7 @@ The `tags.scm` file defines symbols for code navigation. Uses the tree-sitter st
   name: (identifier) @name) @definition.class
 ```
 
-The editor nests each definition under the definitions whose node's range holds it, so a method's outline entry spells its declaring scope. `tool/check_release.dart` runs a grammar's `tags.scm` over the sources under `test/outline/<grammar>/` and requires the outline beside each; the repository's README describes them.
+The editor nests each definition under the definitions whose node's range holds it, so a method's outline entry spells its declaring scope. An enum is captured as `@definition.enum` over a node whose range holds its values, and each value as `@definition.enum_member`, so the values nest under the enum. `tool/check_release.dart` runs a grammar's `tags.scm` over the sources under `test/outline/<grammar>/` and requires the outline beside each; the repository's README describes them.
 
 ## Language Configuration (config.json)
 

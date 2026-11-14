@@ -1,0 +1,12 @@
+enum Direction
+enum_member Direction.Up
+enum_member Direction.Down
+enum Flag
+enum_member Flag.None
+enum_member Flag."Read-Only"
+enum Remote
+enum_member Remote.Origin
+enum Suit
+enum_member Suit.Hearts
+class Deck
+method Deck.shuffle

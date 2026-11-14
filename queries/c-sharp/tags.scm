@@ -8,6 +8,10 @@
 
 (struct_declaration name: (identifier) @name) @definition.struct
 
+(enum_declaration name: (identifier) @name) @definition.enum
+
+(enum_member_declaration name: (identifier) @name) @definition.enum_member
+
 ; A record is defined as a class, a record struct among them: the grammar
 ; marks a record struct only by its "struct" keyword, and no pattern can
 ; require a keyword to be absent.

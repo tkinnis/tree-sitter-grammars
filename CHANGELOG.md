@@ -5,6 +5,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The outline shows enums: the `tags.scm` of C, C++, Objective-C, C#, Dart, Java, Kotlin, Rust, Swift, TypeScript, TSX, PHP, Scala, Python, Protocol Buffers, IDL, Thrift, Ada, Pascal, Zig and SQL define an enum as `@definition.enum` over a node whose range holds its values, and each value as `@definition.enum_member`, each named by its `@name` capture, so the values nest under their enum: Dart's enum constants, Java's enums and constants, C#'s enums and members, Rust's variants, C's, C++'s and Objective-C's enumerators, Swift's enums and cases, TypeScript's and TSX's enums (`const` and `declare` ones among them) and members, PHP 8.1's enums and cases, Scala 3's enums and cases, Protocol Buffers' and IDL's values, Thrift's `enum` and `senum` values, Ada's enumeration types and literals, Pascal's enumerated types and values, a Zig declaration whose value is an `enum` and its fields, and SQL's `CREATE TYPE … AS ENUM` and its labels. A value written as a string or a character is named as written, quotes and all
+- C, C++ and Objective-C: a `typedef` of an enum that has no name of its own, `typedef enum { … } Mode;`, defines the enum under the typedef's name. In C and C++ a `typedef` giving an enum its own tag as a name, `typedef enum Level { … } Level;`, adds nothing to the enum its tag defines, matched with `#not-eq?` on the tag and the name, and a `typedef` naming an enum by any other name defines a type holding that enum
+- Python: a class one of whose bases is `Enum`, `IntEnum`, `StrEnum`, `Flag`, `IntFlag` or `ReprEnum`, bare or reached through `enum` (`enum.IntFlag`), is an enum, read with `#match?` on its bases as written, and each assignment that gives a value directly in its body is a member of it; a base is what the list holds between its parentheses and commas, comments apart, so a keyword argument such as `metaclass=` and an argument of a call in the list, `make(Enum)`, name no base; an annotation with no value in an enum's body, `size: int`, is a variable, and every other class and assignment outlines as a class and a variable
+- Swift: each name of a `case` declaring several, `case number(Int), sum(Expression, Expression)`, is a member of its own, defined over its name
+- An outline test for each of those languages, `test/outline/<grammar>/enums.*`, holding its enums and the declarations around them
+
+### Changed
+
+- Rust's `enum` item is defined as `@definition.enum` rather than `@definition.class`, C's and C++'s enum specifier as `@definition.enum` rather than `@definition.type`, and Kotlin's enum entry as `@definition.enum_member` rather than `@definition.constant`
+- Kotlin's enum class is `@definition.enum`: the grammar marks it only by its `enum` keyword and its body, and a pattern cannot require a keyword to be absent, so a class is told from an enum class by what ends its declaration, a class body, its name or a part of its header, and an enum class with no body is outlined as a class
+- Swift's `enum` declaration is `@definition.enum`, and a class, struct, actor or extension `@definition.class`
+- C, C++ and Objective-C define an enum only where its enumerator list is written, as C and C++ define a struct only where its body is: a forward declaration, `enum class Color;`, and an enum named as a type, `int brightness(enum Color color)`, define nothing
+- A Zig declaration whose value is an `enum` defines the enum alone, with `#not-match?` keeping its variable pattern off it; the fields of an enum a declaration names are its members, apart from the `_` that makes it non-exhaustive
+- C++'s `tags.scm` holds each of C's patterns once, so a struct, union, function, typedef and enum is defined once over its range
+
+### Fixed
+
+- Python: `@definition.method` captures a method's own definition, which the class's range holds, so a method, its parameters and its variables nest under their class; captured on the class, it covered the class's whole range, and everything in the class nested under the name of its last method
+- Zig: a declaration defines one variable, named by its first identifier, or the one after the library name of an `extern "c"` declaration, so the identifiers of its type and its value define nothing: `pub const limit: Count = total;` defines `limit` alone rather than `limit`, `Count` and `total`
+- Thrift: an enum's name is its `type` field, so `Spades` in `enum Suit { HEARTS = 1, Spades = 2 }` is a member of `Suit` rather than an enum of its own, as the pattern matching any identifier in the enum not written in capitals made it
+
 ## [1.6.1] - 2026-10-14
 
 1.6.0 is a tag with no release; its changes, listed under 1.6.0, ship in 1.6.1.

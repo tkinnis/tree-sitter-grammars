@@ -1,0 +1,12 @@
+package com.example.cards
+enum com.example.cards.Suit
+enum_member com.example.cards.Suit.HEARTS
+enum_member com.example.cards.Suit.SPADES
+method com.example.cards.Suit.SPADES.label
+constructor com.example.cards.Suit.Suit
+method com.example.cards.Suit.label
+class com.example.cards.Deck
+enum com.example.cards.Deck.Order
+enum_member com.example.cards.Deck.Order.ASCENDING
+enum_member com.example.cards.Deck.Order.DESCENDING
+method com.example.cards.Deck.shuffle

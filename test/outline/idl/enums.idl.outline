@@ -1,0 +1,5 @@
+module Cards
+enum Cards.Suit
+enum_member Cards.Suit.HEARTS
+enum_member Cards.Suit.SPADES
+type Cards.Card

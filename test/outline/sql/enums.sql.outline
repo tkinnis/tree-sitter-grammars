@@ -1,0 +1,6 @@
+enum suit
+enum_member suit.'hearts'
+enum_member suit.'spades'
+table card
+column card.id
+column card.of_suit

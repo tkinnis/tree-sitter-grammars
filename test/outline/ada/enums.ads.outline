@@ -1,0 +1,10 @@
+module Cards
+enum Cards.Suit
+enum_member Cards.Suit.Hearts
+enum_member Cards.Suit.Spades
+enum Cards.Bit
+enum_member Cards.Bit.'0'
+enum_member Cards.Bit.'1'
+type Cards.Rank
+type Cards.Card
+function Cards.Shuffle

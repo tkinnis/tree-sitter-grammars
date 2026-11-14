@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package cards;
+
+enum Suit {
+  SUIT_UNSPECIFIED = 0;
+  SUIT_HEARTS = 1 [deprecated = true];
+  reserved 2;
+}
+
+message Deck {
+  enum Order {
+    ORDER_UNSPECIFIED = 0;
+  }
+
+  Order order = 1;
+}

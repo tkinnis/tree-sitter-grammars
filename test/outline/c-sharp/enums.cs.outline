@@ -1,0 +1,9 @@
+module Cards
+enum Cards.Suit
+enum_member Cards.Suit.Hearts
+enum_member Cards.Suit.Spades
+class Cards.Deck
+enum Cards.Deck.Order
+enum_member Cards.Deck.Order.Ascending
+enum_member Cards.Deck.Order.Descending
+method Cards.Deck.Shuffle

@@ -10,6 +10,12 @@
 (class_declaration
   name: (name) @name) @definition.class
 
+(enum_declaration
+  name: (name) @name) @definition.enum
+
+(enum_case
+  name: (name) @name) @definition.enum_member
+
 (class_interface_clause [(name) (qualified_name)] @name) @reference.implementation
 
 (property_declaration

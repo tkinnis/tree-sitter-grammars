@@ -1,0 +1,6 @@
+module Cards
+enum Cards.TSuit
+enum_member Cards.TSuit.suHearts
+enum_member Cards.TSuit.suSpades
+type Cards.TRank
+type Cards.TDeck

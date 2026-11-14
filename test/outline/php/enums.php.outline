@@ -1,0 +1,9 @@
+module Cards
+enum Suit
+enum_member Suit.Hearts
+enum_member Suit.Spades
+function Suit.label
+enum Status
+enum_member Status.Active
+class Deck
+field Deck.cards

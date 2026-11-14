@@ -1,0 +1,12 @@
+enum Planet
+enum_member Planet.mercury
+enum_member Planet.venus
+property Planet.mass
+method Planet.compareTo
+function Planet.compareTo
+enum Suit
+enum_member Suit.hearts
+enum_member Suit.spades
+class Deck
+method Deck.shuffle
+function Deck.shuffle

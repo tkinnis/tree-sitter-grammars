@@ -1,0 +1,7 @@
+module Cards {
+  enum Suit { HEARTS, SPADES };
+
+  struct Card {
+    Suit suit;
+  };
+};

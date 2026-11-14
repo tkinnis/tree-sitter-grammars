@@ -2256,7 +2256,7 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `c-sharp/highlights.scm` | tree-sitter-c-sharp | `queries/highlights.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | unchanged |
 | `c-sharp/tags.scm` | tree-sitter-c-sharp | `queries/tags.scm` | `bf99ce8e40358bd215b06727b07ecc3f1e575afb` | MIT | modified in tree-sitter-grammars |
 | `c/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |
-| `c/tags.scm` | tree-sitter-c | `queries/tags.scm` | `0d33f0422ad391c6d652283645d546ffa048f503` | MIT | unchanged |
+| `c/tags.scm` | tree-sitter-c | `queries/tags.scm` | `0d33f0422ad391c6d652283645d546ffa048f503` | MIT | modified in tree-sitter-grammars |
 | `cpp/highlights.scm` | tree-sitter-c | `queries/highlights.scm` | `70c0ddee618f4967c49143636c34982dd3375f89` | MIT | modified in tree-sitter-grammars |
 | `cpp/tags.scm` | tree-sitter-cpp | `queries/tags.scm` | `a71474021410973b29bfe99440d57bcd750246b1` | MIT | modified in tree-sitter-grammars |
 | `css/highlights.scm` | tree-sitter-css | `queries/highlights.scm` | `5c89b88a37a2e1e36c031469462d6ee85ff2c13c` | MIT | modified in tree-sitter-grammars |
@@ -2293,13 +2293,13 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `perl/injections.scm` | tree-sitter-perl | `queries/injections.scm` | `bfb130c6f954b69ac71796892cf340891d670b7a` | MIT | unchanged |
 | `php/highlights.scm` | tree-sitter-php | `queries/highlights.scm` | `43fbdd53c34a82d9a27c83f9798a2918b3dcd270` | MIT | unchanged |
 | `php/injections.scm` | tree-sitter-php | `queries/injections.scm` | `ad1c8c837e34222839c804bf96466e518787e180` | MIT | modified in tree-sitter-grammars |
-| `php/tags.scm` | tree-sitter-php | `queries/tags.scm` | `cb4fac2ee6c34b5e32f98a3ad3e7c17f5288cc85` | MIT | unchanged |
+| `php/tags.scm` | tree-sitter-php | `queries/tags.scm` | `cb4fac2ee6c34b5e32f98a3ad3e7c17f5288cc85` | MIT | modified in tree-sitter-grammars |
 | `python/highlights.scm` | tree-sitter-python | `queries/highlights.scm` | `1124c1872b6cc499b1a8848c366e07da156b505a` | MIT | modified in tree-sitter-grammars |
 | `ruby/highlights.scm` | tree-sitter-ruby | `queries/highlights.scm` | `d60f2a5a68e1b41ba51caa6d3d21593a810c01d6` | MIT | modified in tree-sitter-grammars |
 | `ruby/locals.scm` | tree-sitter-ruby | `queries/locals.scm` | `6ad22db67f131eb01adf1a98d2e22c6d3a689a13` | MIT | unchanged |
 | `ruby/tags.scm` | tree-sitter-ruby | `queries/tags.scm` | `49c5f6e9cc9ea1a3b9fb5414ba0c2d697acb2448` | MIT | unchanged |
 | `rust/highlights.scm` | tree-sitter-rust | `queries/highlights.scm` | `5274df6aa92d9016edf566aeff4d77206184dfaa` | MIT | modified in tree-sitter-grammars |
-| `rust/tags.scm` | tree-sitter-rust | `queries/tags.scm` | `1f63b33efee17e833e0ea29266dd3d713e27e321` | MIT | unchanged |
+| `rust/tags.scm` | tree-sitter-rust | `queries/tags.scm` | `1f63b33efee17e833e0ea29266dd3d713e27e321` | MIT | modified in tree-sitter-grammars |
 | `scala/tags.scm` | tree-sitter-scala | `queries/tags.scm` | `b6a91556ef76f1f903eebb8c8a4dbac1f52cced2` | MIT | modified in tree-sitter-grammars |
 | `scheme/highlights.scm` | tree-sitter-scheme | `queries/highlights.scm` | `184e7596ee0cbaef79230cae1b4ee5bb4fbad314` | MIT | modified in tree-sitter-grammars |
 | `swift/highlights.scm` | tree-sitter-swift | `queries/highlights.scm` | `c79af47572af041d5df15e9d805cf575bb0265e0` | MIT | modified in tree-sitter-grammars |

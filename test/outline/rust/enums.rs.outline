@@ -1,0 +1,10 @@
+enum Shape
+enum_member Shape.Circle
+enum_member Shape.Rectangle
+enum_member Shape.Empty
+enum Level
+enum_member Level.Low
+enum_member Level.High
+method area
+function area
+class Point

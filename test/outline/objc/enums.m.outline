@@ -1,0 +1,14 @@
+enum Color
+enum_member Color.COLOR_RED
+enum_member Color.COLOR_GREEN
+enum Mode
+enum_member Mode.MODE_READ
+enum_member Mode.MODE_WRITE
+enum Level
+enum_member Level.LEVEL_LOW
+enum_member ANONYMOUS_FLAG
+function brightness
+enum Shape
+enum_member Shape.ShapeCircle
+class Canvas
+method Canvas.draw

@@ -4,7 +4,10 @@
     name: (type_identifier) @name) @definition.class
 
 (enum_item
-    name: (type_identifier) @name) @definition.class
+    name: (type_identifier) @name) @definition.enum
+
+(enum_variant
+    name: (identifier) @name) @definition.enum_member
 
 (union_item
     name: (type_identifier) @name) @definition.class

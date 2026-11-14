@@ -66,6 +66,9 @@
 (enum_declaration
   name: (identifier) @name) @definition.enum
 
+(enum_constant
+  name: (identifier) @name) @definition.enum_member
+
 (function_signature
   name: (identifier) @name) @definition.function 
 

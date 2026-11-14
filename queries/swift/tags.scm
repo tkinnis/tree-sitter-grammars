@@ -1,5 +1,15 @@
 (class_declaration
+  declaration_kind: ["class" "struct" "actor" "extension"]
   name: (type_identifier) @name) @definition.class
+
+(class_declaration
+  declaration_kind: "enum"
+  name: (type_identifier) @name) @definition.enum
+
+; One case can declare several members, `case a, b(Int)`, so each is
+; defined by its name.
+(enum_entry
+  name: (simple_identifier) @name @definition.enum_member)
 
 (protocol_declaration
   name: (type_identifier) @name) @definition.interface

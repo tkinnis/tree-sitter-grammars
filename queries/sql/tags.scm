@@ -15,3 +15,11 @@
 
 (column_definition
   name: (identifier) @name) @definition.column
+
+(create_type
+  (object_reference
+    name: (identifier) @name)
+  (enum_elements)) @definition.enum
+
+(enum_elements
+  enum_element: (literal) @name @definition.enum_member)

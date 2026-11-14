@@ -11,6 +11,9 @@
 ((enum_dcl
   (identifier) @name) @definition.enum)
 
+((enumerator
+  (identifier) @name) @definition.enum_member)
+
 ((module_dcl
   (identifier) @name) @definition.module)
 

@@ -7,6 +7,16 @@
 (trait_definition
   name: (identifier) @name) @definition.interface
 
+(enum_definition
+  name: (_) @name) @definition.enum
+
+[
+  (simple_enum_case
+    name: (_) @name)
+  (full_enum_case
+    name: (_) @name)
+] @definition.enum_member
+
 (function_definition
   name: (identifier) @name) @definition.function
 

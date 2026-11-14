@@ -1,0 +1,8 @@
+enum Suit
+enum_member Suit.HEARTS
+enum_member Suit.Spades
+enum_member Suit.clubs
+class Card
+enum Rank
+enum_member Rank."ace"
+enum_member Rank."king"

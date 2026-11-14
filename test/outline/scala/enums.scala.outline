@@ -1,0 +1,9 @@
+enum Color
+enum_member Color.Red
+enum_member Color.Green
+enum_member Color.Blue
+function Color.label
+enum Tree
+enum_member Tree.Leaf
+enum_member Tree.Empty
+class Forest

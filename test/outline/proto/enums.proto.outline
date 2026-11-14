@@ -1,0 +1,7 @@
+enum Suit
+enum_member Suit.SUIT_UNSPECIFIED
+enum_member Suit.SUIT_HEARTS
+class Deck
+enum Deck.Order
+enum_member Deck.Order.ORDER_UNSPECIFIED
+property Deck.order

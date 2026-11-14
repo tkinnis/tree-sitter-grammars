@@ -1,0 +1,14 @@
+enum Expression
+enum_member Expression.number
+enum_member Expression.sum
+enum_member Expression.negation
+function Expression.evaluate
+enum Suit
+enum_member Suit.hearts
+class Deck
+enum Deck.Order
+enum_member Deck.Order.ascending
+property Deck.size
+class Dealer
+class Suit
+property Suit.symbol
