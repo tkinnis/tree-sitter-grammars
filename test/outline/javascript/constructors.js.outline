@@ -1,0 +1,7 @@
+class Counter
+constructor Counter.constructor
+method Counter.increment
+class Box
+constructor Box.constructor
+method Box.open
+function reset

@@ -1,0 +1,6 @@
+enum Tone
+enum_member Tone.Muted
+enum_member Tone.Loud
+class Badge
+constructor Badge.constructor
+method Badge.render

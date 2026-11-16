@@ -2273,7 +2273,7 @@ These files come from the repository of a grammar listed under "Grammars" above,
 | `javascript/highlights.scm` | tree-sitter-javascript | `queries/highlights.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |
 | `javascript/injections.scm` | tree-sitter-javascript | `queries/injections.scm` | `1c751f8a4420f880b65b461bcf617ad2126ebc58` | MIT | modified in tree-sitter-grammars |
 | `javascript/locals.scm` | tree-sitter-javascript | `queries/locals.scm` | `9802cc5812a19cd28168076af36e88b463dd3a18` | MIT | modified in tree-sitter-grammars |
-| `javascript/tags.scm` | tree-sitter-javascript | `queries/tags.scm` | `f85369d14306244a62c1e1f11c26a3fdb972daad` | MIT | unchanged |
+| `javascript/tags.scm` | tree-sitter-javascript | `queries/tags.scm` | `f85369d14306244a62c1e1f11c26a3fdb972daad` | MIT | modified in tree-sitter-grammars |
 | `json/highlights.scm` | tree-sitter-json | `queries/highlights.scm` | `368736a6137770f785e1e7479a6be29417eb13aa` | MIT | modified in tree-sitter-grammars |
 | `kotlin/highlights.scm` | tree-sitter-kotlin | `queries/highlights.scm` | `e72b9d5acf709bf2f73561797a0107fb5370625a` | MIT | modified in tree-sitter-grammars |
 | `lua/highlights.scm` | tree-sitter-lua | `queries/highlights.scm` | `d76023017f7485eae629cb60d406c7a1ca0f40c9` | MIT | modified in tree-sitter-grammars |

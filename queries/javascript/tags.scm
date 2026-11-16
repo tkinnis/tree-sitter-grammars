@@ -8,6 +8,13 @@
   (#select-adjacent! @doc @definition.method)
 )
 
+; `#not-eq?` on `@definition.method` keeps `constructor` off it, since a
+; method outranks a constructor over the same range, and `#eq?` defines a
+; `constructor` method as `@definition.constructor` on its own.
+(method_definition
+  name: (property_identifier) @name
+  (#eq? @name "constructor")) @definition.constructor
+
 (
   (comment)* @doc
   .

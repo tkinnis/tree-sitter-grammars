@@ -889,7 +889,7 @@
   },
   "queries/javascript/tags.scm": {
     "origin": "grammar",
-    "changed": false,
+    "changed": true,
     "upstream": {
       "repo": "https://github.com/tree-sitter/tree-sitter-javascript",
       "commit": "f85369d14306244a62c1e1f11c26a3fdb972daad",

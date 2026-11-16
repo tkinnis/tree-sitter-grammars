@@ -1,0 +1,9 @@
+enum Mode
+enum_member Mode.Idle
+enum_member Mode.Active
+class Worker
+constructor Worker.constructor
+method Worker.run
+class BaseRunner
+constructor BaseRunner.constructor
+method BaseRunner.step

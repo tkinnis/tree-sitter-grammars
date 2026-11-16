@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.1]
+
+### Added
+
+- Outline tests for Zig (`anonymous_enum_type.zig`), Python (`enum_bases.py`, with CRLF line endings) and JavaScript, TypeScript and TSX (`constructors.js`, `constructors.ts`, `constructors.tsx`)
+
+### Fixed
+
+- Zig: `@definition.enum` and `@definition.enum_member` require `"="` before `(enum_declaration)` in `(variable_declaration ...)`, as `zig/highlights.scm` does, so a variable whose type annotation is an anonymous enum, `var state: enum { idle, running } = .idle;`, outlines as `@definition.variable` alone rather than `@definition.enum` with members
+- Python: `python/tags.scm` decides whether a class is an enum from each direct `identifier` or `attribute` child of `superclasses`, matched against `^(enum\s*\.\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$`, with `@definition.enum` ahead of `@definition.class`, rather than a regular expression over the whole `argument_list` text, so `Enum` inside a generic or call argument (`class Box(Generic[str, Enum, int]):`) leaves the class a `@definition.class` and a CRLF comment between bases keeps an enum a `@definition.enum`
+- JavaScript, TypeScript and TSX: `javascript/tags.scm`, `typescript/tags.scm` and `tsx/tags.scm` each define a `method_definition` named `constructor` as `@definition.constructor` and exclude `constructor` from `@definition.method` with `(#not-eq? @name "constructor")`, so all three outline a class's constructor as a constructor
+
 ## [1.7.0] - 2026-11-14
 
 ### Added

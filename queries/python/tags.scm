@@ -1,25 +1,32 @@
 (function_definition
   name: (identifier) @name) @definition.function
 
-; A class is an enum when a base it names is one of the `enum` module's
-; enum classes, bare or reached through `enum`: `Enum`, `IntEnum`,
-; `StrEnum`, `Flag`, `IntFlag` or `ReprEnum`. A base is what the list
-; holds between its parentheses and commas, comments apart, so a keyword
-; argument, `metaclass=...`, names no base, and neither does an argument
-; of a call in the list, `make(Enum)`.
+; A class is an enum when a direct `identifier` or `attribute` child of its
+; `superclasses` list names one of the `enum` module's enum classes, bare or
+; reached through `enum`: `Enum`, `IntEnum`, `StrEnum`, `Flag`, `IntFlag` or
+; `ReprEnum`. Comments, subscripts (`Generic[str, Enum, int]`), calls
+; (`make(Enum)`) and keyword arguments (`metaclass=...`) are other node types,
+; so none of them names a base. `@definition.enum` precedes `@definition.class`,
+; and `[(identifier) @_base (attribute) @_base _]*` gathers every direct
+; `identifier` or `attribute` base into one match while stepping past commas,
+; comments and other expressions, so `#not-match?` refuses the class whenever
+; any base is an enum class and an editor that checks only the first captured
+; node keeps `@definition.enum` over `@definition.class` on equal priority.
+(class_definition
+  name: (identifier) @name
+  superclasses: (argument_list
+    [(identifier) (attribute)] @_base)
+  (#match? @_base "^(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$")) @definition.enum
+
 (class_definition
   name: (identifier) @name
   !superclasses) @definition.class
 
 (class_definition
   name: (identifier) @name
-  superclasses: (argument_list) @_bases
-  (#not-match? @_bases "(^\\(|,)(\\s|#.*\\n)*(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)(\\s|#.*\\n)*(,|\\)$)")) @definition.class
-
-(class_definition
-  name: (identifier) @name
-  superclasses: (argument_list) @_bases
-  (#match? @_bases "(^\\(|,)(\\s|#.*\\n)*(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)(\\s|#.*\\n)*(,|\\)$)")) @definition.enum
+  superclasses: (argument_list
+    [(identifier) @_base (attribute) @_base _]*)
+  (#not-match? @_base "^(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$")) @definition.class
 
 (class_definition
   body: (block
@@ -56,17 +63,19 @@
       ]) @definition.variable))
 
 (class_definition
-  superclasses: (argument_list) @_bases
+  superclasses: (argument_list
+    [(identifier) @_base (attribute) @_base _]*)
   body: (block
     (assignment
       left: [
         (identifier) @name
         (pattern_list (identifier) @name)
       ]) @definition.variable)
-  (#not-match? @_bases "(^\\(|,)(\\s|#.*\\n)*(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)(\\s|#.*\\n)*(,|\\)$)"))
+  (#not-match? @_base "^(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$"))
 
 (class_definition
-  superclasses: (argument_list) @_bases
+  superclasses: (argument_list
+    [(identifier) (attribute)] @_base)
   body: (block
     (assignment
       left: [
@@ -74,15 +83,16 @@
         (pattern_list (identifier) @name)
       ]
       right: (_)) @definition.enum_member)
-  (#match? @_bases "(^\\(|,)(\\s|#.*\\n)*(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)(\\s|#.*\\n)*(,|\\)$)"))
+  (#match? @_base "^(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$"))
 
 (class_definition
-  superclasses: (argument_list) @_bases
+  superclasses: (argument_list
+    [(identifier) (attribute)] @_base)
   body: (block
     (assignment
       left: (identifier) @name
       !right) @definition.variable)
-  (#match? @_bases "(^\\(|,)(\\s|#.*\\n)*(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)(\\s|#.*\\n)*(,|\\)$)"))
+  (#match? @_base "^(enum\\s*\\.\\s*)?(Enum|IntEnum|StrEnum|Flag|IntFlag|ReprEnum)$"))
 
 ; The assignments a chained assignment holds after its first, `b` in
 ; `a = b = 1`, are variables wherever it is.

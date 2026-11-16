@@ -22,8 +22,16 @@
 (function_declaration
   name: (identifier) @name) @definition.function
 
+; `#not-eq?` keeps `constructor` off `@definition.method`, since a method
+; outranks a constructor over the same range, and `#eq?` defines a
+; `constructor` method as `@definition.constructor` on its own.
 (method_definition
-  name: (property_identifier) @name) @definition.method
+  name: (property_identifier) @name
+  (#not-eq? @name "constructor")) @definition.method
+
+(method_definition
+  name: (property_identifier) @name
+  (#eq? @name "constructor")) @definition.constructor
 
 (function_expression
   name: (identifier) @name) @definition.function

@@ -1,0 +1,16 @@
+class Box
+variable Box.item
+class Built
+variable Built.value
+enum Colour
+enum_member Colour.RED
+enum Access
+enum_member Access.READ
+variable Access.label
+class Multi
+variable Multi.count
+enum Status
+enum_member Status.PENDING
+method Status.is_ready
+function Status.is_ready
+parameter Status.is_ready.self

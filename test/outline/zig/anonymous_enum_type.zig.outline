@@ -1,0 +1,9 @@
+variable state
+variable foreign
+enum Mode
+enum_member Mode.read
+enum_member Mode.write
+enum State
+enum_member State.idle
+enum_member State.running
+function State.isRunning
